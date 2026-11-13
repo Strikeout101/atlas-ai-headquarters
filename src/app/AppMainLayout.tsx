@@ -1,4 +1,16 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Bot,
+  Building,
+  FileText,
+  ListChecks,
+  Megaphone,
+  MessageSquare,
+  Moon,
+  Signpost,
+  SquareTerminal,
+  Wrench,
+} from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import OfficeView from "../components/OfficeView";
 import ReferenceOfficeView from "../components/ReferenceOfficeView";
@@ -7,7 +19,11 @@ import TaskBoard from "../components/TaskBoard";
 import AgentManager from "../components/AgentManager";
 import SkillsLibrary from "../components/SkillsLibrary";
 import SettingsPanel from "../components/SettingsPanel";
-import { I18nProvider } from "../i18n";
+import { I18nProvider, localeName, pickLang } from "../i18n";
+import CommandPalette, { type CommandItem } from "../components/command/CommandPalette";
+import TodayView from "../components/today/TodayView";
+import type { DecisionInboxItem } from "../components/chat/decision-inbox";
+import { NAV_ITEMS } from "./routes";
 import type {
   Agent,
   CeoOfficeCall,
@@ -106,6 +122,8 @@ interface AppMainLayoutProps {
   toggleTheme: () => void;
   decisionInboxLoading: boolean;
   decisionInboxCount: number;
+  decisionInboxItems?: DecisionInboxItem[];
+  onOpenChat?: (agent: Agent) => void;
   activeMeetingTaskId: string | null;
   unreadAgentIds: Set<string>;
   crossDeptDeliveries: CrossDeptDelivery[];
@@ -177,6 +195,8 @@ export default function AppMainLayout({
   toggleTheme,
   decisionInboxLoading,
   decisionInboxCount,
+  decisionInboxItems = [],
+  onOpenChat,
   activeMeetingTaskId,
   unreadAgentIds,
   crossDeptDeliveries,
@@ -381,6 +401,149 @@ export default function AppMainLayout({
     [onCreateTask, officePackKey],
   );
 
+  const [commandBarOpen, setCommandBarOpen] = useState(false);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandBarOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const reviewCount = useMemo(() => tasks.filter((task) => task.status === "review").length, [tasks]);
+  const needsYouCount = decisionInboxCount + reviewCount;
+  const tr = useCallback(
+    (text: { ko: string; en: string; ja: string; zh: string }) => pickLang(uiLanguage, text),
+    [uiLanguage],
+  );
+
+  const commands = useMemo<CommandItem[]>(() => {
+    const items: CommandItem[] = NAV_ITEMS.map(({ view: target, icon: Icon, label, keywords }) => ({
+      id: `nav:${target}`,
+      group: "navigate" as const,
+      label: tr(label),
+      icon: <Icon size={15} strokeWidth={1.75} />,
+      keywords: `${keywords} ${label.en}`,
+      run: () => handleViewChange(target),
+    }));
+    const action = (id: string, label: string, icon: ReactNode, run: () => void, keywords = "") =>
+      items.push({ id: `action:${id}`, group: "actions", label, icon, run, keywords });
+    action(
+      "decisions",
+      labels.decisionLabel,
+      <Signpost size={15} strokeWidth={1.75} />,
+      onOpenDecisionInbox,
+      "decision inbox approve needs you",
+    );
+    action(
+      "announcement",
+      labels.announcementLabel,
+      <Megaphone size={15} strokeWidth={1.75} />,
+      onOpenAnnouncement,
+      "directive announce message broadcast",
+    );
+    action(
+      "agent-status",
+      labels.agentStatusLabel,
+      <Wrench size={15} strokeWidth={1.75} />,
+      onOpenAgentStatus,
+      "agent status cli",
+    );
+    action(
+      "reports",
+      labels.reportLabel,
+      <FileText size={15} strokeWidth={1.75} />,
+      onOpenReportHistory,
+      "reports history",
+    );
+    action(
+      "room-manager",
+      labels.roomManagerLabel,
+      <Building size={15} strokeWidth={1.75} />,
+      onOpenRoomManager,
+      "office rooms themes",
+    );
+    action(
+      "new-task",
+      tr({ ko: "새 업무 만들기", en: "New task", ja: "新しいタスク", zh: "新建任务" }),
+      <ListChecks size={15} strokeWidth={1.75} />,
+      () => handleViewChange("tasks"),
+      "create add task work",
+    );
+    action(
+      "theme",
+      theme === "dark"
+        ? tr({ ko: "라이트 모드로 전환", en: "Switch to light mode", ja: "ライトモードに切替", zh: "切换到浅色模式" })
+        : tr({ ko: "다크 모드로 전환", en: "Switch to dark mode", ja: "ダークモードに切替", zh: "切换到深色模式" }),
+      <Moon size={15} strokeWidth={1.75} />,
+      toggleTheme,
+      "theme dark light appearance",
+    );
+
+    for (const agent of agents) {
+      const name = localeName(uiLanguage, agent);
+      const dept = agent.department ? localeName(uiLanguage, agent.department) : "";
+      items.push({
+        id: `agent:${agent.id}`,
+        group: "agents",
+        label: name,
+        hint: dept,
+        icon: <Bot size={15} strokeWidth={1.75} />,
+        keywords: `${agent.name} ${agent.role} profile`,
+        run: () => onSelectAgent(agent),
+      });
+      if (onOpenChat) {
+        items.push({
+          id: `chat:${agent.id}`,
+          group: "agents",
+          label: tr({ ko: `${name}와 대화`, en: `Chat with ${name}`, ja: `${name} とチャット`, zh: `与 ${name} 聊天` }),
+          hint: dept,
+          icon: <MessageSquare size={15} strokeWidth={1.75} />,
+          keywords: `${agent.name} message talk`,
+          run: () => onOpenChat(agent),
+        });
+      }
+    }
+
+    const recentTasks = [...tasks].sort((a, b) => b.updated_at - a.updated_at).slice(0, 200);
+    for (const task of recentTasks) {
+      items.push({
+        id: `task:${task.id}`,
+        group: "tasks",
+        label: task.title,
+        hint: task.status.replace(/_/g, " "),
+        icon: <SquareTerminal size={15} strokeWidth={1.75} />,
+        keywords: `${task.agent_name ?? ""} ${task.status} log terminal`,
+        run: () => onOpenTerminal(task.id),
+      });
+    }
+    return items;
+  }, [
+    agents,
+    handleViewChange,
+    labels.agentStatusLabel,
+    labels.announcementLabel,
+    labels.decisionLabel,
+    labels.reportLabel,
+    labels.roomManagerLabel,
+    onOpenAgentStatus,
+    onOpenAnnouncement,
+    onOpenChat,
+    onOpenDecisionInbox,
+    onOpenReportHistory,
+    onOpenRoomManager,
+    onOpenTerminal,
+    onSelectAgent,
+    tasks,
+    theme,
+    toggleTheme,
+    tr,
+    uiLanguage,
+  ]);
+
   return (
     <I18nProvider language={labels.uiLanguage}>
       <div className="app-shell flex h-[100dvh] min-h-[100dvh] overflow-hidden">
@@ -392,6 +555,8 @@ export default function AppMainLayout({
             agents={officePresentation.agents}
             settings={settings}
             connected={connected}
+            needsYouCount={needsYouCount}
+            onOpenCommandBar={() => setCommandBarOpen(true)}
           />
         </div>
 
@@ -417,6 +582,11 @@ export default function AppMainLayout({
             agents={officePresentation.agents}
             settings={settings}
             connected={connected}
+            needsYouCount={needsYouCount}
+            onOpenCommandBar={() => {
+              setMobileNavOpen(false);
+              setCommandBarOpen(true);
+            }}
           />
         </div>
 
@@ -455,6 +625,9 @@ export default function AppMainLayout({
             onToggleTheme={toggleTheme}
             onToggleMobileHeaderMenu={() => setMobileHeaderMenuOpen(!mobileHeaderMenuOpen)}
             onCloseMobileHeaderMenu={() => setMobileHeaderMenuOpen(false)}
+            onOpenCommandBar={() => setCommandBarOpen(true)}
+            commandBarLabel={tr({ ko: "검색 및 이동", en: "Search and jump", ja: "検索・移動", zh: "搜索与跳转" })}
+            moreLabel={tr({ ko: "더보기", en: "More", ja: "その他", zh: "更多" })}
           />
 
           {executiveDesktopOpen && view !== "office" && (
@@ -650,14 +823,24 @@ export default function AppMainLayout({
             )}
 
             {view === "dashboard" && (
-              <Dashboard
-                stats={stats}
+              <TodayView
                 agents={agents}
                 tasks={tasks}
-                departments={departments}
-                companyName={settings.companyName}
-                onPrimaryCtaClick={() => setView("tasks")}
-              />
+                decisionItems={decisionInboxItems}
+                decisionInboxLoading={decisionInboxLoading}
+                onOpenDecisionInbox={onOpenDecisionInbox}
+                onOpenTerminal={onOpenTerminal}
+                onOpenWork={() => setView("tasks")}
+              >
+                <Dashboard
+                  stats={stats}
+                  agents={agents}
+                  tasks={tasks}
+                  departments={departments}
+                  companyName={settings.companyName}
+                  onPrimaryCtaClick={() => setView("tasks")}
+                />
+              </TodayView>
             )}
 
             {view === "tasks" && (
@@ -723,6 +906,7 @@ export default function AppMainLayout({
         </main>
 
         {children}
+        <CommandPalette open={commandBarOpen} onClose={() => setCommandBarOpen(false)} commands={commands} />
       </div>
     </I18nProvider>
   );

@@ -3,6 +3,7 @@ import type * as api from "../api";
 import { normalizeLanguage, pickLang } from "../i18n";
 import type { CompanySettings, Department } from "../types";
 import type { RuntimeOs, View } from "./types";
+import { NAV_ITEMS } from "./routes";
 
 interface UseAppLabelsParams {
   view: View;
@@ -38,54 +39,8 @@ export function useAppLabels({
     ja: "AIエージェント帝国を準備しています",
     zh: "正在准备你的 AI 代理帝国",
   });
-  const viewTitle = (() => {
-    switch (view) {
-      case "office":
-        return `${pickLang(uiLanguage, {
-          ko: "오피스",
-          en: "Office",
-          ja: "オフィス",
-          zh: "办公室",
-        })}`;
-      case "dashboard":
-        return `${pickLang(uiLanguage, {
-          ko: "대시보드",
-          en: "Dashboard",
-          ja: "ダッシュボード",
-          zh: "仪表盘",
-        })}`;
-      case "tasks":
-        return `${pickLang(uiLanguage, {
-          ko: "업무 관리",
-          en: "Tasks",
-          ja: "タスク管理",
-          zh: "任务管理",
-        })}`;
-      case "agents":
-        return `${pickLang(uiLanguage, {
-          ko: "직원관리",
-          en: "Agents",
-          ja: "社員管理",
-          zh: "员工管理",
-        })}`;
-      case "skills":
-        return `${pickLang(uiLanguage, {
-          ko: "문서고",
-          en: "Skills",
-          ja: "スキル資料室",
-          zh: "技能库",
-        })}`;
-      case "settings":
-        return `${pickLang(uiLanguage, {
-          ko: "설정",
-          en: "Settings",
-          ja: "設定",
-          zh: "设置",
-        })}`;
-      default:
-        return "";
-    }
-  })();
+  const navItem = NAV_ITEMS.find((item) => item.view === view);
+  const viewTitle = navItem ? pickLang(uiLanguage, navItem.label) : "";
   const announcementLabel = `${pickLang(uiLanguage, {
     ko: "전사 공지",
     en: "Announcement",
@@ -135,10 +90,10 @@ export function useAppLabels({
     zh: "任务",
   });
   const agentStatusLabel = pickLang(uiLanguage, {
-    ko: "에이전트",
-    en: "Agents",
-    ja: "エージェント",
-    zh: "代理",
+    ko: "에이전트 상태",
+    en: "Agent status",
+    ja: "エージェント状況",
+    zh: "代理状态",
   });
   const decisionLabel = pickLang(uiLanguage, {
     ko: "의사결정",

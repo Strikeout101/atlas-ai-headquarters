@@ -294,25 +294,30 @@ export function useAppActions({
     [setChatAgent, setShowChat, setUnreadAgentIds, setMessages],
   );
 
-  const loadDecisionInbox = useCallback(async () => {
-    setDecisionInboxLoading(true);
-    try {
-      const [allMessages, workflowDecisionItems] = await Promise.all([
-        api.getMessages({ limit: 500 }),
-        api.getDecisionInbox(),
-      ]);
-      const agentDecisionItems = buildDecisionInboxItems(allMessages, agents);
-      const workflowItems = mapWorkflowDecisionItemsLocalized(workflowDecisionItems, settings.language);
-      const merged = [...workflowItems, ...agentDecisionItems];
-      const deduped = new Map<string, DecisionInboxItem>();
-      for (const item of merged) deduped.set(item.id, item);
-      setDecisionInboxItems(Array.from(deduped.values()).sort((a, b) => b.createdAt - a.createdAt));
-    } catch (error) {
-      console.error("Load decision inbox failed:", error);
-    } finally {
-      setDecisionInboxLoading(false);
-    }
-  }, [agents, settings.language, setDecisionInboxLoading, setDecisionInboxItems]);
+  /** silent: refresh in the background without the loading spinner (used for the live badge). */
+  const loadDecisionInbox = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent === true;
+      if (!silent) setDecisionInboxLoading(true);
+      try {
+        const [allMessages, workflowDecisionItems] = await Promise.all([
+          api.getMessages({ limit: 500 }),
+          api.getDecisionInbox(),
+        ]);
+        const agentDecisionItems = buildDecisionInboxItems(allMessages, agents);
+        const workflowItems = mapWorkflowDecisionItemsLocalized(workflowDecisionItems, settings.language);
+        const merged = [...workflowItems, ...agentDecisionItems];
+        const deduped = new Map<string, DecisionInboxItem>();
+        for (const item of merged) deduped.set(item.id, item);
+        setDecisionInboxItems(Array.from(deduped.values()).sort((a, b) => b.createdAt - a.createdAt));
+      } catch (error) {
+        if (!silent) console.error("Load decision inbox failed:", error);
+      } finally {
+        if (!silent) setDecisionInboxLoading(false);
+      }
+    },
+    [agents, settings.language, setDecisionInboxLoading, setDecisionInboxItems],
+  );
 
   const handleOpenDecisionInbox = useCallback(() => {
     setShowDecisionInbox(true);

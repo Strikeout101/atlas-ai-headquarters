@@ -1,31 +1,9 @@
 import { useState } from "react";
-import {
-  BookOpen,
-  Bot,
-  Briefcase,
-  Building2,
-  Clapperboard,
-  LayoutDashboard,
-  ListChecks,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Server,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import type { Department, Agent, CompanySettings } from "../types";
 import { useI18n, localeName } from "../i18n";
-
-type View =
-  | "office"
-  | "agents"
-  | "dashboard"
-  | "tasks"
-  | "business"
-  | "homelab"
-  | "model_director"
-  | "skills"
-  | "settings";
+import type { View } from "../app/types";
+import { NAV_ITEMS, NAV_SECTION_LABELS, type NavItem } from "../app/routes";
 
 interface SidebarProps {
   currentView: View;
@@ -34,19 +12,10 @@ interface SidebarProps {
   agents: Agent[];
   settings: CompanySettings;
   connected: boolean;
+  /** Items waiting on the owner; shown as a badge on Today. */
+  needsYouCount?: number;
+  onOpenCommandBar?: () => void;
 }
-
-const NAV_ITEMS: { view: View; icon: LucideIcon }[] = [
-  { view: "office", icon: Building2 },
-  { view: "agents", icon: Bot },
-  { view: "skills", icon: BookOpen },
-  { view: "dashboard", icon: LayoutDashboard },
-  { view: "tasks", icon: ListChecks },
-  { view: "business", icon: Briefcase },
-  { view: "homelab", icon: Server },
-  { view: "model_director", icon: Clapperboard },
-  { view: "settings", icon: Settings },
-];
 
 function monogram(name: string): string {
   const letters = name
@@ -57,7 +26,16 @@ function monogram(name: string): string {
   return (letters || name.slice(0, 1) || "A").slice(0, 2).toUpperCase();
 }
 
-export default function Sidebar({ currentView, onChangeView, departments, agents, settings, connected }: SidebarProps) {
+export default function Sidebar({
+  currentView,
+  onChangeView,
+  departments,
+  agents,
+  settings,
+  connected,
+  needsYouCount = 0,
+  onOpenCommandBar,
+}: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { t, locale } = useI18n();
   const workingCount = agents.filter((a) => a.status === "working").length;
@@ -65,29 +43,62 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
 
   const tr = (ko: string, en: string, ja = en, zh = en) => t({ ko, en, ja, zh });
 
-  const navLabels: Record<View, string> = {
-    office: tr("오피스", "Office", "オフィス", "办公室"),
-    agents: tr("직원관리", "Agents", "社員管理", "员工管理"),
-    skills: tr("문서고", "Library", "ライブラリ", "文档库"),
-    dashboard: tr("대시보드", "Dashboard", "ダッシュボード", "仪表盘"),
-    tasks: tr("업무 관리", "Tasks", "タスク管理", "任务管理"),
-    business: tr("비즈니스", "Business", "ビジネス", "业务"),
-    homelab: tr("홈랩", "Homelab", "ホームラボ", "家庭实验室"),
-    model_director: tr("모델 디렉터", "Model Director", "モデルディレクター", "模型主管"),
-    settings: tr("설정", "Settings", "設定", "设置"),
+  const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+
+  const renderItem = ({ view, icon: Icon, label }: NavItem) => {
+    const text = t(label);
+    const badge = view === "dashboard" && needsYouCount > 0 ? needsYouCount : 0;
+    return (
+      <button
+        key={view}
+        type="button"
+        onClick={() => onChangeView(view)}
+        className={`sidebar-nav-item ${currentView === view ? "active" : ""} ${collapsed ? "justify-center !px-0" : ""}`}
+        aria-current={currentView === view ? "page" : undefined}
+        title={collapsed ? text : undefined}
+      >
+        <span className="relative flex">
+          <Icon size={16} strokeWidth={1.75} />
+          {collapsed && badge > 0 && (
+            <span
+              className="absolute -right-1 -top-1 h-2 w-2 rounded-full"
+              style={{ background: "var(--ax-signal)" }}
+              aria-hidden
+            />
+          )}
+        </span>
+        {!collapsed && <span className="flex-1 truncate text-left">{text}</span>}
+        {!collapsed && badge > 0 && (
+          <span
+            className="min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums leading-5"
+            style={{ background: "var(--ax-signal)", color: "var(--ax-signal-ink)" }}
+            aria-label={tr(`${badge}건 대기`, `${badge} waiting`, `${badge} 件待ち`, `${badge} 项待处理`)}
+          >
+            {badge}
+          </span>
+        )}
+      </button>
+    );
   };
 
-  const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const sectionHeading = (key: keyof typeof NAV_SECTION_LABELS) =>
+    collapsed ? (
+      <div className="mx-2 my-2 h-px" style={{ background: "var(--th-border)" }} aria-hidden />
+    ) : (
+      <div className="mb-1 mt-4 px-2.5 text-[11px] font-medium" style={{ color: "var(--th-text-muted)" }}>
+        {t(NAV_SECTION_LABELS[key])}
+      </div>
+    );
 
   return (
     <aside
-      className={`flex h-full flex-col transition-[width] duration-200 ${collapsed ? "w-[60px]" : "w-56"}`}
+      className={`flex h-full flex-col transition-[width] duration-200 ${collapsed ? "w-[60px]" : "w-60"}`}
       style={{ background: "var(--th-bg-sidebar)", borderRight: "1px solid var(--th-border)" }}
     >
       <div className={`flex h-14 items-center gap-2.5 ${collapsed ? "justify-center px-2" : "px-3"}`}>
         <div
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] text-[13px] font-semibold"
-          style={{ background: "var(--th-text-heading)", color: "var(--th-bg-primary)" }}
+          style={{ background: "var(--ax-signal)", color: "var(--ax-signal-ink)" }}
           aria-hidden
         >
           {monogram(settings.companyName)}
@@ -114,7 +125,7 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
         )}
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pt-1">
+      <nav className="flex-1 overflow-y-auto px-2 pb-2 pt-1" aria-label={tr("주 메뉴", "Main")}>
         {collapsed && (
           <button
             type="button"
@@ -125,23 +136,46 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
             <CollapseIcon size={16} strokeWidth={1.75} />
           </button>
         )}
-        {NAV_ITEMS.map(({ view, icon: Icon }) => (
+        {onOpenCommandBar && (
           <button
-            key={view}
             type="button"
-            onClick={() => onChangeView(view)}
-            className={`sidebar-nav-item ${currentView === view ? "active" : ""} ${collapsed ? "justify-center !px-0" : ""}`}
-            aria-current={currentView === view ? "page" : undefined}
-            title={collapsed ? navLabels[view] : undefined}
+            onClick={onOpenCommandBar}
+            className={`sidebar-nav-item mb-2 ${collapsed ? "justify-center !px-0" : ""}`}
+            style={{ boxShadow: "inset 0 0 0 1px var(--th-border)" }}
+            title={collapsed ? tr("검색 및 이동", "Search and jump") : undefined}
+            aria-keyshortcuts="Control+K Meta+K"
           >
-            <Icon size={16} strokeWidth={1.75} />
-            {!collapsed && <span className="truncate">{navLabels[view]}</span>}
+            <Search size={15} strokeWidth={1.75} />
+            {!collapsed && (
+              <>
+                <span className="flex-1 truncate text-left" style={{ color: "var(--th-text-muted)" }}>
+                  {tr("검색 및 이동", "Search and jump", "検索・移動", "搜索与跳转")}
+                </span>
+                <kbd
+                  className="rounded px-1.5 font-mono text-[10.5px]"
+                  style={{ border: "1px solid var(--th-border)", color: "var(--th-text-muted)" }}
+                >
+                  Ctrl K
+                </kbd>
+              </>
+            )}
           </button>
-        ))}
+        )}
+
+        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "primary").map(renderItem)}</div>
+        {sectionHeading("workspaces")}
+        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "workspaces").map(renderItem)}</div>
+        {sectionHeading("team")}
+        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "team").map(renderItem)}</div>
+        <div className="mx-2 my-3 h-px" style={{ background: "var(--th-border)" }} aria-hidden />
+        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "system").map(renderItem)}</div>
       </nav>
 
       {!collapsed && departments.length > 0 && (
-        <div className="px-2 pb-2 pt-3" style={{ borderTop: "1px solid var(--th-border)" }}>
+        <div
+          className="max-h-[30vh] overflow-y-auto px-2 pb-2 pt-3"
+          style={{ borderTop: "1px solid var(--th-border)" }}
+        >
           <div className="mb-1 px-2 text-[11px] font-medium" style={{ color: "var(--th-text-muted)" }}>
             {tr("부서", "Departments", "部門", "部门")}
           </div>

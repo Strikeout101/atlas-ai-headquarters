@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import type { DecisionInboxItem } from "./components/chat/decision-inbox";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type {
@@ -39,6 +39,7 @@ import { useAppActions } from "./app/useAppActions";
 import { useActiveMeetingTaskId } from "./app/useActiveMeetingTaskId";
 import { useUpdateStatusPolling } from "./app/useUpdateStatusPolling";
 import { useAppViewEffects } from "./app/useAppViewEffects";
+import { useViewRoute } from "./app/routes";
 import { useAppBootstrapData } from "./app/useAppBootstrapData";
 import { useLiveSyncScheduler } from "./app/useLiveSyncScheduler";
 import { resolvePackAgentViews, resolvePackDepartmentsForDisplay } from "./app/office-pack-display";
@@ -57,7 +58,7 @@ export default function App() {
   const initialRoomThemes = useMemo(() => readStoredRoomThemes(), []);
   const hasLocalRoomThemesRef = useRef<boolean>(initialRoomThemes.hasStored);
 
-  const [view, setView] = useState<View>("office");
+  const [view, setView] = useViewRoute();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -108,7 +109,7 @@ export default function App() {
     content: string;
   } | null>(null);
 
-  const viewRef = useRef<View>("office");
+  const viewRef = useRef<View>(view);
   viewRef.current = view;
   const agentsRef = useRef<Agent[]>(agents);
   agentsRef.current = agents;
@@ -350,6 +351,26 @@ export default function App() {
 
   const activeMeetingTaskId = useActiveMeetingTaskId(meetingPresence);
 
+  // Keep the decision count current (sidebar badge, Today) without waiting for the inbox to be opened.
+  const loadDecisionInboxRef = useRef(actions.loadDecisionInbox);
+  loadDecisionInboxRef.current = actions.loadDecisionInbox;
+  useEffect(() => {
+    if (loading) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadDecisionInboxRef.current({ silent: true });
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loading]);
+  useEffect(() => {
+    if (view === "dashboard" && !loading) void loadDecisionInboxRef.current({ silent: true });
+  }, [view, loading]);
+
   const labels = useAppLabels({
     view,
     settings,
@@ -413,6 +434,8 @@ export default function App() {
       toggleTheme={toggleTheme}
       decisionInboxLoading={decisionInboxLoading}
       decisionInboxCount={decisionInboxItems.length}
+      decisionInboxItems={decisionInboxItems}
+      onOpenChat={actions.handleOpenChat}
       activeMeetingTaskId={activeMeetingTaskId}
       unreadAgentIds={unreadAgentIds}
       crossDeptDeliveries={crossDeptDeliveries}
