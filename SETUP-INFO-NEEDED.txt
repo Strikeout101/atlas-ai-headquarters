@@ -1,0 +1,86 @@
+CLAW-EMPIRE SETUP INFORMATION
+Updated: 2026-11-11
+
+Fill in what you know. Leave unknown items blank. Do not put passwords, API keys,
+private SSH keys, recovery codes, or customer private data in this file. We will
+connect accounts and credentials through the app or a local credential store.
+
+1. BUSINESS IDENTITY AND BOUNDARIES
+
+Tech business name:
+Party rental business name:
+Websites and public social profile URLs for each:
+Service areas and business hours:
+Who may approve outbound messages or public posts:
+Should agents draft only, or may they send/publish after approval?
+Any topics, promises, discounts, or customer groups agents must avoid:
+Confirm: no payments, deposits, refunds, or other money handling for now [yes/no]:
+
+2. TECH BUSINESS WORKFLOW
+
+Current customer/lead system (app, spreadsheet, paper, or none):
+Current email provider and mailbox addresses to connect:
+Current calendar/scheduling app:
+Current ticket or job-tracking system:
+Where device history, estimates, invoices, and purchase records live:
+Types of service offered and typical service stages:
+Preferred quote/estimate format and approval process:
+Customer follow-up cadence and handoff rules:
+
+3. PARTY RENTAL WORKFLOW
+
+Current quote format or example (redacted):
+Rental items/services and prices or pricing rules (no payment credentials):
+How you currently track check-out and check-in:
+Which check-out/check-in messages you want drafted or sent:
+Any timing rules (before pickup, after return, etc.):
+Where customer/event contact details live:
+Confirm other rental operations remain manual for now [yes/no]:
+
+4. OUTREACH, PROMOTIONS, SOCIAL, AND EMAIL
+
+Email provider(s) and mailbox(es) for each business:
+Social platforms and public account/profile URLs:
+Existing marketing tools, CRM, or mailing list:
+Target audiences and service area for each business:
+Existing brand voice, logos, photos, offers, and examples of good posts:
+Promotion limits and who approves deals:
+May agents research prospects? Which sources are acceptable?
+May agents draft replies to inbound email? May they send after approval?
+May agents draft outreach to new contacts? May they send after approval?
+Posting frequency and review/approval preference:
+Any opt-out or do-not-contact list location:
+
+5. HOMELAB SSH ACCESS
+
+Host inventory: name, IP/DNS, OS, and purpose for each host:
+How the Claw-Empire PC reaches the hosts (LAN, Tailscale, VPN, jump host):
+SSH port and login username for each host:
+Authentication method and location of an existing SSH key (path only):
+Whether a dedicated agent login should be created on each host:
+Whether that login needs sudo, and on which hosts:
+Known host keys/fingerprints, if available (public information):
+Hosts or commands that should always require your approval:
+Where backups and change logs should be stored:
+
+6. MODEL DIRECTOR AND WORKERS
+
+Director preference: Codex, Claude, or both with a primary/fallback:
+Providers and subscriptions/accounts you want used:
+Ollama/other local model hosts, endpoints, and installed model IDs:
+Main PC, homelab, and laptop/Precision hardware and availability:
+Monthly usage budget or limits by provider (if any):
+Tasks that should always use a stronger model:
+Should routine model upgrades be director-approved automatically, or sent to you?
+
+7. EXISTING DATA AND CONNECTION ORDER
+
+Which system should be the source of truth for customers, jobs, and quotes?
+Links/paths to redacted sample quotes, ticket records, and email templates:
+The first email account, social account, and SSH host to connect:
+Anything else the agents must know about your businesses or homelab:
+
+Implementation can proceed without these answers: task-level model routing,
+upgrade-request workflow, local business records/draft queues, and SSH target
+configuration. Live account connections, real outreach, and SSH execution
+require the relevant answers above.
