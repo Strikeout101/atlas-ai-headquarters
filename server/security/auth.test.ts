@@ -16,6 +16,7 @@ import {
   incomingMessageCookieToken,
   installSecurityMiddleware,
   isAuthenticated,
+  isDirectLocalRequest,
   isIncomingMessageAuthenticated,
   isIncomingMessageOriginTrusted,
   isLoopbackAddress,
@@ -29,6 +30,7 @@ import {
   shouldRequireCsrf,
   shouldUseSecureCookie,
 } from "./auth.ts";
+import { createSessionToken, revokeAllSessions, verifySessionToken } from "./login-sessions.ts";
 
 function mockRequest(headers: Record<string, string | undefined>): Request {
   return {
@@ -63,11 +65,17 @@ describe("auth helpers", () => {
     expect(bearerToken(reqWithBearer)).toBe(SESSION_AUTH_TOKEN);
     expect(isAuthenticated(reqWithBearer)).toBe(true);
 
-    const reqWithCookie = mockRequest({
+    // The master API token is not a browser session: cookies carry signed session tokens instead.
+    const reqWithTokenCookie = mockRequest({
       cookie: `${SESSION_COOKIE_NAME}=${encodeURIComponent(SESSION_AUTH_TOKEN)}; foo=bar`,
     });
-    expect(cookieToken(reqWithCookie)).toBe(SESSION_AUTH_TOKEN);
-    expect(isAuthenticated(reqWithCookie)).toBe(true);
+    expect(cookieToken(reqWithTokenCookie)).toBe(SESSION_AUTH_TOKEN);
+    expect(isAuthenticated(reqWithTokenCookie)).toBe(false);
+
+    const passwordSession = createSessionToken("password");
+    const reqWithSession = mockRequest({ cookie: `${SESSION_COOKIE_NAME}=${encodeURIComponent(passwordSession)}` });
+    expect(isAuthenticated(reqWithSession)).toBe(true);
+    expect(isAuthenticated(mockRequest({ cookie: `${SESSION_COOKIE_NAME}=${passwordSession}x` }))).toBe(false);
 
     const parsed = parseCookies("a=1; b=hello%20world; c=%E3%81%82");
     expect(parsed).toMatchObject({
@@ -102,25 +110,46 @@ describe("auth helpers", () => {
     expect(shouldUseSecureCookie(secureReq)).toBe(true);
   });
 
-  it("session cookie 발급 시 append를 호출하고 중복 발급은 방지한다", () => {
+  it("issues signed session cookies that never contain the API token", () => {
     const append = vi.fn();
     const res = { append } as unknown as Response;
 
-    const reqNoCookie = mockRequest({
-      cookie: undefined,
-    });
-    issueSessionCookie(reqNoCookie, res);
+    issueSessionCookie(mockRequest({ cookie: undefined }), res, "local");
     expect(append).toHaveBeenCalledTimes(1);
-    const firstCookie = String(append.mock.calls[0]?.[1] ?? "");
-    expect(firstCookie).toContain(`${SESSION_COOKIE_NAME}=`);
-    expect(firstCookie).toContain("HttpOnly");
+    const cookie = String(append.mock.calls[0]?.[1] ?? "");
+    expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Max-Age=");
+    expect(cookie).not.toContain(SESSION_AUTH_TOKEN);
+    const value = decodeURIComponent(cookie.split(";")[0].split("=").slice(1).join("="));
+    expect(verifySessionToken(value)?.kind).toBe("local");
+  });
 
-    append.mockClear();
-    const reqWithCookie = mockRequest({
-      cookie: `${SESSION_COOKIE_NAME}=${encodeURIComponent(SESSION_AUTH_TOKEN)}`,
+  it("re-checks automatic sessions on every request", () => {
+    const local = encodeURIComponent(createSessionToken("local"));
+    const onServer = mockRequest({ host: "127.0.0.1:8790", cookie: `${SESSION_COOKIE_NAME}=${local}` });
+    expect(isAuthenticated(onServer)).toBe(true);
+    const relayed = mockRequest({
+      host: "claw.example.com",
+      "x-forwarded-for": "203.0.113.9",
+      cookie: `${SESSION_COOKIE_NAME}=${local}`,
     });
-    issueSessionCookie(reqWithCookie, res);
-    expect(append).not.toHaveBeenCalled();
+    expect(isAuthenticated(relayed)).toBe(false);
+
+    // No TRUSTED_NETWORKS configured in this test file, so a network session is never accepted.
+    const network = encodeURIComponent(createSessionToken("network"));
+    expect(isAuthenticated(mockRequest({ host: "127.0.0.1:8790", cookie: `${SESSION_COOKIE_NAME}=${network}` }))).toBe(
+      false,
+    );
+  });
+
+  it("signs out every browser when sessions are revoked", () => {
+    const token = createSessionToken("password");
+    expect(verifySessionToken(token)).not.toBeNull();
+    revokeAllSessions();
+    expect(verifySessionToken(token)).toBeNull();
+    expect(verifySessionToken(createSessionToken("password"))).not.toBeNull();
   });
 
   it("IncomingMessage 인증/원본 판별이 동작한다", () => {
@@ -170,7 +199,66 @@ describe("auth helpers", () => {
   });
 });
 
+describe("isDirectLocalRequest", () => {
+  const local = (headers: Record<string, string | undefined>, remoteAddress = "127.0.0.1") =>
+    isDirectLocalRequest({
+      socket: { remoteAddress },
+      header: (name: string) => headers[name.toLowerCase()],
+    });
+
+  it("accepts direct same-machine requests", () => {
+    expect(local({ host: "127.0.0.1:8790" })).toBe(true);
+    expect(local({ host: "localhost:8800" })).toBe(true);
+    expect(local({ host: "[::1]:8790" }, "::1")).toBe(true);
+    expect(local({ host: "127.0.0.1:8790", "x-forwarded-for": "127.0.0.1" })).toBe(true);
+  });
+
+  it("rejects remote sockets and non-loopback Host headers", () => {
+    expect(local({ host: "127.0.0.1:8790" }, "10.0.0.5")).toBe(false);
+    expect(local({})).toBe(false);
+    expect(local({ host: "claw.example.com" })).toBe(false);
+    expect(local({ host: "atlas.tailnet-abc.ts.net" })).toBe(false);
+    expect(local({ host: "192.168.1.20:8800" })).toBe(false);
+  });
+
+  it("rejects requests a same-host proxy relays for a remote client", () => {
+    expect(local({ host: "localhost", "x-forwarded-for": "203.0.113.9" })).toBe(false);
+    expect(local({ host: "localhost", "x-forwarded-for": "127.0.0.1, 203.0.113.9" })).toBe(false);
+    expect(local({ host: "localhost", "x-real-ip": "203.0.113.9" })).toBe(false);
+    expect(local({ host: "localhost", "cf-connecting-ip": "2001:db8::1" })).toBe(false);
+    expect(local({ host: "localhost", "x-forwarded-host": "claw.example.com" })).toBe(false);
+    expect(local({ host: "localhost", forwarded: "for=203.0.113.9;proto=https" })).toBe(false);
+    expect(local({ host: "localhost", forwarded: 'for="[2001:db8::1]:443"' })).toBe(false);
+    expect(local({ host: "localhost", forwarded: "for=127.0.0.1;host=claw.example.com" })).toBe(false);
+    expect(local({ host: "localhost", forwarded: "for=_hidden" })).toBe(false);
+  });
+});
+
 describe("installSecurityMiddleware", () => {
+  it("does not issue a session to a remote client relayed by a local reverse proxy", async () => {
+    const app = express();
+    installSecurityMiddleware(app);
+    app.get("/api/protected", (_req, res) => {
+      res.json({ ok: true });
+    });
+
+    await request(app)
+      .get("/api/auth/session")
+      .set("Host", "claw.example.com")
+      .set("X-Forwarded-For", "203.0.113.9")
+      .set("X-Forwarded-Proto", "https")
+      .expect(401);
+    await request(app).get("/api/auth/session").set("Host", "atlas.tailnet-abc.ts.net").expect(401);
+
+    const bearerRes = await request(app)
+      .get("/api/auth/session")
+      .set("Host", "claw.example.com")
+      .set("X-Forwarded-For", "203.0.113.9")
+      .set("Authorization", `Bearer ${SESSION_AUTH_TOKEN}`)
+      .expect(200);
+    expect(bearerRes.headers["set-cookie"]?.[0]).toContain(`${SESSION_COOKIE_NAME}=`);
+  });
+
   it("세션 발급 후 보호 API 접근을 허용한다", async () => {
     const app = express();
     installSecurityMiddleware(app);

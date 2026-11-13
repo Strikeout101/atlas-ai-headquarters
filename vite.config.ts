@@ -62,13 +62,16 @@ export default defineConfig({
       ignored: ["**/.climpire-worktrees/**"],
     },
     proxy: {
+      // xfwd: pass the browser's address so the API can tell the server machine from trusted VLANs and others.
       "/api": {
         target: apiTarget,
+        xfwd: true,
         configure: silenceEpipe,
       },
       "/ws": {
         target: wsTarget,
         ws: true,
+        xfwd: true,
         configure: silenceEpipe,
       },
     },

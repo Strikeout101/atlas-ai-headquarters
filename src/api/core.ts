@@ -108,12 +108,18 @@ function writeStoredCsrfToken(token: string): void {
   }
 }
 
-function promptForApiAuthToken(hasExistingToken: boolean): string {
-  if (typeof window === "undefined") return "";
-  const promptText = hasExistingToken
-    ? "Stored API token was rejected. Enter a new API token:"
-    : "Enter API token for this server:";
-  return normalizeApiAuthToken(window.prompt(promptText));
+/** Fired on window when the server wants this browser to sign in. AuthGate listens and shows the login screen. */
+export const AUTH_REQUIRED_EVENT = "atlas:auth-required";
+export type AuthRequiredDetail = { passwordConfigured: boolean };
+
+function announceLoginRequired(passwordConfigured: boolean): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<AuthRequiredDetail>(AUTH_REQUIRED_EVENT, { detail: { passwordConfigured } }));
+}
+
+/** Stores the CSRF token returned by a successful sign-in so later mutations carry it. */
+export function acceptSessionPayload(payload: { csrf_token?: unknown } | null): void {
+  writeStoredCsrfToken(normalizeCsrfToken(typeof payload?.csrf_token === "string" ? payload.csrf_token : ""));
 }
 
 export function setApiAuthToken(token?: string | null): void {
@@ -240,7 +246,7 @@ function withAuthHeaders(init?: HeadersInit, method?: string): Headers {
   return headers;
 }
 
-async function doBootstrapSession(promptOnUnauthorized: boolean): Promise<boolean> {
+async function doBootstrapSession(announceOnUnauthorized: boolean): Promise<boolean> {
   try {
     const response = await fetch(`${base}${SESSION_BOOTSTRAP_PATH}`, {
       method: "GET",
@@ -248,16 +254,15 @@ async function doBootstrapSession(promptOnUnauthorized: boolean): Promise<boolea
       credentials: "same-origin",
     });
     if (response.ok) {
-      const payload = (await response.json().catch(() => null)) as { csrf_token?: unknown } | null;
-      const csrfToken = normalizeCsrfToken(typeof payload?.csrf_token === "string" ? payload.csrf_token : "");
-      writeStoredCsrfToken(csrfToken);
+      acceptSessionPayload((await response.json().catch(() => null)) as { csrf_token?: unknown } | null);
       return true;
     }
-    if (response.status === 401 && promptOnUnauthorized) {
-      const nextToken = promptForApiAuthToken(Boolean(readStoredApiAuthToken()));
-      if (nextToken) {
-        writeStoredApiAuthToken(nextToken);
-        return doBootstrapSession(false);
+    if (response.status === 401) {
+      writeStoredCsrfToken("");
+      if (readStoredApiAuthToken()) writeStoredApiAuthToken("");
+      if (announceOnUnauthorized) {
+        const body = (await response.json().catch(() => null)) as { password_configured?: unknown } | null;
+        announceLoginRequired(body?.password_configured === true);
       }
     }
   } catch {

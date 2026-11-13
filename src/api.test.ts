@@ -182,25 +182,23 @@ describe("api client", () => {
     expect(String(headerKey)).toMatch(/^ceo-message-/);
   });
 
-  it("bootstrapSession은 401에서 prompt 입력 토큰으로 재시도한다", async () => {
+  it("bootstrapSession announces that sign-in is needed on 401 instead of prompting for a token", async () => {
     const fetchMock = vi.fn();
-    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "unauthorized" }, 401)).mockResolvedValueOnce(
-      jsonResponse(
-        {
-          ok: true,
-        },
-        200,
-      ),
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: "login_required", password_configured: true }, 401));
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
-    vi.spyOn(window, "prompt").mockReturnValue("  refreshed-token  ");
+    const promptSpy = vi.spyOn(window, "prompt");
+    const listener = vi.fn();
+    window.addEventListener("atlas:auth-required", listener);
 
     const api = await import("./api");
     const ok = await api.bootstrapSession({ promptOnUnauthorized: true });
+    window.removeEventListener("atlas:auth-required", listener);
 
-    expect(ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(window.sessionStorage.getItem("claw_api_auth_token")).toBe("refreshed-token");
+    expect(ok).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ passwordConfigured: true });
   });
 
   it("세션 부트스트랩 csrf 토큰을 저장하고 mutation 요청에 헤더를 붙인다", async () => {

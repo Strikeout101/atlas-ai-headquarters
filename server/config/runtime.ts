@@ -79,6 +79,16 @@ export const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((v) => v.trim())
   .filter(Boolean);
+/** CIDR ranges (or single addresses) whose browsers sign in automatically, e.g. "192.168.10.0/24,192.168.20.0/24". */
+export const TRUSTED_NETWORKS = (process.env.TRUSTED_NETWORKS ?? "")
+  .split(",")
+  .map((v) => v.trim())
+  .filter(Boolean);
+/** Hostnames (besides IP addresses and localhost) that browsers may use to reach ATLAS, e.g. "atlas.lan". */
+export const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS ?? "")
+  .split(",")
+  .map((v) => v.trim().toLowerCase())
+  .filter(Boolean);
 
 // ---------------------------------------------------------------------------
 // Production static file serving

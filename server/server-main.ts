@@ -14,6 +14,7 @@ import {
   initializeDatabaseRuntime,
 } from "./db/runtime.ts";
 import {
+  configureLoginStore,
   installSecurityMiddleware,
   isIncomingMessageAuthenticated,
   isIncomingMessageOriginTrusted,
@@ -55,6 +56,7 @@ const runInTransaction = createRunInTransaction(db);
 const readSettingString = createReadSettingString(db);
 
 applyBaseSchema(db);
+configureLoginStore(db);
 const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);

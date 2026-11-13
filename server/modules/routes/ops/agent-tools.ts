@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { PORT, SESSION_AUTH_TOKEN } from "../../../config/runtime.ts";
-import { isLoopbackRequest } from "../../../security/auth.ts";
+import { isDirectLocalRequest } from "../../../security/auth.ts";
 import { verifyAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { createModelUpgradeRequest, decideModelUpgrade } from "../../model-routing.ts";
 import { createSshApprovalRequest, getSshApprovalStatus } from "../../ssh-approvals.ts";
@@ -28,7 +28,7 @@ async function localApi(method: string, pathname: string, payload?: unknown) {
 /** Task-scoped local tool gateway. The worker never receives the global API token. */
 export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirector: DirectorRun): void {
   app.post("/api/agent-tools", async (req, res) => {
-    if (!isLoopbackRequest(req)) return res.status(403).json({ error: "local_only" });
+    if (!isDirectLocalRequest(req)) return res.status(403).json({ error: "local_only" });
     const token = req.header("x-agent-task-token") ?? "";
     const claims = verifyAgentTaskToken(token);
     if (!claims) return res.status(401).json({ error: "invalid_agent_task_token" });

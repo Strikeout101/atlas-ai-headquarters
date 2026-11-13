@@ -9,6 +9,7 @@ import CliSettingsTab from "./settings/CliSettingsTab";
 import GatewaySettingsTab from "./settings/GatewaySettingsTab";
 import GeneralSettingsTab from "./settings/GeneralSettingsTab";
 import OAuthSettingsTab from "./settings/OAuthSettingsTab";
+import SecuritySettingsTab from "./settings/SecuritySettingsTab";
 import SettingsTabNav from "./settings/SettingsTabNav";
 import HomelabWorkspace from "./HomelabWorkspace";
 import type { AccountDraftMap, AccountDraftPatch, LocalSettings, SettingsTab } from "./settings/types";
@@ -408,6 +409,8 @@ export default function SettingsPanel({
       {tab === "general" && (
         <GeneralSettingsTab t={t} form={form} setForm={setForm} saved={saved} onSave={handleSave} />
       )}
+
+      {tab === "security" && <SecuritySettingsTab t={t} />}
 
       {tab === "cli" && (
         <CliSettingsTab

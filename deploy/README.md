@@ -34,7 +34,9 @@ Set at minimum:
 
 - `OAUTH_ENCRYPTION_SECRET`
 - `INBOX_WEBHOOK_SECRET`
-- `API_AUTH_TOKEN` for non-loopback access
+- `TRUSTED_NETWORKS` (optional): CIDRs whose browsers sign in automatically, such as your trusted VLANs. Everyone else gets a login screen; set its password in Settings > Security from the server machine or a trusted network. Requests relayed by nginx, Tailscale Serve, cloudflared, or the Vite dev proxy are judged by the client address the proxy reports, not by the proxy's own `127.0.0.1` connection.
+- `ALLOWED_HOSTS` (optional): host names browsers use to reach ATLAS (IP addresses and `localhost` are always allowed).
+- `API_AUTH_TOKEN` (optional) for scripts and integrations using `Authorization: Bearer`.
 - `OAUTH_BASE_URL` if the public URL differs from `http://127.0.0.1:8790`
 
 If you run behind nginx on the same host, keep:

@@ -1,4 +1,4 @@
-import { Cable, KeyRound, Radio, Server, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
+import { Cable, KeyRound, Radio, Server, ShieldCheck, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import type { SettingsTab, TFunction } from "./types";
 
 interface SettingsTabNavProps {
@@ -12,6 +12,11 @@ const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunctio
     key: "general",
     icon: SlidersHorizontal,
     label: (t) => t({ ko: "일반 설정", en: "General", ja: "一般設定", zh: "常规设置" }),
+  },
+  {
+    key: "security",
+    icon: ShieldCheck,
+    label: (t) => t({ ko: "보안", en: "Security", ja: "セキュリティ", zh: "安全" }),
   },
   { key: "cli", icon: Wrench, label: (t) => t({ ko: "CLI 도구", en: "CLI tools", ja: "CLI ツール", zh: "CLI 工具" }) },
   {
