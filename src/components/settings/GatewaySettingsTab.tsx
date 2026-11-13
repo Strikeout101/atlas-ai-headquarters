@@ -486,7 +486,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
   return (
     <section className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/60 p-4 sm:p-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-slate-300">
           {t({ ko: "채널 메시지 설정", en: "Channel Messaging", ja: "チャネルメッセージ設定", zh: "频道消息设置" })}
         </h3>
         {saved && <span className={`text-xs ${saved.ok ? "text-emerald-400" : "text-red-400"}`}>{saved.msg}</span>}
@@ -729,7 +729,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         <button
           onClick={() => void handleSendMessage()}
           disabled={sending || !selectedChat || !sendText.trim() || !selectedChatTransportReady}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-lg ax-btn-primary text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending
             ? t({ ko: "전송 중...", en: "Sending...", ja: "送信中...", zh: "发送中..." })

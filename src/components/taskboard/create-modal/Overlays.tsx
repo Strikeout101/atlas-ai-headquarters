@@ -118,7 +118,7 @@ export default function CreateTaskModalOverlays({
               <button
                 type="button"
                 onClick={onLoadSelectedRestoreDraft}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                className="rounded-md ax-btn-primary px-3 py-1.5 text-xs font-semibold transition"
               >
                 {t({ ko: "불러오기", en: "Load", ja: "読み込み", zh: "加载" })}
               </button>
@@ -175,7 +175,7 @@ export default function CreateTaskModalOverlays({
               <button
                 type="button"
                 onClick={onConfirmSubmitWithoutProject}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500"
+                className="rounded-md ax-btn-primary px-3 py-1.5 text-xs font-semibold transition"
               >
                 {t({ ko: "계속", en: "Continue", ja: "続行", zh: "继续" })}
               </button>
@@ -366,7 +366,7 @@ export default function CreateTaskModalOverlays({
                 type="button"
                 disabled={!manualPathCurrent}
                 onClick={onSelectManualCurrentPath}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md ax-btn-primary px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t({
                   ko: "현재 폴더 선택",
@@ -438,7 +438,7 @@ export default function CreateTaskModalOverlays({
                         <button
                           type="button"
                           onClick={() => onLoadDraft(draft)}
-                          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
+                          className="rounded-md ax-btn-primary px-2.5 py-1 text-xs font-semibold transition"
                         >
                           {t({ ko: "불러오기", en: "Load", ja: "読み込み", zh: "加载" })}
                         </button>

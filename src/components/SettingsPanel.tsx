@@ -394,9 +394,13 @@ export default function SettingsPanel({
   );
 
   return (
-    <div className={tab === "ssh" ? "mx-auto max-w-7xl space-y-4 sm:space-y-6" : "mx-auto max-w-2xl space-y-4 sm:space-y-6"}>
-      <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--th-text-heading)" }}>
-        ⚙️ {t({ ko: "설정", en: "Settings", ja: "設定", zh: "设置" })}
+    <div
+      className={
+        tab === "ssh" ? "mx-auto max-w-7xl space-y-4 sm:space-y-6" : "mx-auto max-w-2xl space-y-4 sm:space-y-6"
+      }
+    >
+      <h2 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
+        {t({ ko: "설정", en: "Settings", ja: "設定", zh: "设置" })}
       </h2>
 
       <SettingsTabNav tab={tab} setTab={setTab} t={t} />

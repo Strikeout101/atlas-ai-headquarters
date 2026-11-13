@@ -1,15 +1,15 @@
 /* ── Kanban column header overrides (TaskBoard -900 → light pastels) ── */
 [data-theme="light"] .bg-blue-900 {
-  background-color: #dbeafe !important;
+  background-color: #dbe5f6 !important;
 }
 [data-theme="light"] .bg-indigo-900 {
-  background-color: #e0e7ff !important;
+  background-color: #e7e4f8 !important;
 }
 [data-theme="light"] .bg-amber-900 {
   background-color: #fef3c7 !important;
 }
 [data-theme="light"] .bg-purple-900 {
-  background-color: #ede9fe !important;
+  background-color: #e7e4f8 !important;
 }
 [data-theme="light"] .bg-green-900 {
   background-color: #d1fae5 !important;
@@ -21,7 +21,7 @@
   background-color: #fee2e2 !important;
 }
 [data-theme="light"] .bg-cyan-900 {
-  background-color: #cffafe !important;
+  background-color: #daf1f0 !important;
 }
 
 /* Kanban header text: white → dark on pastel */
@@ -38,16 +38,16 @@
 
 /* Kanban column border overrides (-700 accent borders → light) */
 [data-theme="light"] .border-blue-700 {
-  border-color: #93c5fd !important;
+  border-color: #93aee2 !important;
 }
 [data-theme="light"] .border-indigo-700 {
-  border-color: #a5b4fc !important;
+  border-color: #b3a9e6 !important;
 }
 [data-theme="light"] .border-amber-700 {
   border-color: #fcd34d !important;
 }
 [data-theme="light"] .border-purple-700 {
-  border-color: #c4b5fd !important;
+  border-color: #b3a9e6 !important;
 }
 [data-theme="light"] .border-green-700 {
   border-color: #6ee7b7 !important;
@@ -70,10 +70,10 @@
   color: #c2410c !important;
 }
 [data-theme="light"] .text-cyan-100 {
-  color: #0891b2 !important;
+  color: #378487 !important;
 }
 [data-theme="light"] .text-cyan-200 {
-  color: #0891b2 !important;
+  color: #378487 !important;
 }
 
 /* ── Shadow adjustments ── */
@@ -122,11 +122,11 @@
   background-color: #ef4444 !important;
 }
 [data-theme="light"] .bg-blue-700 {
-  background-color: #2563eb !important;
+  background-color: #4565ad !important;
   color: #fff !important;
 }
 [data-theme="light"] [class*="hover\\:bg-blue-600"]:hover {
-  background-color: #3b82f6 !important;
+  background-color: #5679c2 !important;
 }
 [data-theme="light"] .bg-orange-700 {
   background-color: #c2410c !important;
@@ -136,17 +136,17 @@
   background-color: #ea580c !important;
 }
 [data-theme="light"] .bg-purple-800 {
-  background-color: #7c3aed !important;
+  background-color: #6c5db3 !important;
   color: #fff !important;
 }
 [data-theme="light"] [class*="hover\\:bg-purple-700"]:hover {
-  background-color: #8b5cf6 !important;
+  background-color: #8172c8 !important;
 }
 [data-theme="light"] [class*="bg-cyan-800"] {
-  background-color: #0891b2 !important;
+  background-color: #378487 !important;
 }
 [data-theme="light"] [class*="hover\\:bg-cyan-700"]:hover {
-  background-color: #06b6d4 !important;
+  background-color: #46a0a2 !important;
 }
 
 /* ── Text on accent buttons should stay white ── */
@@ -163,13 +163,13 @@
   color: #f5f3ff !important;
 }
 [data-theme="light"] [class*="text-purple-300"] {
-  color: #7c3aed !important;
+  color: #6c5db3 !important;
 }
 [data-theme="light"] [class*="text-cyan-200"] {
   color: #f0fdfa !important;
 }
 [data-theme="light"] [class*="text-blue-200"] {
-  color: #1d4ed8 !important;
+  color: #3a548f !important;
 }
 [data-theme="light"] [class*="text-red-300"] {
   color: #dc2626 !important;
@@ -183,18 +183,18 @@
   color: #dc2626 !important;
 }
 [data-theme="light"] [class*="text-cyan-400"] {
-  color: #0891b2 !important;
+  color: #378487 !important;
 }
 
 /* ── TaskBoard type badge dark backgrounds → light tints ── */
 [data-theme="light"] [class*="bg-cyan-900"] {
-  background-color: #cffafe !important;
+  background-color: #daf1f0 !important;
 }
 [data-theme="light"] [class*="bg-pink-900"] {
   background-color: #fce7f3 !important;
 }
 [data-theme="light"] [class*="bg-indigo-900"] {
-  background-color: #e0e7ff !important;
+  background-color: #e7e4f8 !important;
 }
 [data-theme="light"] [class*="bg-orange-900"] {
   background-color: #ffedd5 !important;
@@ -208,7 +208,7 @@
   color: #db2777 !important;
 }
 [data-theme="light"] [class*="text-indigo-300"] {
-  color: #4f46e5 !important;
+  color: #6c5db3 !important;
 }
 [data-theme="light"] [class*="text-teal-300"] {
   color: #0d9488 !important;
@@ -219,7 +219,7 @@
 
 /* ── Hover overrides for slate action buttons ── */
 [data-theme="light"] [class*="hover\\:bg-slate-600"]:hover {
-  background-color: rgba(195, 185, 165, 0.4) !important;
+  background-color: rgba(190, 197, 206, 0.4) !important;
 }
 
 /* ── Delete button bg-red-900/60 ── */
@@ -241,10 +241,10 @@
   background-color: rgba(207, 250, 254, 0.7) !important;
 }
 [data-theme="light"] .border-cyan-600 {
-  border-color: #06b6d4 !important;
+  border-color: #46a0a2 !important;
 }
 [data-theme="light"] [class*="text-cyan-100"] {
-  color: #0891b2 !important;
+  color: #378487 !important;
 }
 
 /* ── Hidden task card border ── */
@@ -252,7 +252,7 @@
   border-color: #67e8f9 !important;
 }
 [data-theme="light"] [class*="hover\\:border-cyan-600"]:hover {
-  border-color: #22d3ee !important;
+  border-color: #5fb8b8 !important;
 }
 [data-theme="light"] [class*="bg-slate-800\\/80"],
 [data-theme="light"] [class*="bg-slate-800/80"] {
@@ -261,7 +261,7 @@
 
 /* ── Hover border overrides ── */
 [data-theme="light"] [class*="hover\\:border-slate-600"]:hover {
-  border-color: rgba(180, 170, 150, 0.5) !important;
+  border-color: rgba(175, 182, 192, 0.5) !important;
 }
 
 /* ── Dashboard: XP bar, glass effects for light ── */
@@ -275,7 +275,7 @@
 }
 [data-theme="light"] [class*="bg-slate-800\\/80"],
 [data-theme="light"] [class*="bg-slate-800/80"] {
-  background-color: rgba(200, 190, 170, 0.4) !important;
+  background-color: rgba(195, 201, 209, 0.4) !important;
 }
 
 /* ── ReportHistory & AgentStatusPanel modal backgrounds ── */
@@ -285,7 +285,7 @@
 }
 [data-theme="light"] [class*="shadow-blue-500\\/10"],
 [data-theme="light"] [class*="shadow-blue-500/10"] {
-  --tw-shadow-color: rgba(59, 130, 246, 0.05) !important;
+  --tw-shadow-color: rgba(86, 121, 194, 0.05) !important;
 }
 [data-theme="light"] [class*="border-emerald-500\\/30"],
 [data-theme="light"] [class*="border-emerald-500/30"] {
@@ -293,7 +293,7 @@
 }
 [data-theme="light"] [class*="border-blue-500\\/30"],
 [data-theme="light"] [class*="border-blue-500/30"] {
-  border-color: rgba(59, 130, 246, 0.3) !important;
+  border-color: rgba(86, 121, 194, 0.3) !important;
 }
 [data-theme="light"] [class*="border-slate-700\\/50"],
 [data-theme="light"] [class*="border-slate-700/50"] {
@@ -307,7 +307,7 @@
 }
 [data-theme="light"] [class*="bg-purple-500\\/20"],
 [data-theme="light"] [class*="bg-purple-500/20"] {
-  background-color: rgba(139, 92, 246, 0.12) !important;
+  background-color: rgba(129, 114, 200, 0.12) !important;
 }
 [data-theme="light"] [class*="bg-green-500\\/20"],
 [data-theme="light"] [class*="bg-green-500/20"] {
@@ -319,7 +319,7 @@
 }
 [data-theme="light"] [class*="bg-blue-500\\/20"],
 [data-theme="light"] [class*="bg-blue-500/20"] {
-  background-color: rgba(59, 130, 246, 0.12) !important;
+  background-color: rgba(86, 121, 194, 0.12) !important;
 }
 [data-theme="light"] [class*="bg-red-500\\/20"],
 [data-theme="light"] [class*="bg-red-500/20"] {
@@ -331,7 +331,7 @@
   color: #b45309 !important;
 }
 [data-theme="light"] [class*="text-purple-400"] {
-  color: #7c3aed !important;
+  color: #6c5db3 !important;
 }
 [data-theme="light"] [class*="text-green-400"] {
   color: #16a34a !important;
@@ -340,7 +340,7 @@
   color: var(--th-text-secondary) !important;
 }
 [data-theme="light"] [class*="text-blue-400"] {
-  color: #2563eb !important;
+  color: #4565ad !important;
 }
 [data-theme="light"] [class*="text-red-400"] {
   color: #dc2626 !important;
@@ -353,7 +353,7 @@
 }
 [data-theme="light"] [class*="border-purple-500\\/40"],
 [data-theme="light"] [class*="border-purple-500/40"] {
-  border-color: rgba(139, 92, 246, 0.3) !important;
+  border-color: rgba(129, 114, 200, 0.3) !important;
 }
 [data-theme="light"] [class*="border-green-500\\/40"],
 [data-theme="light"] [class*="border-green-500/40"] {
@@ -365,7 +365,7 @@
 }
 [data-theme="light"] [class*="border-blue-500\\/40"],
 [data-theme="light"] [class*="border-blue-500/40"] {
-  border-color: rgba(59, 130, 246, 0.3) !important;
+  border-color: rgba(86, 121, 194, 0.3) !important;
 }
 [data-theme="light"] [class*="border-red-500\\/40"],
 [data-theme="light"] [class*="border-red-500/40"] {
@@ -404,13 +404,13 @@
 
 /* ── Blue-800 button for resume task ── */
 [data-theme="light"] .bg-blue-800 {
-  background-color: #1d4ed8 !important;
+  background-color: #3a548f !important;
   color: #fff !important;
 }
 
 /* ── Disabled button: disabled:bg-slate-700 ── */
 [data-theme="light"] [class*="disabled\\:bg-slate-700"]:disabled {
-  background-color: rgba(200, 190, 170, 0.3) !important;
+  background-color: rgba(195, 201, 209, 0.3) !important;
 }
 [data-theme="light"] [class*="disabled\\:text-slate-400"]:disabled {
   color: var(--th-text-muted) !important;
@@ -419,18 +419,18 @@
 /* ── Violet border overrides (header buttons) ── */
 [data-theme="light"] [class*="border-violet-500\\/30"],
 [data-theme="light"] [class*="border-violet-500/30"] {
-  border-color: rgba(139, 92, 246, 0.3) !important;
+  border-color: rgba(129, 114, 200, 0.3) !important;
 }
 [data-theme="light"] [class*="bg-violet-600\\/20"],
 [data-theme="light"] [class*="bg-violet-600/20"] {
-  background-color: rgba(139, 92, 246, 0.1) !important;
+  background-color: rgba(129, 114, 200, 0.1) !important;
 }
 [data-theme="light"] [class*="bg-violet-600\\/30"],
 [data-theme="light"] [class*="bg-violet-600/30"] {
-  background-color: rgba(139, 92, 246, 0.15) !important;
+  background-color: rgba(129, 114, 200, 0.15) !important;
 }
 [data-theme="light"] [class*="text-violet-400"] {
-  color: #7c3aed !important;
+  color: #6c5db3 !important;
 }
 
 /* ── TerminalPanel: hardcoded hex dark backgrounds ── */
@@ -470,7 +470,7 @@
 }
 
 [data-theme="light"] .skills-learn-modal-card {
-  background-color: rgba(255, 251, 244, 0.97) !important;
+  background-color: rgba(255, 255, 255, 0.97) !important;
   border-color: rgba(168, 146, 116, 0.48) !important;
   box-shadow: 0 24px 52px rgba(28, 20, 10, 0.22) !important;
 }
@@ -487,13 +487,13 @@
 }
 
 [data-theme="light"] .skill-history-panel {
-  background-color: rgba(255, 252, 246, 0.86) !important;
-  border-color: rgba(178, 159, 132, 0.44) !important;
+  background-color: rgba(255, 255, 255, 0.86) !important;
+  border-color: rgba(170, 177, 187, 0.44) !important;
 }
 
 [data-theme="light"] .skill-history-panel .skill-history-card {
-  background-color: rgba(255, 253, 248, 0.9) !important;
-  border-color: rgba(188, 168, 142, 0.46) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(178, 185, 195, 0.46) !important;
 }
 
 [data-theme="light"] .skill-history-panel .skill-history-meta {
@@ -518,8 +518,8 @@
 
 [data-theme="light"] .skills-learn-modal-card .skill-unlearn-btn:disabled,
 [data-theme="light"] .skill-history-panel .skill-unlearn-btn:disabled {
-  border-color: rgba(191, 180, 160, 0.45) !important;
-  background-color: rgba(205, 196, 178, 0.22) !important;
+  border-color: rgba(185, 192, 201, 0.45) !important;
+  background-color: rgba(200, 206, 214, 0.22) !important;
   color: #93897d !important;
 }
 
@@ -556,8 +556,8 @@
   background-color: rgba(34, 20, 50, 0.42) !important;
 }
 [data-theme="light"] .custom-skill-modal-card {
-  background-color: rgba(255, 251, 248, 0.97) !important;
-  border-color: rgba(139, 92, 246, 0.35) !important;
+  background-color: rgba(255, 255, 255, 0.97) !important;
+  border-color: rgba(129, 114, 200, 0.35) !important;
   box-shadow: 0 24px 52px rgba(28, 16, 40, 0.22) !important;
 }
 [data-theme="light"] .custom-skill-modal-card [class*="text-violet-200"],
@@ -575,8 +575,8 @@
   color: #6b6280 !important;
 }
 [data-theme="light"] .custom-skill-modal-card input {
-  background-color: rgba(255, 251, 248, 0.9) !important;
-  border-color: rgba(139, 92, 246, 0.3) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(129, 114, 200, 0.3) !important;
   color: #1e1b2e !important;
 }
 [data-theme="light"] .custom-skill-modal-card .custom-skill-submit-btn {
@@ -596,15 +596,15 @@
 
 /* Custom Skill list cards (light mode) */
 [data-theme="light"] .custom-skill-list {
-  background-color: rgba(139, 92, 246, 0.06) !important;
-  border-color: rgba(139, 92, 246, 0.25) !important;
+  background-color: rgba(129, 114, 200, 0.06) !important;
+  border-color: rgba(129, 114, 200, 0.25) !important;
 }
 [data-theme="light"] .custom-skill-list [class*="text-violet-200"] {
   color: #5b21b6 !important;
 }
 [data-theme="light"] .custom-skill-list .custom-skill-card {
-  background-color: rgba(255, 251, 248, 0.85) !important;
-  border-color: rgba(139, 92, 246, 0.2) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(129, 114, 200, 0.2) !important;
 }
 [data-theme="light"] .custom-skill-list .custom-skill-card .text-white {
   color: #1e1b2e !important;
@@ -656,35 +656,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 0.5rem;
-  border: 1px solid var(--th-border);
-  background: var(--th-bg-surface);
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--th-text-secondary);
   cursor: pointer;
-  transition: all 0.25s ease;
-  position: relative;
-  overflow: hidden;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .theme-toggle-btn:hover {
-  background: var(--th-bg-surface-hover);
-  border-color: var(--th-border-strong);
-  transform: scale(1.08);
-}
-[data-theme="dark"] .theme-toggle-btn {
-  color: #a5b4fc;
-}
-[data-theme="dark"] .theme-toggle-btn:hover {
-  color: #c7d2fe;
-  box-shadow: 0 0 12px rgba(165, 180, 252, 0.2);
-}
-[data-theme="light"] .theme-toggle-btn {
-  color: #d97706;
-}
-[data-theme="light"] .theme-toggle-btn:hover {
-  color: #b45309;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+  background: var(--th-bg-surface);
+  border-color: var(--th-border);
+  color: var(--th-text-primary);
 }
 .theme-toggle-icon {
   display: flex;

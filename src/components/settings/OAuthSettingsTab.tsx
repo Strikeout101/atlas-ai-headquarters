@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import GitHubOAuthAppConfig from "./GitHubOAuthAppConfig";
 import OAuthConnectCards from "./OAuthConnectCards";
 import OAuthConnectedProvidersSection from "./OAuthConnectedProvidersSection";
@@ -51,11 +52,12 @@ export default function OAuthSettingsTab({
   return (
     <section className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/60 p-4 sm:p-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-slate-300">
           {t({ ko: "OAuth 인증 현황", en: "OAuth Status", ja: "OAuth 認証状態", zh: "OAuth 认证状态" })}
         </h3>
         <button onClick={onRefresh} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-          🔄 {t({ ko: "새로고침", en: "Refresh", ja: "更新", zh: "刷新" })}
+          <RefreshCw size={13} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
+          {t({ ko: "새로고침", en: "Refresh", ja: "更新", zh: "刷新" })}
         </button>
       </div>
 

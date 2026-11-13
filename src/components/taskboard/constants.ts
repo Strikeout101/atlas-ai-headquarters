@@ -103,69 +103,16 @@ export function saveCreateTaskDrafts(drafts: CreateTaskDraft[]): void {
   window.localStorage.setItem(TASK_CREATE_DRAFTS_STORAGE_KEY, JSON.stringify(drafts.slice(0, 20)));
 }
 
-export const COLUMNS: {
-  status: TaskStatus;
-  icon: string;
-  headerBg: string;
-  borderColor: string;
-  dotColor: string;
-}[] = [
-  {
-    status: "inbox",
-    icon: "📥",
-    headerBg: "bg-slate-800",
-    borderColor: "border-slate-600",
-    dotColor: "bg-slate-400",
-  },
-  {
-    status: "planned",
-    icon: "📋",
-    headerBg: "bg-blue-900",
-    borderColor: "border-blue-700",
-    dotColor: "bg-blue-400",
-  },
-  {
-    status: "collaborating",
-    icon: "🤝",
-    headerBg: "bg-indigo-900",
-    borderColor: "border-indigo-700",
-    dotColor: "bg-indigo-400",
-  },
-  {
-    status: "in_progress",
-    icon: "⚡",
-    headerBg: "bg-amber-900",
-    borderColor: "border-amber-700",
-    dotColor: "bg-amber-400",
-  },
-  {
-    status: "review",
-    icon: "🔍",
-    headerBg: "bg-purple-900",
-    borderColor: "border-purple-700",
-    dotColor: "bg-purple-400",
-  },
-  {
-    status: "done",
-    icon: "✅",
-    headerBg: "bg-green-900",
-    borderColor: "border-green-700",
-    dotColor: "bg-green-400",
-  },
-  {
-    status: "pending",
-    icon: "⏸️",
-    headerBg: "bg-orange-900",
-    borderColor: "border-orange-700",
-    dotColor: "bg-orange-400",
-  },
-  {
-    status: "cancelled",
-    icon: "🚫",
-    headerBg: "bg-red-900",
-    borderColor: "border-red-700",
-    dotColor: "bg-red-400",
-  },
+/** Board columns in workflow order; color is a CSS token shared with the dashboard. */
+export const COLUMNS: { status: TaskStatus; color: string }[] = [
+  { status: "inbox", color: "var(--ax-muted)" },
+  { status: "planned", color: "var(--ax-planned)" },
+  { status: "collaborating", color: "var(--ax-planned)" },
+  { status: "in_progress", color: "var(--ax-signal)" },
+  { status: "review", color: "var(--ax-review)" },
+  { status: "done", color: "var(--ax-done)" },
+  { status: "pending", color: "var(--ax-break)" },
+  { status: "cancelled", color: "var(--ax-danger)" },
 ];
 
 export const STATUS_OPTIONS: TaskStatus[] = [
@@ -194,8 +141,10 @@ export function taskStatusLabel(status: TaskStatus, t: TFunction) {
       return t({ ko: "수신함", en: "Inbox", ja: "受信箱", zh: "收件箱" });
     case "planned":
       return t({ ko: "계획됨", en: "Planned", ja: "計画済み", zh: "已计划" });
+    case "collaborating":
+      return t({ ko: "협업 중", en: "Collaborating", ja: "協業中", zh: "协作中" });
     case "in_progress":
-      return t({ ko: "진행 중", en: "In Progress", ja: "進行中", zh: "进行中" });
+      return t({ ko: "진행 중", en: "In progress", ja: "進行中", zh: "进行中" });
     case "review":
       return t({ ko: "검토", en: "Review", ja: "レビュー", zh: "审核" });
     case "done":

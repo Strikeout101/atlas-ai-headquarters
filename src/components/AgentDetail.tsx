@@ -1,3 +1,4 @@
+import { Wrench, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { OAuthStatus } from "../api";
 import * as api from "../api";
@@ -432,7 +433,7 @@ export default function AgentDetail({
                   selectedCli === "codex" ? (
                     <div className="space-y-1">
                       <div className="flex w-full min-w-0 items-center gap-1 pb-0.5">
-                        <span className="shrink-0">🔧</span>
+                        <Wrench size={12} strokeWidth={1.75} className="shrink-0" />
                         <select
                           value={selectedCli}
                           onChange={(event) => {
@@ -533,7 +534,7 @@ export default function AgentDetail({
                           onClick={() => {
                             void handleSaveCli();
                           }}
-                          className="text-[10px] px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50"
+                          className="text-[10px] px-1.5 py-0.5 ax-btn-primary rounded transition-colors disabled:opacity-50"
                         >
                           {savingCli ? "..." : t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
                         </button>
@@ -547,7 +548,7 @@ export default function AgentDetail({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-1">
-                      <span>🔧</span>
+                      <Wrench size={12} strokeWidth={1.75} />
                       <select
                         value={selectedCli}
                         onChange={(event) => {
@@ -598,10 +599,10 @@ export default function AgentDetail({
                       {requiresApiProvider && (
                         <span className="text-[10px] text-amber-300">
                           {t({
-                            ko: "⚙️ 설정 > API 탭에서 모델을 배정하세요",
-                            en: "⚙️ Assign models in Settings > API tab",
-                            ja: "⚙️ 設定 > API タブでモデルを割り当ててください",
-                            zh: "⚙️ 请在设置 > API 标签页中分配模型",
+                            ko: "설정 > API 탭에서 모델을 배정하세요",
+                            en: "Assign models in Settings > API",
+                            ja: "設定 > API タブでモデルを割り当ててください",
+                            zh: "请在设置 > API 标签页中分配模型",
                           })}
                         </span>
                       )}
@@ -663,7 +664,7 @@ export default function AgentDetail({
                         onClick={() => {
                           void handleSaveCli();
                         }}
-                        className="text-[10px] px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors disabled:opacity-50"
+                        className="text-[10px] px-1.5 py-0.5 ax-btn-primary rounded transition-colors disabled:opacity-50"
                       >
                         {savingCli ? "..." : t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
                       </button>
@@ -696,7 +697,7 @@ export default function AgentDetail({
                         : agent.cli_provider === "codex" && agent.cli_reasoning_level
                           ? `${CLI_LABELS[agent.cli_provider] ?? agent.cli_provider} · (${agent.cli_reasoning_level})`
                           : (CLI_LABELS[agent.cli_provider] ?? agent.cli_provider)}
-                    <span className="text-[9px] text-slate-600 ml-0.5">✏️</span>
+                    <Pencil size={10} strokeWidth={1.75} className="ml-0.5 inline text-slate-500" />
                   </button>
                 )}
               </div>

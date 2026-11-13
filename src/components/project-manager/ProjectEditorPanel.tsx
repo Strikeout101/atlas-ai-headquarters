@@ -337,7 +337,7 @@ export default function ProjectEditorPanel({
               onSave();
             }}
             disabled={!canSave || saving}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+            className="rounded-lg ax-btn-primary px-3 py-1.5 text-xs font-medium disabled:opacity-40"
           >
             {editingProjectId
               ? t({ ko: "수정 저장", en: "Save", ja: "保存", zh: "保存" })

@@ -1,3 +1,4 @@
+import { MessageSquare } from "lucide-react";
 import type { RefObject } from "react";
 import type { Agent, Message } from "../../types";
 import type { DecisionOption } from "../chat/decision-request";
@@ -103,10 +104,15 @@ export default function ChatMessageList({
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
       {visibleMessages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-          <div className="text-6xl">💬</div>
+          <MessageSquare size={40} strokeWidth={1.25} className="opacity-40" />
           <div>
             <p className="font-medium text-gray-400">
-              {tr("대화를 시작해보세요! 👋", "Start a conversation! 👋", "会話を始めましょう! 👋", "开始对话吧! 👋")}
+              {tr(
+                "대화를 시작해보세요.",
+                "Send a message to start the conversation.",
+                "メッセージを送って会話を始めましょう。",
+                "发送消息开始对话。",
+              )}
             </p>
             <p className="mt-1 text-sm text-gray-600">
               {selectedAgent
@@ -216,7 +222,7 @@ export default function ChatMessageList({
               return (
                 <div key={msg.id} className="flex flex-col items-end gap-1">
                   <span className="px-1 text-xs text-gray-500">{tr("CEO", "CEO")}</span>
-                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-blue-600 px-4 py-2.5 text-sm text-white shadow-md">
+                  <div className="ax-bubble-self max-w-[80%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm">
                     <MessageContent content={msg.content} />
                   </div>
                   <span className="px-1 text-xs text-gray-600">{formatTime(msg.created_at, locale)}</span>

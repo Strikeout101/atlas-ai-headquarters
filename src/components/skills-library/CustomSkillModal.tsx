@@ -1,3 +1,4 @@
+import { Pencil, Paperclip, GraduationCap } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import type { SkillLearnProvider } from "../../api";
@@ -52,7 +53,7 @@ export default function CustomSkillModal({
         <div className="flex items-start justify-between gap-4 border-b border-slate-700/60 px-5 py-4">
           <div>
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
-              <span>✏️</span>
+              <Pencil size={14} strokeWidth={1.75} />
               {t({ ko: "커스텀 스킬 추가", en: "Add Custom Skill", ja: "カスタムスキル追加", zh: "添加自定义技能" })}
             </h3>
             <div className="mt-1 text-xs text-slate-400">
@@ -109,7 +110,7 @@ export default function CustomSkillModal({
                 onClick={() => customFileInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800/60 border border-slate-600/50 rounded-lg text-slate-300 hover:bg-slate-700/60 transition-all"
               >
-                <span>📎</span>
+                <Paperclip size={14} strokeWidth={1.75} />
                 {t({ ko: "파일 선택", en: "Choose File", ja: "ファイル選択", zh: "选择文件" })}
               </button>
               <input
@@ -120,7 +121,7 @@ export default function CustomSkillModal({
                 className="hidden"
               />
               {customSkillFileName && (
-                <span className="text-xs text-emerald-300 truncate max-w-[200px]">📄 {customSkillFileName}</span>
+                <span className="text-xs text-emerald-300 truncate max-w-[200px]">{customSkillFileName}</span>
               )}
             </div>
             {customSkillContent && (
@@ -219,7 +220,7 @@ export default function CustomSkillModal({
                 </>
               ) : (
                 <>
-                  <span>🎓</span>
+                  <GraduationCap size={14} strokeWidth={1.75} />
                   {t({ ko: "학습 시작", en: "Start Training", ja: "学習開始", zh: "开始培训" })}
                 </>
               )}

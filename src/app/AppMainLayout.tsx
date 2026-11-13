@@ -654,6 +654,7 @@ export default function AppMainLayout({
                 stats={stats}
                 agents={agents}
                 tasks={tasks}
+                departments={departments}
                 companyName={settings.companyName}
                 onPrimaryCtaClick={() => setView("tasks")}
               />

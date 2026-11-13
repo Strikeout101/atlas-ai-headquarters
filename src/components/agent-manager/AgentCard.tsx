@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import type { Agent, Department } from "../../types";
 import { localeName } from "../../i18n";
 import AgentAvatar from "../AgentAvatar";
@@ -39,11 +40,12 @@ export default function AgentCard({
   return (
     <div
       onClick={onEdit}
-      className="group rounded-xl p-4 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg hover:shadow-black/10"
+      className="ax-agent-card ax-lift group cursor-pointer rounded-[10px] p-4"
+      data-status={agent.status}
       style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
     >
       <div className="flex items-start gap-3">
-        <div className="relative shrink-0">
+        <div className="ax-agent-face relative shrink-0">
           <AgentAvatar agent={agent} spriteMap={spriteMap} size={44} rounded="xl" />
           <div
             className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${STATUS_DOT[agent.status] ?? STATUS_DOT.idle}`}
@@ -69,10 +71,11 @@ export default function AgentCard({
             </span>
             {dept && (
               <span
-                className="text-[10px] px-1.5 py-0.5 rounded-md"
-                style={{ background: "var(--th-bg-surface)", color: "var(--th-text-muted)" }}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px]"
+                style={{ background: "var(--th-bg-surface)", color: "var(--th-text-secondary)" }}
               >
-                {dept.icon} {localeName(locale, dept)}
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: dept.color || "var(--ax-idle)" }} />
+                {localeName(locale, dept)}
               </span>
             )}
           </div>
@@ -128,7 +131,7 @@ export default function AgentCard({
               style={{ color: "var(--th-text-muted)" }}
               title={tr("해고", "Fire")}
             >
-              ✕
+              <X size={13} strokeWidth={2} />
             </button>
           )}
         </div>

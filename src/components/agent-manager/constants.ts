@@ -28,10 +28,10 @@ export const ROLE_BADGE: Record<string, string> = {
 };
 
 export const STATUS_DOT: Record<string, string> = {
-  working: "bg-emerald-400 shadow-emerald-400/50 shadow-sm",
-  break: "bg-amber-400",
-  offline: "bg-red-400",
-  idle: "bg-slate-500",
+  working: "bg-[var(--ax-working)]",
+  break: "bg-[var(--ax-break)]",
+  offline: "bg-[var(--ax-offline)]",
+  idle: "bg-[var(--ax-idle)]",
 };
 
 export const ICON_SPRITE_POOL = Array.from({ length: 13 }, (_, i) => i + 1);

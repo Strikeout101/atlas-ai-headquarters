@@ -226,7 +226,7 @@ export default function AgentStatusPanel({ agents, uiLanguage, onClose }: AgentS
           {inspectorMode && (
             <div className="border-b border-slate-700/50 bg-slate-950/40 px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <span className="text-xs font-semibold text-slate-300">
                   {inspectorMode === "script"
                     ? t({
                         ko: "실행 중인 Script",

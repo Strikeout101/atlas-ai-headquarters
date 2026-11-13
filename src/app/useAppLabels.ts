@@ -41,21 +41,21 @@ export function useAppLabels({
   const viewTitle = (() => {
     switch (view) {
       case "office":
-        return `🏢 ${pickLang(uiLanguage, {
+        return `${pickLang(uiLanguage, {
           ko: "오피스",
           en: "Office",
           ja: "オフィス",
           zh: "办公室",
         })}`;
       case "dashboard":
-        return `📊 ${pickLang(uiLanguage, {
+        return `${pickLang(uiLanguage, {
           ko: "대시보드",
           en: "Dashboard",
           ja: "ダッシュボード",
           zh: "仪表盘",
         })}`;
       case "tasks":
-        return `📋 ${pickLang(uiLanguage, {
+        return `${pickLang(uiLanguage, {
           ko: "업무 관리",
           en: "Tasks",
           ja: "タスク管理",
@@ -69,14 +69,14 @@ export function useAppLabels({
           zh: "员工管理",
         })}`;
       case "skills":
-        return `📚 ${pickLang(uiLanguage, {
+        return `${pickLang(uiLanguage, {
           ko: "문서고",
           en: "Skills",
           ja: "スキル資料室",
           zh: "技能库",
         })}`;
       case "settings":
-        return `⚙️ ${pickLang(uiLanguage, {
+        return `${pickLang(uiLanguage, {
           ko: "설정",
           en: "Settings",
           ja: "設定",
@@ -86,13 +86,13 @@ export function useAppLabels({
         return "";
     }
   })();
-  const announcementLabel = `📢 ${pickLang(uiLanguage, {
+  const announcementLabel = `${pickLang(uiLanguage, {
     ko: "전사 공지",
     en: "Announcement",
     ja: "全社告知",
     zh: "全员公告",
   })}`;
-  const roomManagerLabel = `🏢 ${pickLang(uiLanguage, {
+  const roomManagerLabel = `${pickLang(uiLanguage, {
     ko: "사무실 관리",
     en: "Office Manager",
     ja: "オフィス管理",
@@ -122,7 +122,7 @@ export function useAppLabels({
     ],
     [departments, uiLanguage],
   );
-  const reportLabel = `📋 ${pickLang(uiLanguage, {
+  const reportLabel = `${pickLang(uiLanguage, {
     ko: "보고서",
     en: "Reports",
     ja: "レポート",

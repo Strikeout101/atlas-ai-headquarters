@@ -151,7 +151,7 @@ export default function GitHubImportWizard({
                   type="button"
                   onClick={onDirectInputSubmit}
                   disabled={!directInput.trim()}
-                  className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                  className="shrink-0 rounded-lg ax-btn-primary px-4 py-2 text-xs font-medium disabled:opacity-40"
                 >
                   {t({ ko: "이동", en: "Go", ja: "移動", zh: "前往" })}
                 </button>
@@ -390,7 +390,7 @@ export default function GitHubImportWizard({
                 type="button"
                 onClick={onImport}
                 disabled={creating || !projectName.trim() || !targetPath.trim()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                className="rounded-lg ax-btn-primary px-4 py-2 text-sm font-medium disabled:opacity-40"
               >
                 {creating
                   ? t({ ko: "가져오는 중...", en: "Importing...", ja: "インポート中...", zh: "正在导入..." })

@@ -122,7 +122,7 @@ export default function BulkHideModal({ tasks, hiddenTaskIds, onClose, onApply }
           <button
             onClick={() => onApply(selectedStatuses)}
             disabled={hideTargetCount <= 0}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+            className="rounded-lg ax-btn-primary px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
           >
             {t({ ko: "숨김 적용", en: "Apply hide", ja: "非表示適用", zh: "应用隐藏" })} ({hideTargetCount})
           </button>

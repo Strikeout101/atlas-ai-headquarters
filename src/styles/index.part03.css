@@ -351,67 +351,20 @@
   justify-content: center;
 }
 
-/* ─── Game Dashboard Styles ─── */
+/* ─── Panels ─── */
 .game-panel {
-  background: var(--th-glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--th-glass-border);
-  border-radius: 1rem;
-  box-shadow:
-    0 8px 32px var(--th-glass-shadow),
-    inset 0 1px 0 var(--th-glass-highlight);
-}
-[data-theme="light"] .game-panel {
-  background: rgba(255, 252, 246, 0.72);
-  border-color: rgba(210, 200, 180, 0.35);
-  box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: var(--th-panel-bg);
+  border: 1px solid var(--th-panel-border);
+  border-radius: 10px;
 }
 
-/* ── Dashboard title gradient ── */
-.dashboard-title-gradient {
-  background: linear-gradient(135deg, #00f0ff, #3b82f6, #c45ff6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 12px rgba(0, 240, 255, 0.3));
-}
-[data-theme="light"] .dashboard-title-gradient {
-  background: linear-gradient(135deg, #1a5276, #1e40af, #6d28d9);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: none;
-}
-
-/* ── Dashboard ranking board gradient ── */
+/* Legacy dashboard text treatments now render as plain headings */
+.dashboard-title-gradient,
 .dashboard-ranking-gradient {
-  background: linear-gradient(135deg, #ffd700, #ffa500);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.3));
+  color: var(--th-text-heading);
 }
-[data-theme="light"] .dashboard-ranking-gradient {
-  background: linear-gradient(135deg, #b8860b, #d2691e);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: none;
-}
-
-/* ── Dashboard time display ── */
 .dashboard-time-display {
-  color: #a5f3fc;
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
-}
-[data-theme="light"] .dashboard-time-display {
-  color: #0e7490;
-  text-shadow: none;
-}
-
-/* ── Dashboard ambient orbs: soften for light mode ── */
-[data-theme="light"] .animate-drift-slow,
-[data-theme="light"] .animate-drift-slow-rev {
-  opacity: 0.3;
+  color: var(--th-text-heading);
 }
 
 /* ── Dashboard scanline overlay: hide for light mode ── */
@@ -427,16 +380,16 @@
   color: #059669 !important;
 }
 [data-theme="light"] [class*="text-cyan-200"] {
-  color: #0e7490 !important;
+  color: #2f6b6e !important;
 }
 [data-theme="light"] [class*="text-orange-300"] {
   color: #c2410c !important;
 }
 [data-theme="light"] [class*="text-cyan-300"] {
-  color: #0891b2 !important;
+  color: #378487 !important;
 }
 [data-theme="light"] [class*="text-violet-100"] {
-  color: #6d28d9 !important;
+  color: #594c94 !important;
 }
 [data-theme="light"] [class*="text-emerald-100"] {
   color: #047857 !important;
@@ -451,10 +404,10 @@
   color: #9a3412 !important;
 }
 [data-theme="light"] [class*="text-blue-100"] {
-  color: #1e40af !important;
+  color: #334774 !important;
 }
 [data-theme="light"] [class*="text-cyan-100"] {
-  color: #0e7490 !important;
+  color: #2f6b6e !important;
 }
 [data-theme="light"] [class*="text-teal-100"] {
   color: #115e59 !important;

@@ -1,3 +1,4 @@
+import { Building, FileText, ListChecks, Loader2, Megaphone, Menu, Moon, Signpost, Sun, Wrench } from "lucide-react";
 import type { WorkflowPackKey } from "../types";
 import type { View } from "./types";
 
@@ -69,7 +70,7 @@ export default function AppHeaderBar({
 }: AppHeaderBarProps) {
   return (
     <header
-      className="sticky top-0 z-30 flex items-center justify-between px-3 py-2 backdrop-blur-sm sm:px-4 sm:py-3 lg:px-6"
+      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-3 backdrop-blur-md sm:px-4 lg:px-6"
       style={{ borderBottom: "1px solid var(--th-border)", background: "var(--th-bg-header)" }}
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -83,28 +84,12 @@ export default function AppHeaderBar({
           }}
           aria-label="Open navigation"
         >
-          ☰
+          <Menu size={16} strokeWidth={1.75} />
         </button>
         <h1
-          className="truncate text-base font-bold sm:text-lg flex items-center gap-2"
+          className="flex items-center gap-2 truncate text-[15px] font-semibold"
           style={{ color: "var(--th-text-heading)" }}
         >
-          {currentView === "agents" && (
-            <span className="relative inline-flex items-center" style={{ width: 30, height: 22 }}>
-              <img
-                src="/sprites/8-D-1.png"
-                alt=""
-                className="absolute left-0 top-0 w-5 h-5 rounded-full object-cover"
-                style={{ imageRendering: "pixelated", opacity: 0.85 }}
-              />
-              <img
-                src="/sprites/3-D-1.png"
-                alt=""
-                className="absolute left-2.5 top-0.5 w-5 h-5 rounded-full object-cover"
-                style={{ imageRendering: "pixelated", zIndex: 1 }}
-              />
-            </span>
-          )}
           <span className="truncate">{viewTitle}</span>
         </h1>
         {officePackControl && (
@@ -112,7 +97,7 @@ export default function AppHeaderBar({
             className="hidden xl:flex items-center gap-2 rounded-lg px-2 py-1"
             style={{ border: "1px solid var(--th-border)", background: "var(--th-bg-surface)" }}
           >
-            <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--th-text-muted)" }}>
+            <span className="text-[11.5px] font-medium" style={{ color: "var(--th-text-muted)" }}>
               {officePackControl.label}
             </span>
             <select
@@ -130,14 +115,14 @@ export default function AppHeaderBar({
           </label>
         )}
       </div>
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-1.5">
         <button
           onClick={onOpenTasks}
           className="header-action-btn header-action-btn-primary"
           aria-label={tasksPrimaryLabel}
         >
-          <span className="sm:hidden">📋</span>
-          <span className="hidden sm:inline">📋 {tasksPrimaryLabel}</span>
+          <ListChecks size={15} strokeWidth={2} />
+          <span className="hidden sm:inline">{tasksPrimaryLabel}</span>
         </button>
         <button
           onClick={onOpenDecisionInbox}
@@ -147,23 +132,28 @@ export default function AppHeaderBar({
           }`}
           aria-label={decisionLabel}
         >
-          <span className="sm:hidden">{decisionInboxLoading ? "⏳" : "🧭"}</span>
-          <span className="hidden sm:inline">
-            {decisionInboxLoading ? "⏳" : "🧭"} {decisionLabel}
-          </span>
+          {decisionInboxLoading ? (
+            <Loader2 size={15} strokeWidth={1.75} className="animate-spin" />
+          ) : (
+            <Signpost size={15} strokeWidth={1.75} />
+          )}
+          <span className="hidden sm:inline">{decisionLabel}</span>
           {decisionInboxCount > 0 && <span className="header-decision-badge">{decisionInboxCount}</span>}
         </button>
         <button onClick={onOpenAgentStatus} className="header-action-btn header-action-btn-secondary mobile-hidden">
-          &#x1F6E0; {agentStatusLabel}
+          <Wrench size={15} strokeWidth={1.75} />
+          {agentStatusLabel}
         </button>
         <button onClick={onOpenReportHistory} className="header-action-btn header-action-btn-secondary mobile-hidden">
+          <FileText size={15} strokeWidth={1.75} />
           {reportLabel}
         </button>
         <button onClick={onOpenAnnouncement} className="header-action-btn header-action-btn-secondary">
-          <span className="sm:hidden">📢</span>
+          <Megaphone size={15} strokeWidth={1.75} />
           <span className="hidden sm:inline">{announcementLabel}</span>
         </button>
         <button onClick={onOpenRoomManager} className="header-action-btn header-action-btn-secondary mobile-hidden">
+          <Building size={15} strokeWidth={1.75} />
           {roomManagerLabel}
         </button>
         <button
@@ -173,41 +163,7 @@ export default function AppHeaderBar({
           title={theme === "dark" ? "라이트 모드" : "다크 모드"}
         >
           <span className="theme-toggle-icon">
-            {theme === "dark" ? (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            ) : (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            )}
+            {theme === "dark" ? <Moon size={16} strokeWidth={1.75} /> : <Sun size={16} strokeWidth={1.75} />}
           </span>
         </button>
         <div className="relative sm:hidden">
@@ -247,7 +203,7 @@ export default function AppHeaderBar({
                   <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--th-border)" }}>
                     <label
                       htmlFor="mobile-office-pack-selector"
-                      className="mb-1 block text-[10px] uppercase tracking-wider"
+                      className="mb-1 block text-[11.5px] font-medium"
                       style={{ color: "var(--th-text-muted)" }}
                     >
                       {officePackControl.label}
@@ -282,7 +238,8 @@ export default function AppHeaderBar({
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:opacity-80"
                   style={{ color: "var(--th-text-primary)" }}
                 >
-                  &#x1F6E0; {agentStatusLabel}
+                  <Wrench size={15} strokeWidth={1.75} />
+                  {agentStatusLabel}
                 </button>
                 <button
                   onClick={() => {
@@ -309,7 +266,10 @@ export default function AppHeaderBar({
           )}
         </div>
         <div className="flex items-center gap-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
-          <div className={`w-2 h-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: connected ? "var(--ax-working)" : "var(--ax-danger)" }}
+          />
           <span className="hidden sm:inline">{connected ? "Live" : "Offline"}</span>
         </div>
       </div>

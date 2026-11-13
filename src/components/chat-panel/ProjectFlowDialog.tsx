@@ -96,7 +96,7 @@ export default function ProjectFlowDialog({
                 <button
                   type="button"
                   onClick={onChooseExisting}
-                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500"
+                  className="flex-1 rounded-lg ax-btn-primary px-3 py-2 text-xs font-medium"
                 >
                   {tr("기존 프로젝트", "Existing Project", "既存プロジェクト", "已有项目")}
                 </button>
@@ -278,7 +278,7 @@ export default function ProjectFlowDialog({
                 <button
                   type="button"
                   onClick={onConfirm}
-                  className="flex-1 rounded bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500"
+                  className="flex-1 rounded ax-btn-primary px-3 py-2 text-xs font-medium"
                 >
                   {tr("선택 후 전송", "Select & Send", "選択して送信", "选择并发送")}
                 </button>

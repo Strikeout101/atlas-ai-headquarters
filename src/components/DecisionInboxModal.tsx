@@ -1,3 +1,4 @@
+import { Signpost, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { UiLanguage } from "../i18n";
 import { pickLang } from "../i18n";
@@ -215,16 +216,19 @@ export default function DecisionInboxModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative mx-4 w-full max-w-3xl rounded-2xl border border-indigo-500/30 bg-slate-900 shadow-2xl shadow-indigo-500/10"
+        className="relative mx-4 w-full max-w-3xl rounded-[14px] border border-slate-700 bg-slate-900 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🧭</span>
-            <h2 className="text-lg font-bold text-white">
+            <Signpost size={20} strokeWidth={1.75} style={{ color: "var(--ax-signal)" }} />
+            <h2 className="text-[17px] font-semibold text-white">
               {t({ ko: "미결 의사결정", en: "Pending Decisions", ja: "未決の意思決定", zh: "待处理决策" })}
             </h2>
-            <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
+              style={{ background: "var(--ax-signal-soft)", color: "var(--ax-signal)" }}
+            >
               {items.length}
             </span>
           </div>
@@ -239,7 +243,7 @@ export default function DecisionInboxModal({
               onClick={onClose}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
             >
-              ✕
+              <X size={16} strokeWidth={1.75} />
             </button>
           </div>
         </div>

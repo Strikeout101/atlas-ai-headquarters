@@ -1,0 +1,376 @@
+/* ─── ATLAS: shared life layer ───
+   Texture, depth and motion shared by every screen. Motion either answers
+   an action (hover, open) or marks something live (working agents). */
+
+:root,
+[data-theme="dark"] {
+  --ax-contour: rgba(227, 163, 59, 0.085);
+  --ax-summit: rgba(227, 163, 59, 0.07);
+  --ax-shadow-1: 0 1px 0 rgba(255, 255, 255, 0.035) inset, 0 1px 2px rgba(0, 0, 0, 0.28);
+  --ax-shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 10px 28px -12px rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] {
+  --ax-contour: rgba(168, 100, 0, 0.1);
+  --ax-summit: rgba(227, 163, 59, 0.1);
+  --ax-shadow-1: 0 1px 2px rgba(25, 28, 33, 0.05);
+  --ax-shadow-lift: 0 12px 28px -14px rgba(60, 45, 20, 0.28);
+}
+
+/* Topographic backdrop: the ATLAS signature, very quiet */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 40% 45% at 74% 12%, var(--ax-summit), transparent 70%), var(--ax-ink);
+}
+.app-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ax-contour);
+  -webkit-mask: url("/textures/atlas-contours.svg") center / cover no-repeat;
+  mask: url("/textures/atlas-contours.svg") center / cover no-repeat;
+}
+
+/* Depth for surfaces */
+.ax-panel,
+.game-panel {
+  box-shadow: var(--ax-shadow-1);
+}
+
+/* Interactive cards lift toward the pointer */
+.ax-lift {
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.ax-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ax-shadow-lift);
+  border-color: var(--th-border-strong) !important;
+}
+.ax-lift:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* Primary action, usable anywhere */
+.ax-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--ax-signal);
+  background: var(--ax-signal) !important;
+  color: var(--ax-signal-ink) !important;
+  font-weight: 600;
+  transition:
+    filter 0.15s ease,
+    transform 0.1s ease;
+}
+.ax-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.ax-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.ax-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Underline tabs */
+.ax-tabs {
+  display: flex;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--th-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ax-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--th-text-muted);
+  transition: color 0.15s ease;
+}
+.ax-tab:hover {
+  color: var(--th-text-primary);
+}
+.ax-tab[aria-selected="true"],
+.ax-tab.active {
+  color: var(--th-text-heading);
+}
+.ax-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ax-signal);
+  transform: scaleX(0);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ax-tab[aria-selected="true"]::after,
+.ax-tab.active::after {
+  transform: scaleX(1);
+}
+
+/* Live indicator: a dot that breathes while something is working */
+.ax-live {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--ax-working);
+}
+.ax-live::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: ax-breathe 2.4s ease-out infinite;
+}
+@keyframes ax-breathe {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Dialogs open with a short rise; overlay fades */
+.fixed.inset-0.flex.items-center.justify-center {
+  animation: ax-fade 0.16s ease-out both;
+}
+.fixed.inset-0.flex.items-center.justify-center > :not(button) {
+  animation: ax-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes ax-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ax-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+/* Form controls pick up the signal focus ring */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--ax-signal) !important;
+  box-shadow: 0 0 0 3px var(--th-focus-ring-shadow) !important;
+}
+button:focus-visible,
+[role="tab"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--th-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-lift,
+  .ax-tab::after,
+  .ax-live::after,
+  .fixed.inset-0.flex.items-center.justify-center,
+  .fixed.inset-0.flex.items-center.justify-center > :not(button) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─── Task cards ─── */
+.ax-task-card {
+  position: relative;
+  background: var(--th-panel-bg) !important;
+  border-color: var(--th-border) !important;
+  box-shadow: var(--ax-shadow-1);
+}
+.ax-task-card[data-status="in_progress"] {
+  box-shadow:
+    inset 2px 0 0 var(--ax-signal),
+    var(--ax-shadow-1);
+}
+.ax-task-card[data-status="in_progress"]::after {
+  /* a thin running line at the foot of active cards */
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--ax-signal), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: ax-run 2.2s ease-in-out infinite;
+}
+@keyframes ax-run {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+/* Priority: three ascending bars */
+.ax-priority {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.ax-priority i {
+  display: block;
+  width: 3px;
+  border-radius: 1px;
+  background: var(--th-border-strong);
+}
+.ax-priority i:nth-child(1) {
+  height: 5px;
+}
+.ax-priority i:nth-child(2) {
+  height: 8px;
+}
+.ax-priority i:nth-child(3) {
+  height: 12px;
+}
+.ax-priority[data-level="low"] i:nth-child(1),
+.ax-priority[data-level="medium"] i:nth-child(-n + 2) {
+  background: var(--th-text-secondary);
+}
+.ax-priority[data-level="high"] i {
+  background: var(--ax-danger);
+}
+
+/* Compact action buttons on cards */
+.ax-act {
+  --tone: var(--th-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 1.75rem;
+  padding: 0 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--th-border);
+  background: transparent;
+  color: var(--tone);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.ax-act:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  color: var(--th-text-heading);
+}
+.ax-act[data-tone="go"] {
+  --tone: var(--ax-working);
+  background: color-mix(in srgb, var(--ax-working) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ax-working) 40%, transparent);
+  color: var(--th-text-heading);
+}
+.ax-act[data-tone="warn"] {
+  --tone: var(--ax-signal);
+}
+.ax-act[data-tone="danger"] {
+  --tone: var(--ax-danger);
+}
+.ax-act[data-tone="info"] {
+  --tone: var(--ax-review);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-task-card[data-status="in_progress"]::after {
+    animation: none;
+  }
+}
+
+/* ─── Filter chips ─── */
+.ax-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--th-border);
+  background: var(--th-panel-bg);
+  color: var(--th-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.ax-chip:hover {
+  border-color: var(--th-border-strong);
+  color: var(--th-text-primary);
+}
+.ax-chip[aria-pressed="true"] {
+  background: var(--th-text-heading);
+  border-color: var(--th-text-heading);
+  color: var(--th-bg-primary);
+}
+.ax-chip-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+/* ─── Agent cards: working agents get a live ring ─── */
+.ax-agent-face > :first-child {
+  transition: box-shadow 0.2s ease;
+}
+.ax-agent-card[data-status="working"] .ax-agent-face > :first-child {
+  box-shadow:
+    0 0 0 2px var(--th-card-bg),
+    0 0 0 4px var(--ax-working);
+}
+.ax-agent-card[data-status="working"] {
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--ax-working) 10%, transparent), transparent 60%),
+    var(--th-card-bg) !important;
+}
+
+/* CEO's own chat messages carry the signal colour */
+.ax-bubble-self {
+  background: var(--ax-signal);
+  color: var(--ax-signal-ink);
+  box-shadow: 0 6px 16px -10px var(--ax-signal);
+}
+.ax-bubble-self * {
+  color: inherit;
+}

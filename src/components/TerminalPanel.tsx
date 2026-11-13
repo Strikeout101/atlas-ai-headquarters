@@ -1,3 +1,4 @@
+import { SquareTerminal } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { Agent, Task, MeetingMinute } from "../types";
 import * as api from "../api";
@@ -702,7 +703,7 @@ export default function TerminalPanel({
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {meetingMinutes.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center" style={{ color: "var(--th-text-muted)" }}>
-              <div className="text-3xl mb-3">📝</div>
+              <SquareTerminal size={30} strokeWidth={1.5} className="mx-auto mb-3 opacity-50" />
               <div className="text-sm">
                 {tr("회의록이 아직 없습니다", "No meeting minutes yet", "会議録はまだありません", "暂无会议纪要")}
               </div>

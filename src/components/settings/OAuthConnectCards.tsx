@@ -12,7 +12,7 @@ export default function OAuthConnectCards({
 }: OAuthConnectCardProps) {
   return (
     <div className="space-y-3">
-      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="text-xs font-semibold text-slate-500">
         {t({
           ko: "OAuth 계정 추가",
           en: "Add OAuth Account",
@@ -85,7 +85,7 @@ export default function OAuthConnectCards({
                     ) : (
                       <button
                         onClick={() => void onStartDeviceCodeFlow()}
-                        className="text-[11px] px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                        className="text-[11px] px-3 py-1 rounded-lg ax-btn-primary font-medium transition-colors"
                       >
                         {isConnected || isDetectedOnly
                           ? t({ ko: "계정 추가", en: "Add Account", ja: "アカウント追加", zh: "添加账号" })
@@ -95,7 +95,7 @@ export default function OAuthConnectCards({
                   ) : (
                     <button
                       onClick={() => onConnect(id)}
-                      className="text-[11px] px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+                      className="text-[11px] px-3 py-1 rounded-lg ax-btn-primary font-medium transition-colors"
                     >
                       {isConnected || isDetectedOnly
                         ? t({ ko: "계정 추가", en: "Add Account", ja: "アカウント追加", zh: "添加账号" })

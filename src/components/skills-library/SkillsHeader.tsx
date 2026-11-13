@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import type { TFunction } from "./model";
 
 interface SkillsHeaderProps {
@@ -20,11 +21,10 @@ export default function SkillsHeader({
   onOpenCustomSkillModal,
 }: SkillsHeaderProps) {
   return (
-    <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5">
+    <div className="ax-panel p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="text-2xl">📚</span>
+          <h2 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
             {t({
               ko: "Agent Skills 문서고",
               en: "Agent Skills Library",
@@ -34,17 +34,17 @@ export default function SkillsHeader({
           </h2>
           <p className="text-sm text-slate-400 mt-1">
             {t({
-              ko: "AI 에이전트 스킬 디렉토리 · skills.sh 실시간 데이터",
-              en: "AI agent skill directory · live skills.sh data",
-              ja: "AI エージェントスキルディレクトリ · skills.sh リアルタイムデータ",
-              zh: "AI 代理技能目录 · skills.sh 实时数据",
+              ko: "AI 에이전트 스킬 디렉토리, skills.sh 실시간 데이터",
+              en: "Skills your agents can learn, live from skills.sh",
+              ja: "AI エージェントスキルディレクトリ（skills.sh リアルタイムデータ）",
+              zh: "AI 代理技能目录（skills.sh 实时数据）",
             })}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenCustomSkillModal}
-            className="custom-skill-add-btn flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-violet-600/20 text-violet-300 border border-violet-500/30 rounded-lg hover:bg-violet-600/30 transition-all"
+            className="custom-skill-add-btn header-action-btn header-action-btn-secondary !border-[var(--th-border)]"
             title={t({
               ko: "커스텀 스킬 직접 추가",
               en: "Add custom skill",
@@ -52,11 +52,16 @@ export default function SkillsHeader({
               zh: "添加自定义技能",
             })}
           >
-            <span className="text-base">✏️</span>
-            {t({ ko: "커스텀 스킬 추가", en: "Add Custom Skill", ja: "カスタムスキル追加", zh: "添加自定义技能" })}
+            <Plus size={15} strokeWidth={2} />
+            {t({ ko: "커스텀 스킬 추가", en: "Add custom skill", ja: "カスタムスキル追加", zh: "添加自定义技能" })}
           </button>
           <div className="text-right">
-            <div className="text-2xl font-bold text-empire-gold">{skillsCount}</div>
+            <div
+              className="text-[26px] font-semibold leading-none tabular-nums tracking-[-0.02em]"
+              style={{ color: "var(--th-text-heading)" }}
+            >
+              {skillsCount}
+            </div>
             <div className="text-xs text-slate-500">
               {t({ ko: "등록된 스킬", en: "Registered skills", ja: "登録済みスキル", zh: "已收录技能" })}
             </div>

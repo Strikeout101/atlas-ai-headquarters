@@ -1,3 +1,4 @@
+import { Image as ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Department } from "../../types";
 import { localeName, useI18n } from "../../i18n";
@@ -99,10 +100,7 @@ export default function AgentFormModal({
         <div className="grid grid-cols-2 gap-5">
           {/* ── Left column: 기본 정보 ── */}
           <div className="space-y-4">
-            <div
-              className="text-[10px] font-semibold uppercase tracking-widest"
-              style={{ color: "var(--th-text-muted)" }}
-            >
+            <div className="text-[11.5px] font-semibold" style={{ color: "var(--th-text-muted)" }}>
               {tr("기본 정보", "Basic Info")}
             </div>
             {/* ── 스프라이트 얼굴 미리보기 + 위/아래 변경 ── */}
@@ -250,10 +248,7 @@ export default function AgentFormModal({
 
           {/* ── Right column: 역할 설정 ── */}
           <div className="space-y-4">
-            <div
-              className="text-[10px] font-semibold uppercase tracking-widest"
-              style={{ color: "var(--th-text-muted)" }}
-            >
+            <div className="text-[11.5px] font-semibold" style={{ color: "var(--th-text-muted)" }}>
               {tr("역할 설정", "Role Config")}
             </div>
             {/* 직급 */}
@@ -325,10 +320,7 @@ export default function AgentFormModal({
 
         {/* ── Sprite Upload ── */}
         <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--th-card-border)" }}>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-widest mb-3"
-            style={{ color: "var(--th-text-muted)" }}
-          >
+          <div className="text-[11.5px] font-semibold mb-3" style={{ color: "var(--th-text-muted)" }}>
             {tr("캐릭터 스프라이트", "Character Sprite")}
           </div>
 
@@ -337,7 +329,7 @@ export default function AgentFormModal({
               className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:border-blue-500/50"
               style={{ borderColor: "var(--th-input-border)", color: "var(--th-text-muted)" }}
             >
-              <span className="text-2xl">🖼️</span>
+              <ImageIcon size={22} strokeWidth={1.5} />
               <span className="text-xs">
                 {tr("4방향 스프라이트 시트 업로드 (2x2 그리드)", "Upload 4-direction sprite sheet (2x2 grid)")}
               </span>
@@ -378,7 +370,7 @@ export default function AgentFormModal({
 
           {processing && (
             <div className="flex items-center justify-center gap-2 py-8" style={{ color: "var(--th-text-muted)" }}>
-              <span className="animate-spin text-lg">⏳</span>
+              <Loader2 size={18} className="animate-spin" />
               <span className="text-sm">
                 {tr("배경 제거 및 분할 처리 중...", "Removing background & splitting...")}
               </span>
@@ -484,7 +476,7 @@ export default function AgentFormModal({
           <button
             onClick={onSave}
             disabled={saving || !form.name.trim()}
-            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white disabled:opacity-40 shadow-sm shadow-blue-600/20"
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ax-btn-primary disabled:opacity-40 shadow-sm"
           >
             {saving
               ? tr("처리 중...", "Saving...")

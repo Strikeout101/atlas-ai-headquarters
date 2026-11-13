@@ -17,7 +17,7 @@ export default function CliSettingsTab({
       style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--th-text-primary)" }}>
+        <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
           {t({ ko: "CLI 도구 상태", en: "CLI Tool Status", ja: "CLI ツール状態", zh: "CLI 工具状态" })}
         </h3>
         <button onClick={onRefresh} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">

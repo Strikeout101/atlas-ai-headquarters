@@ -318,10 +318,7 @@ export default function ChatEditorModal({
           >
             {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
           </button>
-          <button
-            onClick={handleSaveEditor}
-            className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-500"
-          >
+          <button onClick={handleSaveEditor} className="px-3 py-1.5 text-xs rounded ax-btn-primary">
             {t({ ko: "확인", en: "Confirm", ja: "確認", zh: "确认" })}
           </button>
         </div>

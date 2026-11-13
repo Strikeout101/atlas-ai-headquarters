@@ -242,7 +242,7 @@ export default function CreateTaskModalView({
             <button
               type="submit"
               disabled={!title.trim() || submitBusy}
-              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg ax-btn-primary px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitBusy
                 ? t({ ko: "생성 중...", en: "Creating...", ja: "作成中...", zh: "创建中..." })

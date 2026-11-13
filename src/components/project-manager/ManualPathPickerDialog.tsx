@@ -138,7 +138,7 @@ export default function ManualPathPickerDialog({
             type="button"
             disabled={!manualPathCurrent}
             onClick={onSelectCurrent}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md ax-btn-primary px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t({ ko: "현재 폴더 선택", en: "Select Current Folder", ja: "現在フォルダを選択", zh: "选择当前文件夹" })}
           </button>

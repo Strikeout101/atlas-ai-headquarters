@@ -32,7 +32,7 @@ export default function GitHubOAuthAppConfig({ t }: { t: TFunction }) {
   return (
     <div className="space-y-2 rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
       <div className="flex items-center gap-2">
-        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+        <h4 className="text-xs font-semibold text-slate-400">
           {t({
             ko: "GitHub OAuth App (Private 리포 접근)",
             en: "GitHub OAuth App (Private repo access)",
@@ -107,7 +107,7 @@ export default function GitHubOAuthAppConfig({ t }: { t: TFunction }) {
           />
           <button
             onClick={saveClientId}
-            className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-500"
+            className="shrink-0 rounded-lg ax-btn-primary px-3 py-1.5 text-[11px] font-medium"
           >
             {t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
           </button>

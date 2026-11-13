@@ -1,7 +1,7 @@
 import type { Agent, Department } from "../../types";
 import { localeName } from "../../i18n";
 import AgentCard from "./AgentCard";
-import { StackedSpriteIcon } from "./EmojiPicker";
+import { Search } from "lucide-react";
 import type { Translator } from "./types";
 
 interface AgentsTabProps {
@@ -45,7 +45,6 @@ export default function AgentsTab({
   onEditDepartment,
   onDeleteAgent,
   saving,
-  randomIconSprites,
 }: AgentsTabProps) {
   const workingCount = agents.filter((agent) => agent.status === "working").length;
   const deptCounts = new Map<string, { total: number; working: number }>();
@@ -59,70 +58,67 @@ export default function AgentsTab({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
         {[
-          {
-            label: tr("전체 인원", "Total"),
-            value: agents.length,
-            icon: <StackedSpriteIcon sprites={randomIconSprites.total} />,
-          },
-          { label: tr("근무 중", "Working"), value: workingCount, icon: "💼" },
-          { label: tr("부서", "Departments"), value: departments.length, icon: "🏢" },
+          { label: tr("전체 인원", "Agents"), value: agents.length, live: false },
+          { label: tr("근무 중", "Working now"), value: workingCount, live: workingCount > 0 },
+          { label: tr("부서", "Departments"), value: departments.length, live: false },
         ].map((summary) => (
-          <div
-            key={summary.label}
-            className="rounded-xl px-4 py-3"
-            style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
-          >
-            <div className="text-xs mb-1" style={{ color: "var(--th-text-muted)" }}>
-              {summary.icon} {summary.label}
-            </div>
-            <div className="text-2xl font-bold tabular-nums" style={{ color: "var(--th-text-heading)" }}>
+          <div key={summary.label} className="flex items-baseline gap-2">
+            <span
+              className="text-[26px] font-semibold leading-none tabular-nums tracking-[-0.02em]"
+              style={{ color: "var(--th-text-heading)" }}
+            >
               {summary.value}
-            </div>
+            </span>
+            <span className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--th-text-secondary)" }}>
+              {summary.live && <span className="ax-live" aria-hidden />}
+              {summary.label}
+            </span>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap" style={{ borderBottom: "1px solid var(--th-card-border)" }}>
-        <button
-          onClick={() => setDeptTab("all")}
-          className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
-            deptTab === "all" ? "text-blue-400 border-b-2 border-blue-400" : "hover:text-slate-200"
-          }`}
-          style={deptTab !== "all" ? { color: "var(--th-text-muted)" } : undefined}
-        >
-          {tr("전체", "All")} <span className="opacity-60">{agents.length}</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setDeptTab("all")} className="ax-chip" aria-pressed={deptTab === "all"}>
+          {tr("전체", "All")}
+          <span className="ax-chip-count">{agents.length}</span>
         </button>
         {departments.map((department) => {
           const count = deptCounts.get(department.id);
           return (
             <button
               key={department.id}
+              type="button"
               onClick={() => setDeptTab(department.id)}
               onDoubleClick={(e) => {
                 e.preventDefault();
                 onEditDepartment(department);
               }}
-              title={tr("더블클릭: 부서 편집", "Double-click: edit dept")}
-              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
-                deptTab === department.id ? "text-blue-400 border-b-2 border-blue-400" : "hover:text-slate-200"
-              }`}
-              style={deptTab !== department.id ? { color: "var(--th-text-muted)" } : undefined}
+              title={tr("더블클릭: 부서 편집", "Double-click to edit department")}
+              className="ax-chip"
+              aria-pressed={deptTab === department.id}
             >
-              <span>{department.icon}</span>
-              <span className="hidden sm:inline">{localeName(locale, department)}</span>
-              <span className="opacity-60">{count?.total ?? 0}</span>
+              <span className="h-2 w-2 rounded-full" style={{ background: department.color || "var(--ax-idle)" }} />
+              {localeName(locale, department)}
+              <span className="ax-chip-count">{count?.total ?? 0}</span>
+              {(count?.working ?? 0) > 0 && <span className="ax-live !h-1.5 !w-1.5" aria-hidden />}
             </button>
           );
         })}
-        <div className="ml-auto pb-1">
+        <div className="relative ml-auto">
+          <Search
+            size={14}
+            strokeWidth={1.75}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--th-text-muted)" }}
+          />
           <input
             type="text"
-            placeholder={`${tr("검색", "Search")}...`}
+            placeholder={tr("검색", "Search agents")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/40 transition-shadow w-36"
+            className="h-8 w-44 rounded-[7px] pl-8 pr-3 text-[13px] outline-none"
             style={{
               background: "var(--th-input-bg)",
               border: "1px solid var(--th-input-border)",
@@ -134,8 +130,7 @@ export default function AgentsTab({
 
       {sortedAgents.length === 0 ? (
         <div className="text-center py-16" style={{ color: "var(--th-text-muted)" }}>
-          <div className="text-3xl mb-2">🔍</div>
-          {tr("검색 결과 없음", "No agents found")}
+          {tr("검색 결과 없음", "No agents match this search.")}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

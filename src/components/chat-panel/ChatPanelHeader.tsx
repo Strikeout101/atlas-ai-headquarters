@@ -1,3 +1,4 @@
+import { Megaphone } from "lucide-react";
 import AgentAvatar from "../AgentAvatar";
 import type { Agent } from "../../types";
 
@@ -62,8 +63,8 @@ export default function ChatPanelHeader({
           </>
         ) : (
           <>
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-500/20 text-xl">
-              📢
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-400">
+              <Megaphone size={18} strokeWidth={1.75} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-white">
@@ -138,7 +139,7 @@ export default function ChatPanelHeader({
       {showAnnouncementBanner && (
         <div className="flex flex-shrink-0 items-center gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2">
           <span className="text-sm font-medium text-yellow-400">
-            📢{" "}
+            <Megaphone size={14} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
             {tr(
               "전사 공지 모드 - 모든 에이전트에게 전달됩니다",
               "Announcement mode - sent to all agents",

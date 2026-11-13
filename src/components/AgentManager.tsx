@@ -1,3 +1,4 @@
+import { Bot, Building2, Plus, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import type { Agent, Department } from "../types";
 import { useI18n } from "../i18n";
@@ -9,7 +10,6 @@ import AgentsTab from "./agent-manager/AgentsTab";
 import { BLANK, ICON_SPRITE_POOL } from "./agent-manager/constants";
 import DepartmentFormModal from "./agent-manager/DepartmentFormModal";
 import DepartmentsTab from "./agent-manager/DepartmentsTab";
-import { StackedSpriteIcon } from "./agent-manager/EmojiPicker";
 import type { AgentManagerProps, FormData } from "./agent-manager/types";
 import { pickRandomSpritePair } from "./agent-manager/utils";
 
@@ -483,47 +483,48 @@ export default function AgentManager({
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 sm:space-y-5">
-      <div className="flex items-center justify-end gap-2">
-        <button
-          onClick={openCreateDept}
-          className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 active:opacity-80 shadow-sm"
-          style={{ background: "#7c3aed", color: "#ffffff", boxShadow: "0 1px 3px rgba(124,58,237,0.3)" }}
-        >
-          + {tr("부서 추가", "Add Dept")}
-        </button>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 rounded-lg text-sm font-medium transition-all bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white shadow-sm shadow-blue-600/20"
-        >
-          + {tr("신규 채용", "Hire Agent")}
-        </button>
-      </div>
-
-      <div
-        className="flex gap-1 p-1 rounded-xl"
-        style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
-      >
-        {[
-          {
-            key: "agents" as const,
-            label: tr("직원관리", "Agents"),
-            icon: <StackedSpriteIcon sprites={randomIconSprites.tab} />,
-          },
-          { key: "departments" as const, label: tr("부서관리", "Departments"), icon: "🏢" },
-        ].map((tab) => (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div role="tablist" className="ax-tabs flex-1">
+          {[
+            { key: "agents" as const, label: tr("직원관리", "Agents"), Icon: Bot, count: agents.length },
+            {
+              key: "departments" as const,
+              label: tr("부서관리", "Departments"),
+              Icon: Building2,
+              count: departments.length,
+            },
+          ].map(({ key, label, Icon, count }) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={subTab === key}
+              onClick={() => setSubTab(key)}
+              className="ax-tab"
+            >
+              <Icon size={15} strokeWidth={1.75} />
+              {label}
+              <span className="text-[11.5px] tabular-nums" style={{ color: "var(--th-text-muted)" }}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 pb-1.5">
           <button
-            key={tab.key}
-            onClick={() => setSubTab(tab.key)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              subTab === tab.key ? "bg-blue-600 text-white shadow-sm" : "hover:bg-white/5"
-            }`}
-            style={subTab !== tab.key ? { color: "var(--th-text-muted)" } : undefined}
+            type="button"
+            onClick={openCreateDept}
+            className="header-action-btn header-action-btn-secondary !border-[var(--th-border)]"
           >
-            <span>{tab.icon}</span>
-            {tab.label}
+            <Plus size={15} strokeWidth={2} />
+            {tr("부서 추가", "Add department")}
           </button>
-        ))}
+          <button type="button" onClick={openCreate} className="ax-btn-primary h-8 rounded-[7px] px-3.5 text-[13px]">
+            <UserPlus size={15} strokeWidth={2} />
+            {tr("신규 채용", "Hire agent")}
+          </button>
+        </div>
       </div>
 
       {subTab === "agents" && (

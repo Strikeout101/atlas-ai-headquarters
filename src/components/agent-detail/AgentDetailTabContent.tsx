@@ -1,3 +1,4 @@
+import { MessageSquare, ListChecks, UserRound } from "lucide-react";
 import { localeName, type UiLanguage } from "../../i18n";
 import type { Agent, Department, SubAgent, SubTask, Task } from "../../types";
 import { getSubAgentSpriteNum, SUBTASK_STATUS_ICON, taskStatusLabel, taskTypeLabel, type TFunction } from "./constants";
@@ -71,15 +72,17 @@ export default function AgentDetailTabContent({
         <div className="flex gap-2 pt-2">
           <button
             onClick={() => onChat(agent)}
-            className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+            className="flex-1 py-2 rounded-lg ax-btn-primary text-sm font-medium transition-colors"
           >
-            💬 {t({ ko: "대화하기", en: "Chat", ja: "チャット", zh: "对话" })}
+            <MessageSquare size={15} strokeWidth={1.75} className="mr-1.5 inline -mt-0.5" />
+            {t({ ko: "대화하기", en: "Chat", ja: "チャット", zh: "对话" })}
           </button>
           <button
             onClick={() => onAssignTask(agent.id)}
             className="flex-1 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
           >
-            📋 {t({ ko: "업무 배정", en: "Assign Task", ja: "タスク割り当て", zh: "分配任务" })}
+            <ListChecks size={15} strokeWidth={1.75} className="mr-1.5 inline -mt-0.5" />
+            {t({ ko: "업무 배정", en: "Assign Task", ja: "タスク割り当て", zh: "分配任务" })}
           </button>
         </div>
         {agent.status === "working" && agent.current_task_id && onOpenTerminal && (
@@ -202,7 +205,7 @@ export default function AgentDetailTabContent({
     <div className="space-y-2">
       {agentSubAgents.length === 0 ? (
         <div className="text-center py-8 text-slate-500 text-sm">
-          <div className="text-3xl mb-2">🧑‍💼</div>
+          <UserRound size={28} strokeWidth={1.5} className="mx-auto mb-2 opacity-50" />
           {t({
             ko: "현재 알바생이 없습니다",
             en: "No sub-agents currently",
@@ -241,8 +244,8 @@ export default function AgentDetailTabContent({
               </div>
               <div className="text-xs text-slate-500 mt-0.5">
                 {subAgent.status === "working"
-                  ? `🔨 ${t({ ko: "작업중...", en: "Working...", ja: "作業中...", zh: "工作中..." })}`
-                  : `✅ ${t({ ko: "완료", en: "Done", ja: "完了", zh: "完成" })}`}
+                  ? `${t({ ko: "작업중...", en: "Working...", ja: "作業中...", zh: "工作中..." })}`
+                  : `${t({ ko: "완료", en: "Done", ja: "完了", zh: "完成" })}`}
               </div>
             </div>
             {subAgent.status === "working" && (

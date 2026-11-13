@@ -1,8 +1,31 @@
 import { useState } from "react";
+import {
+  BookOpen,
+  Bot,
+  Briefcase,
+  Building2,
+  Clapperboard,
+  LayoutDashboard,
+  ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Server,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import type { Department, Agent, CompanySettings } from "../types";
 import { useI18n, localeName } from "../i18n";
 
-type View = "office" | "agents" | "dashboard" | "tasks" | "business" | "homelab" | "model_director" | "skills" | "settings";
+type View =
+  | "office"
+  | "agents"
+  | "dashboard"
+  | "tasks"
+  | "business"
+  | "homelab"
+  | "model_director"
+  | "skills"
+  | "settings";
 
 interface SidebarProps {
   currentView: View;
@@ -13,17 +36,26 @@ interface SidebarProps {
   connected: boolean;
 }
 
-const NAV_ITEMS: { view: View; icon: string; sprite?: string }[] = [
-  { view: "office", icon: "🏢" },
-  { view: "agents", icon: "👥", sprite: "/sprites/3-D-1.png" },
-  { view: "skills", icon: "📚" },
-  { view: "dashboard", icon: "📊" },
-  { view: "tasks", icon: "📋" },
-  { view: "business", icon: "B" },
-  { view: "homelab", icon: "H" },
-  { view: "model_director", icon: "M" },
-  { view: "settings", icon: "⚙️" },
+const NAV_ITEMS: { view: View; icon: LucideIcon }[] = [
+  { view: "office", icon: Building2 },
+  { view: "agents", icon: Bot },
+  { view: "skills", icon: BookOpen },
+  { view: "dashboard", icon: LayoutDashboard },
+  { view: "tasks", icon: ListChecks },
+  { view: "business", icon: Briefcase },
+  { view: "homelab", icon: Server },
+  { view: "model_director", icon: Clapperboard },
+  { view: "settings", icon: Settings },
 ];
+
+function monogram(name: string): string {
+  const letters = name
+    .split(/[\s\-_]+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("");
+  return (letters || name.slice(0, 1) || "A").slice(0, 2).toUpperCase();
+}
 
 export default function Sidebar({ currentView, onChangeView, departments, agents, settings, connected }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -45,77 +77,73 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
     settings: tr("설정", "Settings", "設定", "设置"),
   };
 
+  const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+
   return (
     <aside
-      className={`flex h-full flex-col backdrop-blur-sm transition-all duration-300 ${collapsed ? "w-16" : "w-48"}`}
+      className={`flex h-full flex-col transition-[width] duration-200 ${collapsed ? "w-[60px]" : "w-56"}`}
       style={{ background: "var(--th-bg-sidebar)", borderRight: "1px solid var(--th-border)" }}
     >
-      {/* Logo */}
-      <div
-        className="flex items-center gap-2 px-3 py-4"
-        style={{ borderBottom: "1px solid var(--th-border)", boxShadow: "0 4px 12px rgba(59, 130, 246, 0.06)" }}
-      >
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+      <div className={`flex h-14 items-center gap-2.5 ${collapsed ? "justify-center px-2" : "px-3"}`}>
+        <div
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] text-[13px] font-semibold"
+          style={{ background: "var(--th-text-heading)", color: "var(--th-bg-primary)" }}
+          aria-hidden
         >
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 relative overflow-visible">
-            <img
-              src="/sprites/ceo-lobster.png"
-              alt={tr("CEO", "CEO")}
-              className="w-8 h-8 object-contain"
-              style={{ imageRendering: "pixelated" }}
-            />
-            <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[10px] leading-none drop-shadow">👑</span>
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <div className="text-sm font-bold truncate" style={{ color: "var(--th-text-heading)" }}>
-                {settings.companyName}
-              </div>
-              <div className="text-[10px]" style={{ color: "var(--th-text-muted)" }}>
-                👑 {settings.ceoName}
-              </div>
+          {monogram(settings.companyName)}
+        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-[13px] font-semibold" style={{ color: "var(--th-text-heading)" }}>
+              {settings.companyName}
             </div>
-          )}
-        </button>
+            <div className="truncate text-[11px]" style={{ color: "var(--th-text-muted)" }}>
+              {settings.ceoName}
+            </div>
+          </div>
+        )}
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="theme-toggle-btn !h-7 !w-7"
+            aria-label={tr("사이드바 접기", "Collapse sidebar")}
+          >
+            <CollapseIcon size={15} strokeWidth={1.75} />
+          </button>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-2 space-y-0.5 px-2">
-        {NAV_ITEMS.map((item) => (
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pt-1">
+        {collapsed && (
           <button
-            key={item.view}
-            onClick={() => onChangeView(item.view)}
-            className={`sidebar-nav-item ${
-              currentView === item.view ? "active font-semibold shadow-sm shadow-blue-500/10" : ""
-            }`}
+            type="button"
+            onClick={() => setCollapsed(false)}
+            className="sidebar-nav-item justify-center !px-0"
+            aria-label={tr("사이드바 펼치기", "Expand sidebar")}
           >
-            <span className="text-base shrink-0">
-              {item.sprite ? (
-                <img
-                  src={item.sprite}
-                  alt=""
-                  className="w-5 h-5 object-cover rounded-full"
-                  style={{ imageRendering: "pixelated" }}
-                />
-              ) : (
-                item.icon
-              )}
-            </span>
-            {!collapsed && <span>{navLabels[item.view]}</span>}
+            <CollapseIcon size={16} strokeWidth={1.75} />
+          </button>
+        )}
+        {NAV_ITEMS.map(({ view, icon: Icon }) => (
+          <button
+            key={view}
+            type="button"
+            onClick={() => onChangeView(view)}
+            className={`sidebar-nav-item ${currentView === view ? "active" : ""} ${collapsed ? "justify-center !px-0" : ""}`}
+            aria-current={currentView === view ? "page" : undefined}
+            title={collapsed ? navLabels[view] : undefined}
+          >
+            <Icon size={16} strokeWidth={1.75} />
+            {!collapsed && <span className="truncate">{navLabels[view]}</span>}
           </button>
         ))}
       </nav>
 
-      {/* Department quick stats */}
-      {!collapsed && (
-        <div className="px-3 py-2" style={{ borderTop: "1px solid var(--th-border)" }}>
-          <div
-            className="text-[10px] uppercase font-semibold mb-1.5 tracking-wider"
-            style={{ color: "var(--th-text-muted)" }}
-          >
-            {tr("부서 현황", "Department Status", "部門状況", "部门状态")}
+      {!collapsed && departments.length > 0 && (
+        <div className="px-2 pb-2 pt-3" style={{ borderTop: "1px solid var(--th-border)" }}>
+          <div className="mb-1 px-2 text-[11px] font-medium" style={{ color: "var(--th-text-muted)" }}>
+            {tr("부서", "Departments", "部門", "部门")}
           </div>
           {departments.map((d) => {
             const deptAgents = agents.filter((a) => a.department_id === d.id);
@@ -123,12 +151,18 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
             return (
               <div
                 key={d.id}
-                className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-[var(--th-bg-surface-hover)] transition-colors"
+                className="flex h-7 items-center gap-2 rounded-md px-2 text-[12px]"
                 style={{ color: "var(--th-text-secondary)" }}
               >
-                <span>{d.icon}</span>
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: working > 0 ? "var(--ax-working)" : "var(--ax-idle)" }}
+                />
                 <span className="flex-1 truncate">{localeName(locale, d)}</span>
-                <span className={working > 0 ? "text-blue-400 font-medium" : ""}>
+                <span
+                  className="tabular-nums"
+                  style={{ color: working > 0 ? "var(--th-text-primary)" : "var(--th-text-muted)" }}
+                >
                   {working}/{deptAgents.length}
                 </span>
               </div>
@@ -137,19 +171,27 @@ export default function Sidebar({ currentView, onChangeView, departments, agents
         </div>
       )}
 
-      {/* Status bar */}
-      <div className="px-3 py-2.5" style={{ borderTop: "1px solid var(--th-border)" }}>
-        <div className="flex items-center gap-2">
-          <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
-          {!collapsed && (
-            <div className="text-[10px]" style={{ color: "var(--th-text-muted)" }}>
-              {connected
-                ? tr("연결됨", "Connected", "接続中", "已连接")
-                : tr("연결 끊김", "Disconnected", "接続なし", "已断开")}{" "}
-              · {workingCount}/{totalAgents} {tr("근무중", "working", "稼働中", "工作中")}
-            </div>
-          )}
-        </div>
+      <div
+        className={`flex h-10 items-center gap-2 text-[11px] ${collapsed ? "justify-center" : "px-4"}`}
+        style={{ borderTop: "1px solid var(--th-border)", color: "var(--th-text-muted)" }}
+        title={connected ? undefined : tr("서버 연결 끊김", "Server disconnected")}
+      >
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ background: connected ? "var(--ax-working)" : "var(--ax-danger)" }}
+        />
+        {!collapsed && (
+          <span className="truncate">
+            {connected
+              ? tr(
+                  `${workingCount}/${totalAgents} 근무중`,
+                  `${workingCount} of ${totalAgents} agents working`,
+                  `${workingCount}/${totalAgents} 稼働中`,
+                  `${workingCount}/${totalAgents} 工作中`,
+                )
+              : tr("연결 끊김", "Disconnected", "接続なし", "已断开")}
+          </span>
+        )}
       </div>
     </aside>
   );

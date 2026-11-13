@@ -61,7 +61,7 @@ export default function ApiSettingsTab({ t, localeTag, apiState }: ApiSettingsTa
     <>
       <section className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/60 p-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+          <h3 className="text-sm font-semibold text-slate-300">
             {t({ ko: "API 프로바이더", en: "API Providers", ja: "API プロバイダー", zh: "API 提供方" })}
           </h3>
           <div className="flex items-center gap-2">
@@ -349,7 +349,7 @@ export default function ApiSettingsTab({ t, localeTag, apiState }: ApiSettingsTa
               <button
                 onClick={() => void handleApiProviderSave()}
                 disabled={apiSaving || !apiForm.name.trim() || !apiForm.base_url.trim()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg ax-btn-primary px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {apiSaving
                   ? t({ ko: "저장 중...", en: "Saving...", ja: "保存中...", zh: "保存中..." })

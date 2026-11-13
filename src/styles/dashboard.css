@@ -1,0 +1,149 @@
+/* ─── ATLAS dashboard: graphite console ─── */
+
+.ax-panel {
+  background: var(--th-panel-bg);
+  border: 1px solid var(--th-panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Pipeline stages share hairline dividers whatever the column count:
+   each stage draws its own left/top rule and the list is pulled 1px up-left
+   so the outer edge rules disappear under the panel border. */
+.ax-panel > ol:has(.ax-stage) {
+  margin: -1px 0 0 -1px;
+}
+.ax-stage {
+  box-shadow:
+    inset 1px 0 0 var(--th-border),
+    inset 0 1px 0 var(--th-border);
+}
+.ax-stage-arrow {
+  z-index: 1;
+  border-radius: 9999px;
+}
+
+/* Workforce ribbon: one segment per agent */
+.ax-ribbon {
+  display: flex;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ax-ribbon-seg {
+  flex: 1 1 0;
+  min-width: 4px;
+  border-radius: 3px;
+  transform-origin: bottom;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s ease;
+  animation: ax-seg-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  cursor: default;
+  outline: none;
+}
+.ax-ribbon:hover .ax-ribbon-seg:not([data-active]) {
+  opacity: 0.55;
+}
+.ax-ribbon-seg[data-active] {
+  transform: scaleY(1.12);
+}
+.ax-ribbon-seg:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--th-panel-bg),
+    0 0 0 4px var(--th-focus-ring);
+}
+
+@keyframes ax-seg-in {
+  from {
+    transform: scaleY(0.15);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-ribbon-seg {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Ribbon segments as tiles: tinted body, solid status base, agent face */
+.ax-ribbon {
+  height: 54px;
+}
+.ax-ribbon-seg {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--seg) 20%, var(--th-panel-bg));
+  box-shadow: inset 0 -4px 0 var(--seg);
+}
+.ax-seg-face {
+  display: flex;
+  margin-bottom: 3px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--seg) 55%, transparent);
+  transition: filter 0.2s ease;
+}
+.ax-ribbon-seg[data-status="idle"] .ax-seg-face,
+.ax-ribbon-seg[data-status="offline"] .ax-seg-face {
+  filter: grayscale(1) opacity(0.6);
+}
+.ax-ribbon-seg[data-active] .ax-seg-face {
+  filter: none;
+}
+@container (max-width: 30px) {
+  .ax-seg-face {
+    display: none;
+  }
+}
+/* Working agents carry a slow light sweep so the ribbon reads as live */
+.ax-ribbon-seg[data-status="working"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--seg) 35%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: ax-sweep 3.2s ease-in-out infinite;
+}
+@keyframes ax-sweep {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Pipeline stages tint when they hold work */
+.ax-stage[data-busy] {
+  background: color-mix(in srgb, var(--stage) 9%, transparent);
+}
+.ax-stage[data-busy]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--stage);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ax-ribbon-seg[data-status="working"]::after {
+    animation: none;
+    display: none;
+  }
+}

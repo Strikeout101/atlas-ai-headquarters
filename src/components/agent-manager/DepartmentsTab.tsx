@@ -1,3 +1,4 @@
+import { Building2 } from "lucide-react";
 import type { DragEvent } from "react";
 import type { Agent, Department } from "../../types";
 import { localeName } from "../../i18n";
@@ -57,7 +58,7 @@ export default function DepartmentsTab({
           <button
             onClick={onSaveOrder}
             disabled={reorderSaving}
-            className="ml-auto px-4 py-1.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-all"
+            className="ml-auto px-4 py-1.5 rounded-lg text-sm font-medium ax-btn-primary disabled:opacity-50 transition-all"
           >
             {reorderSaving ? tr("저장 중...", "Saving...") : tr("순번 저장", "Save Order")}
           </button>
@@ -162,7 +163,7 @@ export default function DepartmentsTab({
 
       {deptOrder.length === 0 && (
         <div className="text-center py-16" style={{ color: "var(--th-text-muted)" }}>
-          <div className="text-3xl mb-2">🏢</div>
+          <Building2 size={28} strokeWidth={1.5} className="mx-auto mb-2 opacity-50" />
           {tr("등록된 부서가 없습니다.", "No departments found.")}
         </div>
       )}

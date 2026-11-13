@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { EyeOff, FolderKanban, Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { bulkHideTasks } from "../api";
 import { useI18n } from "../i18n";
@@ -131,9 +133,9 @@ export function TaskBoard({
   }, [tasks, hiddenTaskIds]);
 
   return (
-    <div className="taskboard-shell flex h-full flex-col gap-4 bg-slate-950 p-3 sm:p-4">
+    <div className="taskboard-shell flex h-full flex-col gap-4 p-3 sm:p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold text-white">
+        <h1 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
           {t({ ko: "업무 보드", en: "Task Board", ja: "タスクボード", zh: "任务看板" })}
         </h1>
         <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-400">
@@ -205,19 +207,19 @@ export function TaskBoard({
               zh: "隐藏完成/待处理/已取消任务",
             })}
           >
-            🙈 {t({ ko: "숨김", en: "Hide", ja: "非表示", zh: "隐藏" })}
+            <EyeOff size={13} strokeWidth={1.75} className="mr-1 inline -mt-px" />
+            {t({ ko: "숨김", en: "Hide", ja: "非表示", zh: "隐藏" })}
           </button>
           <button
             onClick={() => setShowProjectManager(true)}
             className="taskboard-project-manage-btn rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
           >
-            🗂 {t({ ko: "프로젝트 관리", en: "Project Manager", ja: "プロジェクト管理", zh: "项目管理" })}
+            <FolderKanban size={13} strokeWidth={1.75} className="mr-1 inline -mt-px" />
+            {t({ ko: "프로젝트 관리", en: "Project Manager", ja: "プロジェクト管理", zh: "项目管理" })}
           </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white shadow transition hover:bg-blue-500 active:scale-95"
-          >
-            + {t({ ko: "새 업무", en: "New Task", ja: "新規タスク", zh: "新建任务" })}
+          <button onClick={() => setShowCreate(true)} className="ax-btn-primary h-8 rounded-[7px] px-3.5 text-[13px]">
+            <Plus size={15} strokeWidth={2} />
+            {t({ ko: "새 업무", en: "New task", ja: "新規タスク", zh: "新建任务" })}
           </button>
         </div>
       </div>
@@ -241,23 +243,34 @@ export function TaskBoard({
           return (
             <div
               key={column.status}
-              className={`taskboard-column flex w-full flex-col rounded-xl border sm:w-72 sm:flex-shrink-0 ${column.borderColor} bg-slate-900`}
+              className="taskboard-column flex w-full flex-col rounded-[10px] border sm:w-72 sm:flex-shrink-0"
+              style={{ "--col": column.color } as CSSProperties}
+              data-busy={columnTasks.length > 0 || undefined}
             >
-              <div className={`flex items-center justify-between rounded-t-xl ${column.headerBg} px-3.5 py-2.5`}>
+              <div className="taskboard-column-head flex items-center justify-between px-3.5 py-2.5">
                 <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${column.dotColor}`} />
-                  <span className="text-sm font-semibold text-white">
-                    {column.icon} {taskStatusLabel(column.status, t)}
+                  <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: column.color }} />
+                  <span className="text-[13px] font-semibold" style={{ color: "var(--th-text-heading)" }}>
+                    {taskStatusLabel(column.status, t)}
                   </span>
                 </div>
-                <span className="rounded-full bg-black/30 px-2 py-0.5 text-xs font-bold text-white/80">
+                <span
+                  className="min-w-6 rounded-full px-2 py-0.5 text-center text-[11.5px] font-medium tabular-nums"
+                  style={{
+                    background: "color-mix(in srgb, var(--col) 16%, transparent)",
+                    color: "var(--th-text-primary)",
+                  }}
+                >
                   {columnTasks.length}
                 </span>
               </div>
 
               <div className="flex flex-col gap-2.5 p-2.5 sm:flex-1 sm:overflow-y-auto">
                 {columnTasks.length === 0 ? (
-                  <div className="flex min-h-24 items-center justify-center py-8 text-xs text-slate-600 sm:flex-1">
+                  <div
+                    className="flex min-h-24 items-center justify-center rounded-lg border border-dashed py-8 text-xs sm:flex-1"
+                    style={{ borderColor: "var(--th-border)", color: "var(--th-text-muted)" }}
+                  >
                     {t({ ko: "업무 없음", en: "No tasks", ja: "タスクなし", zh: "暂无任务" })}
                   </div>
                 ) : (

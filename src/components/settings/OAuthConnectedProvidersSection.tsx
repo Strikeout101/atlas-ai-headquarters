@@ -37,7 +37,7 @@ export default function OAuthConnectedProvidersSection({
 
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+      <div className="text-xs font-semibold text-slate-500 mb-2">
         {t({ ko: "인증 상태", en: "Auth Status", ja: "認証状態", zh: "认证状态" })}
       </div>
       {detectedProviders.map(([provider, info]) => {
@@ -119,7 +119,7 @@ export default function OAuthConnectedProvidersSection({
                 {isExpired && !info.hasRefreshToken && isWebOAuth && (
                   <button
                     onClick={() => onConnect(provider as OAuthConnectProvider)}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+                    className="text-xs px-2.5 py-1 rounded-lg ax-btn-primary transition-colors"
                   >
                     {t({ ko: "재연결", en: "Reconnect", ja: "再接続", zh: "重新连接" })}
                   </button>
@@ -242,7 +242,7 @@ export default function OAuthConnectedProvidersSection({
             {accountList.length > 0 && (
               <div className="space-y-2 rounded-lg border border-slate-600/40 bg-slate-800/40 p-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="text-[11px] font-semibold text-slate-400">
                     {t({ ko: "계정 풀", en: "Account Pool", ja: "アカウントプール", zh: "账号池" })}
                   </div>
                   <div className="text-[10px] text-slate-500 text-right">
@@ -295,7 +295,7 @@ export default function OAuthConnectedProvidersSection({
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <label className="space-y-1">
-                          <span className="block text-[10px] uppercase tracking-wider text-slate-500">
+                          <span className="block text-[11.5px] font-medium text-slate-500">
                             {t({ ko: "라벨", en: "Label", ja: "ラベル", zh: "标签" })}
                           </span>
                           <input
@@ -312,7 +312,7 @@ export default function OAuthConnectedProvidersSection({
                         </label>
 
                         <label className="space-y-1">
-                          <span className="block text-[10px] uppercase tracking-wider text-slate-500">
+                          <span className="block text-[11.5px] font-medium text-slate-500">
                             {t({ ko: "모델 오버라이드", en: "Model Override", ja: "モデル上書き", zh: "模型覆盖" })}
                           </span>
                           <select
@@ -338,7 +338,7 @@ export default function OAuthConnectedProvidersSection({
                         </label>
 
                         <label className="space-y-1">
-                          <span className="block text-[10px] uppercase tracking-wider text-slate-500">
+                          <span className="block text-[11.5px] font-medium text-slate-500">
                             {t({ ko: "우선순위", en: "Priority", ja: "優先度", zh: "优先级" })}
                           </span>
                           <input

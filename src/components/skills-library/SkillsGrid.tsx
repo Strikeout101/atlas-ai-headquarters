@@ -4,11 +4,9 @@ import type { Agent } from "../../types";
 import AgentAvatar from "../AgentAvatar";
 import {
   CATEGORY_COLORS,
-  CATEGORY_ICONS,
   categoryLabel,
   cliProviderIcon,
   formatFirstSeen,
-  getRankBadge,
   learnedProviderLabel,
   localizeAuditStatus,
   type CategorizedSkill,
@@ -56,7 +54,6 @@ export default function SkillsGrid({
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {filtered.map((skill) => {
-          const badge = getRankBadge(skill.rank);
           const catColor = CATEGORY_COLORS[skill.category] || CATEGORY_COLORS.Other;
           const detailId = skill.skillId || skill.name;
           const detailKey = `${skill.repo}/${detailId}`;
@@ -68,17 +65,27 @@ export default function SkillsGrid({
           return (
             <div
               key={`${skill.rank}-${detailId}`}
-              className="relative bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:bg-slate-800/70 hover:border-slate-600/50 transition-all group"
+              className="ax-lift relative rounded-[10px] border p-4 group"
+              style={{ background: "var(--th-card-bg)", borderColor: "var(--th-card-border)" }}
               onMouseEnter={() => onHoverEnter(skill)}
               onMouseLeave={onHoverLeave}
             >
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900/60 text-sm font-bold">
-                    {badge.icon ? <span>{badge.icon}</span> : <span className={badge.color}>#{skill.rank}</span>}
+                  <div
+                    className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-[12px] font-semibold tabular-nums"
+                    style={
+                      skill.rank <= 3
+                        ? { background: "var(--ax-signal-soft)", color: "var(--ax-signal)" }
+                        : { background: "var(--th-bg-surface)", color: "var(--th-text-muted)" }
+                    }
+                  >
+                    {skill.rank}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-white">{skill.name}</div>
+                    <div className="truncate text-[13.5px] font-semibold" style={{ color: "var(--th-text-heading)" }}>
+                      {skill.name}
+                    </div>
                     <div className="mt-0.5 truncate text-xs text-slate-500">{skill.repo}</div>
                   </div>
                 </div>
@@ -108,7 +115,7 @@ export default function SkillsGrid({
 
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full border ${catColor}`}>
-                  {CATEGORY_ICONS[skill.category]} {categoryLabel(skill.category, t)}
+                  {categoryLabel(skill.category, t)}
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-slate-400">
@@ -184,7 +191,7 @@ export default function SkillsGrid({
 
                       {detail.whenToUse.length > 0 && (
                         <div className="space-y-1.5">
-                          <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+                          <div className="text-[10px] text-slate-500">
                             {t({ ko: "사용 시점", en: "When to Use", ja: "使うタイミング", zh: "适用场景" })}
                           </div>
                           <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-300">
@@ -212,7 +219,7 @@ export default function SkillsGrid({
 
                       {detail.platforms.length > 0 && (
                         <div>
-                          <div className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-wider">
+                          <div className="text-[10px] text-slate-500 mb-1.5">
                             {t({
                               ko: "플랫폼별 설치",
                               en: "Platform Installs",

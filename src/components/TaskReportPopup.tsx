@@ -271,7 +271,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
         </div>
       )}
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+        <p className="mb-2 text-xs font-medium text-slate-500">
           {t({ ko: "문서 원문", en: "Source Documents", ja: "原本文書", zh: "原始文档" })}
         </p>
         {renderDocuments(planningDocs, "planning")}
@@ -307,7 +307,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
 
         {team.linked_subtasks.length > 0 && (
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            <p className="mb-2 text-xs font-medium text-slate-500">
               {t({ ko: "연결된 서브태스크", en: "Linked Subtasks", ja: "関連サブタスク", zh: "关联子任务" })}
             </p>
             <div className="space-y-1.5">
@@ -325,7 +325,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
         )}
 
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+          <p className="mb-2 text-xs font-medium text-slate-500">
             {t({ ko: "팀 문서", en: "Team Documents", ja: "チーム文書", zh: "团队文档" })}
           </p>
           {renderDocuments(team.documents ?? [], `team:${team.id}`)}
@@ -333,7 +333,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
 
         {keyLogs.length > 0 && (
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            <p className="mb-2 text-xs font-medium text-slate-500">
               {t({ ko: "진행 로그", en: "Progress Logs", ja: "進行ログ", zh: "进度日志" })}
             </p>
             <div className="space-y-1">

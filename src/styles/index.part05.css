@@ -1,5 +1,5 @@
 [data-theme="light"] .chat-header::after {
-  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(69, 101, 173, 0.2), transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -25,10 +25,10 @@
   height: 50%;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: #3b82f6;
+  background: #5679c2;
 }
 [data-theme="light"] .sidebar-nav-active::before {
-  background: #2563eb;
+  background: #4565ad;
 }
 
 /* ─── Settings toggle switch improvements ─── */

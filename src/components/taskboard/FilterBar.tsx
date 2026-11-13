@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import type { Agent, Department } from "../../types";
 import { useI18n } from "../../i18n";
 import AgentSelect from "../AgentSelect";
@@ -33,7 +34,7 @@ export default function FilterBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative min-w-[140px] flex-1 sm:min-w-[180px]">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔎</span>
+        <Search size={14} strokeWidth={1.75} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           value={search}

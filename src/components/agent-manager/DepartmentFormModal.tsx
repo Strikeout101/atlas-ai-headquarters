@@ -368,7 +368,7 @@ export default function DepartmentFormModal({
           <button
             onClick={handleSave}
             disabled={saving || !form.name.trim()}
-            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white disabled:opacity-40 shadow-sm shadow-blue-600/20"
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ax-btn-primary disabled:opacity-40 shadow-sm"
           >
             {saving
               ? tr("처리 중...", "Saving...")

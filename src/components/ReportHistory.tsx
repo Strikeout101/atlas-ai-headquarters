@@ -157,9 +157,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                 return (
                   <div key={projectName} className="overflow-hidden rounded-xl border border-slate-700/50">
                     <div className="flex items-center justify-between bg-slate-800/70 px-4 py-2">
-                      <p className="truncate text-xs font-semibold uppercase tracking-wider text-emerald-300">
-                        {projectName}
-                      </p>
+                      <p className="truncate text-xs font-semibold text-emerald-300">{projectName}</p>
                       <span className="text-[11px] text-slate-500">{rows.length}</span>
                     </div>
                     <div className="divide-y divide-slate-700/30">
