@@ -58,6 +58,8 @@ export type HomelabSshApproval = {
   status: "pending" | "approved" | "denied" | "consumed" | "expired" | string;
   created_at: number;
   decided_at?: number | null;
+  /** "owner" or "auto_read_only" when ATLAS approved a read-only check by itself. */
+  decided_by?: string | null;
   expires_at?: number | null;
 };
 
@@ -99,6 +101,16 @@ export function getHomelabSshRuns(targetId?: string): Promise<{ ok: true; runs: 
 
 export function getHomelabSshApprovals(): Promise<{ approvals: HomelabSshApproval[] }> {
   return request("/api/homelab/approvals");
+}
+
+export function getHomelabApprovalPolicy(): Promise<{ ok: true; auto_approve_read_only: boolean }> {
+  return request("/api/homelab/approval-policy");
+}
+
+export function setHomelabApprovalPolicy(
+  autoApproveReadOnly: boolean,
+): Promise<{ ok: true; auto_approve_read_only: boolean }> {
+  return put("/api/homelab/approval-policy", { auto_approve_read_only: autoApproveReadOnly });
 }
 
 export function decideHomelabSshApproval(id: string, approve: boolean): Promise<{ approval: HomelabSshApproval }> {

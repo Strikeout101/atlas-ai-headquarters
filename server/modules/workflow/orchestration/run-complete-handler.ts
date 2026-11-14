@@ -159,7 +159,8 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
         sshApproval = db
           .prepare(
             `SELECT id,status FROM homelab_ssh_approvals
-          WHERE task_id = ? AND created_at >= ? AND status IN ('pending','approved')
+          WHERE task_id = ? AND created_at >= ?
+            AND (status = 'pending' OR (status = 'approved' AND COALESCE(decided_by, '') <> 'auto_read_only'))
           ORDER BY created_at DESC LIMIT 1`,
           )
           .get(taskId, task.started_at) as typeof sshApproval;
@@ -182,7 +183,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       );
       broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
       notifyCeo(
-        `SSH command approval needed for '${task.title}'. Review it in Settings > SSH Hosts, then resume the task.`,
+        `SSH command approval needed for '${task.title}'. Review it on Today or in Homelab, then resume the task.`,
         taskId,
       );
       return;

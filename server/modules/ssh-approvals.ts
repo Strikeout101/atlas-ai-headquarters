@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret, encryptSecret } from "../oauth/helpers.ts";
+import { classifySshCommand } from "./ssh-command-policy.ts";
 
 const digest = (command: string) => createHash("sha256").update(command).digest("hex");
 
@@ -18,6 +19,32 @@ export function ensureSshApprovalSchema(db: DatabaseSync): void {
     consumed_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_homelab_ssh_approvals_status ON homelab_ssh_approvals(status, created_at DESC);`);
+  const columns = db.prepare("PRAGMA table_info(homelab_ssh_approvals)").all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === "decided_by")) {
+    db.exec("ALTER TABLE homelab_ssh_approvals ADD COLUMN decided_by TEXT");
+  }
+}
+
+export const AUTO_APPROVE_READ_ONLY_SETTING = "homelabAutoApproveReadOnly";
+
+/** Whether read-only SSH commands run without asking. On unless the owner turned it off. */
+export function isReadOnlyAutoApprovalEnabled(db: DatabaseSync): boolean {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(AUTO_APPROVE_READ_ONLY_SETTING) as
+      | { value: string }
+      | undefined;
+    if (!row) return true;
+    return JSON.parse(row.value) !== false;
+  } catch {
+    return true;
+  }
+}
+
+export function setReadOnlyAutoApproval(db: DatabaseSync, enabled: boolean): void {
+  db.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(
+    AUTO_APPROVE_READ_ONLY_SETTING,
+    JSON.stringify(enabled),
+  );
 }
 
 export function createSshApprovalRequest(
@@ -38,12 +65,34 @@ export function createSshApprovalRequest(
   if (!grant) throw new Error("ssh_agent_not_granted");
   const id = randomUUID();
   const now = Date.now();
+  // Read-only commands are approved on the spot; everything else waits for the owner.
+  const autoApprove = isReadOnlyAutoApprovalEnabled(db) && classifySshCommand(command).readOnly;
+  const status = autoApprove ? "approved" : "pending";
   db.prepare(
     `INSERT INTO homelab_ssh_approvals
-    (id,target_id,task_id,agent_id,command_enc,command_sha256,status,created_at)
-    VALUES (?,?,?,?,?,?,'pending',?)`,
-  ).run(id, targetId, taskId, agentId, encryptSecret(command), digest(command), now);
-  return { id, target_id: targetId, task_id: taskId, agent_id: agentId, status: "pending", created_at: now };
+    (id,target_id,task_id,agent_id,command_enc,command_sha256,status,created_at,decided_at,decided_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id,
+    targetId,
+    taskId,
+    agentId,
+    encryptSecret(command),
+    digest(command),
+    status,
+    now,
+    autoApprove ? now : null,
+    autoApprove ? "auto_read_only" : null,
+  );
+  return {
+    id,
+    target_id: targetId,
+    task_id: taskId,
+    agent_id: agentId,
+    status,
+    auto_approved: autoApprove,
+    created_at: now,
+  };
 }
 
 export function consumeSshApproval(
@@ -73,7 +122,7 @@ export function listSshApprovals(db: DatabaseSync) {
 export function getSshApprovalStatus(db: DatabaseSync, id: string, taskId: string, agentId: string) {
   return db
     .prepare(
-      "SELECT id,target_id,task_id,agent_id,status,created_at,decided_at,consumed_at FROM homelab_ssh_approvals WHERE id = ? AND task_id = ? AND agent_id = ?",
+      "SELECT id,target_id,task_id,agent_id,status,created_at,decided_at,decided_by,consumed_at FROM homelab_ssh_approvals WHERE id = ? AND task_id = ? AND agent_id = ?",
     )
     .get(id, taskId, agentId);
 }

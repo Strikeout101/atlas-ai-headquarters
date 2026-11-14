@@ -17,7 +17,8 @@ afterEach(() => databases.splice(0).forEach((db) => db.close()));
 function harness() {
   const db = new DatabaseSync(":memory:");
   databases.push(db);
-  db.exec(`CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, enabled INTEGER);
+  db.exec(`CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
+    CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, enabled INTEGER);
     CREATE TABLE homelab_ssh_grants (target_id TEXT, agent_id TEXT);
     INSERT INTO homelab_ssh_targets VALUES ('host-1',1);
     INSERT INTO homelab_ssh_grants VALUES ('host-1','worker');`);
@@ -29,18 +30,45 @@ function harness() {
 }
 
 describe("SSH command approvals", () => {
-  it("requires an owner decision and consumes permission only for the exact command once", async () => {
+  it("requires an owner decision for a state-changing command and consumes it only for that exact command once", async () => {
     const { app, db } = harness();
-    const approval = createSshApprovalRequest(db, "host-1", "task-1", "worker", "uptime");
-    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", "uptime")).toBe(false);
+    const cmd = "systemctl restart pihole-FTL";
+    const approval = createSshApprovalRequest(db, "host-1", "task-1", "worker", cmd);
+    expect(approval).toMatchObject({ status: "pending", auto_approved: false });
+    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", cmd)).toBe(false);
     await request(app).post(`/api/homelab/approvals/${approval.id}/decide`).send({ approve: true }).expect(403);
     const list = await request(app).get("/api/homelab/approvals").expect(200);
-    expect(list.body.approvals[0]).toMatchObject({ id: approval.id, command: "uptime", status: "pending" });
+    expect(list.body.approvals[0]).toMatchObject({ id: approval.id, command: cmd, status: "pending" });
     expect(JSON.stringify(list.body)).not.toContain("sealed:");
-    await request(app).post(`/api/homelab/approvals/${approval.id}/decide`).set("x-csrf-token", getCsrfToken()).send({ approve: true }).expect(200);
+    await request(app)
+      .post(`/api/homelab/approvals/${approval.id}/decide`)
+      .set("x-csrf-token", getCsrfToken())
+      .send({ approve: true })
+      .expect(200);
     expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", "rm -rf /tmp/x")).toBe(false);
-    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", "uptime")).toBe(true);
-    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", "uptime")).toBe(false);
+    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", cmd)).toBe(true);
+    expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", cmd)).toBe(false);
+  });
+
+  it("approves read-only checks on the spot, and asks for everything once the owner turns that off", async () => {
+    const { app, db } = harness();
+    const quick = createSshApprovalRequest(db, "host-1", "task-1", "worker", "systemctl status pihole-FTL --no-pager");
+    expect(quick).toMatchObject({ status: "approved", auto_approved: true });
+    expect(db.prepare("SELECT decided_by FROM homelab_ssh_approvals WHERE id = ?").get(quick.id)).toEqual({
+      decided_by: "auto_read_only",
+    });
+    expect(
+      consumeSshApproval(db, quick.id, "host-1", "task-1", "worker", "systemctl status pihole-FTL --no-pager"),
+    ).toBe(true);
+
+    await request(app).get("/api/homelab/approval-policy").expect(200, { ok: true, auto_approve_read_only: true });
+    await request(app).put("/api/homelab/approval-policy").send({ auto_approve_read_only: false }).expect(403);
+    await request(app)
+      .put("/api/homelab/approval-policy")
+      .set("x-csrf-token", getCsrfToken())
+      .send({ auto_approve_read_only: false })
+      .expect(200);
+    expect(createSshApprovalRequest(db, "host-1", "task-1", "worker", "uptime")).toMatchObject({ status: "pending" });
   });
 
   it("rejects a request without a host grant", () => {

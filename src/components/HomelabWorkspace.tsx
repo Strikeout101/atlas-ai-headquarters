@@ -6,6 +6,8 @@ import {
   decideHomelabSshApproval,
   deleteHomelabSshTarget,
   getHomelabSshApprovals,
+  getHomelabApprovalPolicy,
+  setHomelabApprovalPolicy,
   getHomelabSshRuns,
   getHomelabSshTargets,
   probeHomelabSshTarget,
@@ -86,6 +88,8 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
   const [approvals, setApprovals] = useState<HomelabSshApproval[]>([]);
   const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [loadingApprovals, setLoadingApprovals] = useState(false);
+  const [autoApproveReadOnly, setAutoApproveReadOnly] = useState<boolean | null>(null);
+  const [savingPolicy, setSavingPolicy] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [command, setCommand] = useState("");
   const [running, setRunning] = useState(false);
@@ -163,6 +167,30 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
   useEffect(() => {
     void refreshApprovals();
   }, [refreshApprovals]);
+
+  useEffect(() => {
+    getHomelabApprovalPolicy()
+      .then((policy) => setAutoApproveReadOnly(policy.auto_approve_read_only))
+      .catch(() => setAutoApproveReadOnly(null));
+  }, []);
+
+  async function changeApprovalPolicy(next: boolean) {
+    setSavingPolicy(true);
+    setError(null);
+    try {
+      const policy = await setHomelabApprovalPolicy(next);
+      setAutoApproveReadOnly(policy.auto_approve_read_only);
+      setNotice(
+        policy.auto_approve_read_only
+          ? "Read-only checks now run without asking. Anything that could change a host still needs your approval."
+          : "Every agent SSH command now needs your approval.",
+      );
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setSavingPolicy(false);
+    }
+  }
   useEffect(() => {
     setGrantDraft(selected?.agent_ids ?? []);
     setOutput(null);
@@ -298,7 +326,11 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
     try {
       await setHomelabSshGrants(selected.id, grantDraft);
       await refreshTargets(selected.id);
-      setNotice("Agent grants saved. Every agent command still needs owner approval.");
+      setNotice(
+        autoApproveReadOnly === false
+          ? "Agent grants saved. Every agent command still needs owner approval."
+          : "Agent grants saved. Commands that could change the host still need owner approval.",
+      );
     } catch (cause) {
       setError(errorText(cause));
     } finally {
@@ -650,7 +682,10 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
                   <div>
                     <h3 className="text-lg font-semibold">Agent access</h3>
                     <p className="mt-1 text-sm text-slate-400">
-                      A grant allows an agent to request SSH. Every command needs a separate owner approval.
+                      A grant allows an agent to request SSH.{" "}
+                      {autoApproveReadOnly === false
+                        ? "Every command needs a separate owner approval."
+                        : "Read-only checks run on their own; anything that could change the host needs your approval."}
                     </p>
                   </div>
                   <button
@@ -701,6 +736,23 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
                   <div>
                     <h3 className="text-lg font-semibold">Agent command approvals</h3>
                     <p className="mt-1 text-sm text-slate-400">Review the exact command and target before deciding.</p>
+                    <label className="mt-3 flex items-start gap-2 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={autoApproveReadOnly !== false}
+                        disabled={autoApproveReadOnly === null || savingPolicy}
+                        onChange={(event) => void changeApprovalPolicy(event.target.checked)}
+                      />
+                      <span>
+                        Let read-only checks run without asking
+                        <span className="block text-xs text-slate-400">
+                          Status, logs, disk and network lookups such as systemctl status, journalctl, df, docker ps.
+                          Anything that could change a host, chain commands, write files or read secrets still waits for
+                          you.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                   <button
                     type="button"
@@ -732,6 +784,7 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
                           </span>
                           <span className={approval.status === "pending" ? "text-amber-300" : "text-slate-400"}>
                             {approval.status}
+                            {approval.decided_by === "auto_read_only" ? " · auto (read-only)" : ""}
                           </span>
                         </div>
                         <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-200">
