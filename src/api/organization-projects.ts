@@ -129,6 +129,7 @@ export async function updateAgent(
       | "oauth_account_id"
       | "api_provider_id"
       | "api_model"
+      | "context_window_tokens"
       | "cli_model"
       | "cli_reasoning_level"
       | "avatar_emoji"

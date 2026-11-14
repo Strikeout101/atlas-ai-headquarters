@@ -5,6 +5,8 @@ import { decryptSecret } from "../../../../oauth/helpers.ts";
 import type { ApiProviderRow } from "./types.ts";
 import { IncompleteProviderStreamError } from "./stream-tools.ts";
 import { getCurrentTaskModelRoute } from "../../../model-routing.ts";
+import { createOpenCodeContextMonitor } from "./opencode-context-monitor.ts";
+import { setContextRolloverProcessPid } from "../context-rollover-store.ts";
 
 class ProviderUnavailableError extends Error {
   constructor(message: string) {
@@ -25,11 +27,23 @@ type CreateApiProviderToolsDeps = {
   activeProcesses: Map<string, ChildProcess>;
   broadcast: (event: string, payload: unknown) => void;
   normalizeStreamChunk: (raw: Buffer | string, opts?: { dropCliNoise?: boolean }) => string;
-  handleTaskRunComplete: (taskId: string, exitCode: number, failureKind?: "provider_unavailable" | "worker_interrupted") => void;
+  handleTaskRunComplete: (
+    taskId: string,
+    exitCode: number,
+    failureKind?: "provider_unavailable" | "worker_interrupted" | "context_exhausted" | "context_near_limit",
+  ) => void;
   spawnCliAgent: (
-    taskId: string, provider: string, prompt: string, projectPath: string, logPath: string,
-    model?: string, reasoningLevel?: string, extraEnv?: Record<string, string>,
+    taskId: string,
+    provider: string,
+    prompt: string,
+    projectPath: string,
+    logPath: string,
+    model?: string,
+    reasoningLevel?: string,
+    extraEnv?: Record<string, string>,
+    onRawOutput?: (chunk: Buffer, stream: "stdout" | "stderr") => void,
   ) => ChildProcess;
+  killPidTree?: (pid: number) => void;
   createSafeLogStreamOps: (logStream: any) => {
     safeWrite: (text: string) => boolean;
     safeEnd: (onDone?: () => void) => void;
@@ -58,6 +72,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     normalizeStreamChunk,
     handleTaskRunComplete,
     spawnCliAgent,
+    killPidTree,
     createSafeLogStreamOps,
     parseSSEStream,
     parseGeminiSSEStream,
@@ -310,22 +325,55 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         permission: { bash: { "*": "allow", "git commit*": "deny", "git push*": "deny" } },
       };
       let child: ChildProcess;
+      const agentConfig = db
+        .prepare(
+          "SELECT a.context_window_tokens FROM tasks t JOIN agents a ON a.id = t.assigned_agent_id WHERE t.id = ?",
+        )
+        .get(taskId) as { context_window_tokens?: number | null } | undefined;
+      const monitor = createOpenCodeContextMonitor({
+        contextWindowTokens: agentConfig?.context_window_tokens,
+        onNearLimit: () => {
+          if (child?.pid && killPidTree) killPidTree(child.pid);
+          else child?.kill("SIGINT");
+        },
+      });
       try {
         child = spawnCliAgent(
-          taskId, "opencode", prompt, projectPath, logPath, `${providerKey}/${model}`, undefined,
+          taskId,
+          "opencode",
+          prompt,
+          projectPath,
+          logPath,
+          `${providerKey}/${model}`,
+          undefined,
           { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) },
+          (chunk, stream) => monitor.ingest(chunk, stream),
         );
       } catch {
         if (onComplete) onComplete(1);
         else handleTaskRunComplete(taskId, 1, "provider_unavailable");
         return;
       }
+      if (child.pid && child.pid > 0) {
+        try {
+          setContextRolloverProcessPid(db as any, taskId, child.pid, Date.now());
+        } catch {
+          /* Optional schema in isolated tests. */
+        }
+      }
       const onAbort = () => child.kill();
       controller.signal.addEventListener("abort", onAbort, { once: true });
       child.once("close", async (code) => {
         controller.signal.removeEventListener("abort", onAbort);
+        monitor.finish();
+        // A late close from an older run must not complete or clear its replacement.
+        const currentProcess = activeProcesses.get(taskId);
+        if (currentProcess && currentProcess !== child) return;
         const exitCode = code ?? 1;
         if (onComplete) onComplete(exitCode);
+        else if (monitor.reason === "near_limit") handleTaskRunComplete(taskId, exitCode || 1, "context_near_limit");
+        else if (monitor.reason === "context_exhausted" && exitCode !== 0)
+          handleTaskRunComplete(taskId, exitCode, "context_exhausted");
         else if (exitCode === 0) handleTaskRunComplete(taskId, 0);
         else {
           let kind: "provider_unavailable" | "worker_interrupted" = "worker_interrupted";
@@ -375,8 +423,12 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         );
       } catch (err: any) {
         exitCode = 1;
-        if (!controller.signal.aborted &&
-            (err instanceof ProviderUnavailableError || err instanceof IncompleteProviderStreamError || err instanceof TypeError)) {
+        if (
+          !controller.signal.aborted &&
+          (err instanceof ProviderUnavailableError ||
+            err instanceof IncompleteProviderStreamError ||
+            err instanceof TypeError)
+        ) {
           failureKind = "provider_unavailable";
         }
         if (err.name !== "AbortError") {

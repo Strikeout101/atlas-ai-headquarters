@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS agents (
   oauth_account_id TEXT,
   api_provider_id TEXT,
   api_model TEXT,
+  context_window_tokens INTEGER CHECK(context_window_tokens IS NULL OR context_window_tokens > 0),
   cli_model TEXT,
   cli_reasoning_level TEXT,
   avatar_emoji TEXT NOT NULL DEFAULT '🤖',

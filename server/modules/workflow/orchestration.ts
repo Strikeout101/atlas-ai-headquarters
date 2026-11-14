@@ -34,6 +34,12 @@ import { createRunCompleteHandler } from "./orchestration/run-complete-handler.t
 import { createReportWorkflowTools } from "./orchestration/report-workflow-tools.ts";
 import { createSessionReviewTools } from "./orchestration/session-review-tools.ts";
 import {
+  claimContextRolloverResume,
+  getContextRollover,
+  holdContextRollover,
+  listPendingContextRollovers,
+} from "./agents/context-rollover-store.ts";
+import {
   extractReportDesignParentTaskId,
   extractReportPathByLabel,
   isPresentationReportTask,
@@ -59,6 +65,7 @@ interface AgentRow {
   oauth_account_id: string | null;
   api_provider_id: string | null;
   api_model: string | null;
+  context_window_tokens: number | null;
   cli_model: string | null;
   cli_reasoning_level: string | null;
 }
@@ -609,6 +616,68 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     notifyCeo,
   });
 
+  async function resumeContextRollover(taskId: string): Promise<void> {
+    const state = getContextRollover(db, taskId);
+    if (!state || state.status !== "pending_resume" || activeProcesses.has(taskId)) return;
+    const task = db.prepare("SELECT status, assigned_agent_id FROM tasks WHERE id = ?").get(taskId) as
+      | { status: string; assigned_agent_id: string | null }
+      | undefined;
+    if (task?.status !== "pending" || task.assigned_agent_id !== state.agentId) return;
+    const agent = db.prepare("SELECT * FROM agents WHERE id = ?").get(state.agentId) as AgentRow | undefined;
+    if (!agent || agent.status === "offline") return;
+    if (!claimContextRolloverResume(db, taskId, nowMs())) return;
+    try {
+      await startTaskExecutionForAgent(
+        taskId,
+        agent,
+        agent.department_id,
+        agent.department_id ? getDeptName(agent.department_id) : "Unassigned",
+      );
+      const latest = db.prepare("SELECT status FROM tasks WHERE id = ?").get(taskId) as { status: string } | undefined;
+      if (latest?.status === "in_progress" && activeProcesses.has(taskId)) {
+        appendTaskLog(
+          taskId,
+          "system",
+          `CONTEXT resumed automatically in existing worktree (rollover=${state.rolloverCount})`,
+        );
+        return;
+      }
+      if (latest?.status === "review" || latest?.status === "done") return;
+      if (latest?.status === "cancelled" || getContextRollover(db, taskId)?.status === "held") return;
+      throw new Error("rollover_restart_did_not_start_process");
+    } catch (error) {
+      const currentTask = db.prepare("SELECT status FROM tasks WHERE id = ?").get(taskId) as
+        | { status: string }
+        | undefined;
+      if (currentTask?.status === "cancelled" || getContextRollover(db, taskId)?.status === "held") return;
+      db.prepare("UPDATE tasks SET status = 'pending', updated_at = ? WHERE id = ? AND status = 'in_progress'").run(
+        nowMs(),
+        taskId,
+      );
+      db.prepare("UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ? AND current_task_id = ?").run(
+        state.agentId,
+        taskId,
+      );
+      holdContextRollover(db, taskId, nowMs());
+      appendTaskLog(taskId, "error", `CONTEXT restart held: ${String(error)}`);
+      broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
+      broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(state.agentId));
+      notifyCeo(`Context continuation for '${taskId}' could not start. Checkpoint and worktree are preserved.`, taskId);
+    }
+  }
+
+  function scheduleContextRolloverResume(taskId: string): void {
+    setTimeout(() => {
+      void resumeContextRollover(taskId).catch((error) => {
+        appendTaskLog(taskId, "error", `CONTEXT scheduler failed: ${String(error)}`);
+      });
+    }, 1_800);
+  }
+
+  function resumePendingContextRollovers(): void {
+    for (const state of listPendingContextRollovers(db)) scheduleContextRolloverResume(state.taskId);
+  }
+
   // ---------------------------------------------------------------------------
   // Run completion handler — enhanced with review flow + CEO reporting
   // ---------------------------------------------------------------------------
@@ -654,12 +723,13 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     getWorktreeDiffSummary,
     hasVisibleDiffSummary,
     runAgentOneShot,
+    scheduleContextRolloverResume,
   });
 
   function handleTaskRunComplete(
     taskId: string,
     exitCode: number,
-    failureKind?: "provider_unavailable" | "worker_interrupted",
+    failureKind?: "provider_unavailable" | "worker_interrupted" | "context_exhausted" | "context_near_limit",
   ): void {
     runCompleteHandler.handleTaskRunComplete(taskId, exitCode, failureKind);
   }
@@ -734,6 +804,7 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     archivePlanningConsolidatedReport,
     isAgentInMeeting,
     startTaskExecutionForAgent,
+    resumePendingContextRollovers,
     startPlannedApprovalMeeting,
     scheduleNextReviewRound,
     handleTaskRunComplete,

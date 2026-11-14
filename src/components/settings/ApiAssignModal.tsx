@@ -10,10 +10,25 @@ interface ApiAssignModalProps {
 }
 
 export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModalProps) {
-  const { apiAssignTarget, apiAssigning, apiAssignAgents, apiAssignDepts, setApiAssignTarget, handleApiAssignToAgent } =
-    apiState;
+  const {
+    apiAssignTarget,
+    apiAssigning,
+    apiAssignAgents,
+    apiAssignDepts,
+    apiProviders,
+    contextWindowTokensInput,
+    setContextWindowTokensInput,
+    setApiAssignTarget,
+    handleApiAssignToAgent,
+  } = apiState;
 
   if (!apiAssignTarget) return null;
+
+  const isOllama = apiProviders.some(
+    (provider) => provider.id === apiAssignTarget.providerId && provider.type === "ollama",
+  );
+  const windowValue = contextWindowTokensInput === "" ? null : Number(contextWindowTokensInput);
+  const validWindow = windowValue === null || (Number.isSafeInteger(windowValue) && windowValue > 0);
 
   const spriteMap = buildSpriteMap(apiAssignAgents);
   const localName = (nameEn: string, nameKo: string) => (localeTag === "ko" ? nameKo || nameEn : nameEn || nameKo);
@@ -80,12 +95,13 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
     const isAssigned =
       agent.cli_provider === "api" &&
       agent.api_provider_id === apiAssignTarget.providerId &&
-      agent.api_model === apiAssignTarget.model;
+      agent.api_model === apiAssignTarget.model &&
+      (!isOllama || (agent.context_window_tokens ?? null) === windowValue);
 
     return (
       <button
         key={agent.id}
-        disabled={apiAssigning || isAssigned}
+        disabled={apiAssigning || isAssigned || !validWindow}
         onClick={() => void handleApiAssignToAgent(agent.id)}
         className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-2.5 ${
           isAssigned ? "bg-green-500/10 text-green-400 cursor-default" : "hover:bg-slate-700/60 text-slate-300"
@@ -98,7 +114,9 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
             {roleBadge(agent.role)}
           </div>
           <div className="text-[10px] text-slate-500 truncate mt-0.5">
-            {agent.cli_provider === "api" && agent.api_model ? `API: ${agent.api_model}` : agent.cli_provider}
+            {agent.cli_provider === "api" && agent.api_model
+              ? `API: ${agent.api_model}${agent.context_window_tokens ? ` · ${agent.context_window_tokens.toLocaleString()} tokens` : ""}`
+              : agent.cli_provider}
           </div>
         </div>
         {isAssigned && <span className="text-green-400 flex-shrink-0">✓</span>}
@@ -125,6 +143,47 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
             })}
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{apiAssignTarget.model}</p>
+          {isOllama && (
+            <div className="mt-3">
+              <label htmlFor="ollama-context-window" className="block text-[11px] text-slate-300 mb-1">
+                {t({
+                  ko: "컨텍스트 창 (토큰)",
+                  en: "Context window (tokens)",
+                  ja: "コンテキスト窓（トークン）",
+                  zh: "上下文窗口（令牌）",
+                })}
+              </label>
+              <input
+                id="ollama-context-window"
+                type="number"
+                min="1"
+                step="1"
+                value={contextWindowTokensInput}
+                onChange={(event) => setContextWindowTokensInput(event.target.value)}
+                placeholder={t({ ko: "미설정", en: "Unknown", ja: "未設定", zh: "未设置" })}
+                aria-invalid={!validWindow}
+                className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+              />
+              <p className="mt-1 text-[10px] text-slate-400">
+                {t({
+                  ko: "80%에서 자동으로 새 컨텍스트로 이어갑니다. 비워두면 한도 오류가 발생했을 때 복구합니다.",
+                  en: "Roll over at 80%. Leave blank to recover only after a context error.",
+                  ja: "80%で新しいコンテキストに切り替えます。空欄なら上限エラー時に復旧します。",
+                  zh: "达到 80% 时切换到新上下文。留空则仅在超限错误后恢复。",
+                })}
+              </p>
+              {!validWindow && (
+                <p className="mt-1 text-[10px] text-rose-400">
+                  {t({
+                    ko: "양의 정수를 입력하세요.",
+                    en: "Enter a positive whole number.",
+                    ja: "正の整数を入力してください。",
+                    zh: "请输入正整数。",
+                  })}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="max-h-[55vh] overflow-y-auto p-2 space-y-3">

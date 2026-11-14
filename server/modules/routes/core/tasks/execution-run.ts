@@ -7,6 +7,8 @@ import { buildWorkflowPackExecutionGuidance } from "../../../workflow/packs/exec
 import { resolveVideoArtifactSpecForTask } from "../../../workflow/packs/video-artifact.ts";
 import { ensureVideoPreprodRemotionBestPracticesSkill } from "../../../workflow/core/video-skill-bootstrap.ts";
 import { routeTaskModel } from "../../../model-routing.ts";
+import { getContextRollover } from "../../../workflow/agents/context-rollover-store.ts";
+import { buildCompactContextRolloverPrompt } from "../../../workflow/agents/context-rollover-prompt.ts";
 import {
   buildInterruptPromptBlock,
   consumeInterruptPrompts,
@@ -197,6 +199,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
           oauth_account_id: string | null;
           api_provider_id: string | null;
           api_model: string | null;
+          context_window_tokens: number | null;
           cli_model: string | null;
           cli_reasoning_level: string | null;
           personality: string | null;
@@ -233,6 +236,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
             oauth_account_id: string | null;
             api_provider_id: string | null;
             api_model: string | null;
+            context_window_tokens: number | null;
             cli_model: string | null;
             cli_reasoning_level: string | null;
             personality: string | null;
@@ -261,6 +265,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
             oauth_account_id: string | null;
             api_provider_id: string | null;
             api_model: string | null;
+            context_window_tokens: number | null;
             cli_model: string | null;
             cli_reasoning_level: string | null;
             personality: string | null;
@@ -347,8 +352,15 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
 
     appendTaskLog(id, "system", `Git worktree created: ${worktreePath} (branch: climpire/${id.slice(0, 8)})`);
 
-    const projectContext = generateProjectContext(projectPath);
-    const recentChanges = getRecentChanges(projectPath, id);
+    let rollover: ReturnType<typeof getContextRollover> = null;
+    try {
+      rollover = getContextRollover(db as any, id);
+    } catch {
+      /* Optional schema in isolated tests. */
+    }
+    const compactRollover = rollover && rollover.status !== "complete";
+    const projectContext = compactRollover ? "" : generateProjectContext(projectPath);
+    const recentChanges = compactRollover ? "" : getRecentChanges(projectPath, id);
 
     if (provider === "claude") {
       ensureClaudeMd(projectPath, worktreePath);
@@ -361,7 +373,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
       : "";
     const departmentPrompt = normalizeTextField(agent.department_prompt);
     const departmentPromptBlock = departmentPrompt ? `[Department Shared Prompt]\n${departmentPrompt}` : "";
-    const conversationCtx = getRecentConversationContext(agentId);
+    const conversationCtx = compactRollover ? "" : getRecentConversationContext(agentId);
     const continuationCtx = getTaskContinuationContext(id);
     const continuationInstruction = continuationCtx
       ? pickL(
@@ -484,39 +496,54 @@ Whenever you complete a subtask, report it in this format:
       videoArtifactRelativePath: videoArtifactSpec?.relativePath,
     });
 
-    const prompt = buildTaskExecutionPrompt(
-      [
-        (
-          buildAvailableSkillsPromptBlock ||
-          ((providerName: string) => `[Available Skills][provider=${providerName || "unknown"}][unavailable]`)
-        )(provider),
-        `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
-        "This session is task-scoped. Keep continuity for this task only and do not cross-contaminate context from other projects.",
-        projectStructureBlock,
-        recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
-        `[Task] ${task.title}`,
-        task.description ? `\n${task.description}` : "",
-        workflowPackGuidance ? `\n[Workflow Pack Execution Rules]\n${workflowPackGuidance}` : "",
-        continuationCtx,
-        conversationCtx,
-        `\n---`,
-        `Agent: ${agent.name} (${roleLabel}, ${agent.department_name || "Unassigned"})`,
-        agent.personality ? `Personality: ${agent.personality}` : "",
-        deptConstraint,
-        departmentPromptBlock,
-        `NOTE: You are working in an isolated Git worktree branch (climpire/${id.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
-        `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
-        `Task tools: ${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs (run with Node and a JSON operation or --file). Business resources: contacts/tickets/quotes/drafts. For SSH: homelab.targets lists your granted hosts; homelab.request with target_id and command asks the owner to approve that exact command; homelab.approval_status checks the request; homelab.run requires target_id, command, and an approved approval_id. Never run agent SSH without that approval. model.request_upgrade requests a stronger model. The task token is in the process environment. Do not handle payments or money movement. Keep outbound business messages as drafts until approved.`,
-        interruptPromptBlock,
-        subtaskInstruction,
-        subModelHint,
-        continuationInstruction,
-        runInstruction,
-      ],
-      {
-        allowWarningFix: hasExplicitWarningFixRequest(task.title, task.description),
-      },
-    );
+    const promptOptions = { allowWarningFix: hasExplicitWarningFixRequest(task.title, task.description) };
+    const prompt = compactRollover
+      ? buildCompactContextRolloverPrompt(
+          {
+            taskId: id,
+            title: task.title,
+            checkpointText: rollover!.checkpointText,
+            contextWindowTokens: agent.context_window_tokens,
+            workflowGuidance: workflowPackGuidance,
+            departmentConstraint: deptConstraint,
+            departmentSharedPrompt: departmentPromptBlock,
+            interruptPrompt: interruptPromptBlock,
+            taskToolsPath: `${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs`,
+            worktreeBranch: `climpire/${id.slice(0, 8)}`,
+          },
+          (parts) => buildTaskExecutionPrompt(parts, promptOptions),
+        )
+      : buildTaskExecutionPrompt(
+          [
+            (
+              buildAvailableSkillsPromptBlock ||
+              ((providerName: string) => `[Available Skills][provider=${providerName || "unknown"}][unavailable]`)
+            )(provider),
+            `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
+            "This session is task-scoped. Keep continuity for this task only and do not cross-contaminate context from other projects.",
+            projectStructureBlock,
+            recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
+            `[Task] ${task.title}`,
+            task.description ? `\n${task.description}` : "",
+            workflowPackGuidance ? `\n[Workflow Pack Execution Rules]\n${workflowPackGuidance}` : "",
+            continuationCtx,
+            conversationCtx,
+            `\n---`,
+            `Agent: ${agent.name} (${roleLabel}, ${agent.department_name || "Unassigned"})`,
+            agent.personality ? `Personality: ${agent.personality}` : "",
+            deptConstraint,
+            departmentPromptBlock,
+            `NOTE: You are working in an isolated Git worktree branch (climpire/${id.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
+            `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
+            `Task tools: ${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs (run with Node and a JSON operation or --file). Business resources: contacts/tickets/quotes/drafts. For SSH: homelab.targets lists your granted hosts; homelab.request with target_id and command asks the owner to approve that exact command; homelab.approval_status checks the request; homelab.run requires target_id, command, and an approved approval_id. Never run agent SSH without that approval. model.request_upgrade requests a stronger model. The task token is in the process environment. Do not handle payments or money movement. Keep outbound business messages as drafts until approved.`,
+            interruptPromptBlock,
+            subtaskInstruction,
+            subModelHint,
+            continuationInstruction,
+            runInstruction,
+          ],
+          promptOptions,
+        );
 
     if (pendingInterruptPrompts.length > 0) {
       consumeInterruptPrompts(

@@ -85,6 +85,7 @@ const AGENT_EQ_KNOWN_KEYS = new Set<string>([
   "oauth_account_id",
   "api_provider_id",
   "api_model",
+  "context_window_tokens",
   "cli_model",
   "cli_reasoning_level",
   "avatar_emoji",
@@ -129,6 +130,7 @@ export function areAgentsEquivalent(a: Agent, b: Agent): boolean {
     (a.oauth_account_id ?? null) === (b.oauth_account_id ?? null) &&
     (a.api_provider_id ?? null) === (b.api_provider_id ?? null) &&
     (a.api_model ?? null) === (b.api_model ?? null) &&
+    (a.context_window_tokens ?? null) === (b.context_window_tokens ?? null) &&
     (a.cli_model ?? null) === (b.cli_model ?? null) &&
     (a.cli_reasoning_level ?? null) === (b.cli_reasoning_level ?? null) &&
     a.avatar_emoji === b.avatar_emoji &&

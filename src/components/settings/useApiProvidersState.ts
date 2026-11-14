@@ -66,6 +66,7 @@ export function useApiProvidersState({
   const [apiTestResult, setApiTestResult] = useState<Record<string, { ok: boolean; msg: string }>>({});
   const [apiModelsExpanded, setApiModelsExpanded] = useState<Record<string, boolean>>({});
   const [apiAssignTarget, setApiAssignTarget] = useState<ApiAssignTarget | null>(null);
+  const [contextWindowTokensInput, setContextWindowTokensInput] = useState("");
   const [apiAssignAgents, setApiAssignAgents] = useState<Agent[]>([]);
   const [apiAssignDepts, setApiAssignDepts] = useState<ApiAssignDepartment[]>([]);
   const [apiAssigning, setApiAssigning] = useState(false);
@@ -210,6 +211,7 @@ export function useApiProvidersState({
   const handleApiModelAssign = useCallback(
     async (providerId: string, model: string) => {
       setApiAssignTarget({ providerId, model });
+      setContextWindowTokensInput("");
       try {
         const assignPackKeys = resolveAssignablePackKeys(settings);
         const [agents, deptLists] = await Promise.all([
@@ -236,12 +238,19 @@ export function useApiProvidersState({
   const handleApiAssignToAgent = useCallback(
     async (agentId: string) => {
       if (!apiAssignTarget) return;
+      const isOllama = apiProviders.some(
+        (provider) => provider.id === apiAssignTarget.providerId && provider.type === "ollama",
+      );
+      const contextWindowTokens = isOllama && contextWindowTokensInput ? Number(contextWindowTokensInput) : null;
+      if (contextWindowTokens !== null && (!Number.isSafeInteger(contextWindowTokens) || contextWindowTokens <= 0))
+        return;
       setApiAssigning(true);
       try {
         await api.updateAgent(agentId, {
           cli_provider: "api",
           api_provider_id: apiAssignTarget.providerId,
           api_model: apiAssignTarget.model,
+          context_window_tokens: contextWindowTokens,
         });
         setApiAssignAgents((prev) =>
           prev.map((agent) =>
@@ -251,6 +260,7 @@ export function useApiProvidersState({
                   cli_provider: "api",
                   api_provider_id: apiAssignTarget.providerId,
                   api_model: apiAssignTarget.model,
+                  context_window_tokens: contextWindowTokens,
                 }
               : agent,
           ),
@@ -261,7 +271,7 @@ export function useApiProvidersState({
         setApiAssigning(false);
       }
     },
-    [apiAssignTarget],
+    [apiAssignTarget, apiProviders, contextWindowTokensInput],
   );
 
   return {
@@ -278,6 +288,7 @@ export function useApiProvidersState({
     apiTestResult,
     apiModelsExpanded,
     apiAssignTarget,
+    contextWindowTokensInput,
     apiAssignAgents,
     apiAssignDepts,
     apiAssigning,
@@ -287,6 +298,7 @@ export function useApiProvidersState({
     setApiSaveError,
     setApiModelsExpanded,
     setApiAssignTarget,
+    setContextWindowTokensInput,
     loadApiProviders,
     loadApiPresets,
     handleApiProviderSave,

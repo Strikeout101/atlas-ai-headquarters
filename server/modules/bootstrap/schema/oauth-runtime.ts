@@ -59,6 +59,13 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
     /* already exists */
   }
   try {
+    db.exec(
+      "ALTER TABLE agents ADD COLUMN context_window_tokens INTEGER CHECK(context_window_tokens IS NULL OR context_window_tokens > 0)",
+    );
+  } catch {
+    /* already exists */
+  }
+  try {
     db.exec("ALTER TABLE agents ADD COLUMN cli_model TEXT");
   } catch {
     /* already exists */
@@ -131,6 +138,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
       const workflowPackExpr = hasColumn("agents", "workflow_pack_key")
         ? "COALESCE(workflow_pack_key, 'development')"
         : "'development'";
+      const contextWindowExpr = hasColumn("agents", "context_window_tokens") ? "context_window_tokens" : "NULL";
       runInTransaction(() => {
         db.exec(`
         DROP TABLE IF EXISTS agents_new;
@@ -148,6 +156,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
           oauth_account_id TEXT,
           api_provider_id TEXT,
           api_model TEXT,
+          context_window_tokens INTEGER CHECK(context_window_tokens IS NULL OR context_window_tokens > 0),
           cli_model TEXT,
           cli_reasoning_level TEXT,
           avatar_emoji TEXT NOT NULL DEFAULT '🤖',
@@ -162,7 +171,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
         INSERT INTO agents_new (
           id, name, name_ko, name_ja, name_zh, department_id, workflow_pack_key,
           role, acts_as_planning_leader, cli_provider, oauth_account_id,
-          api_provider_id, api_model, cli_model, cli_reasoning_level,
+          api_provider_id, api_model, context_window_tokens, cli_model, cli_reasoning_level,
           avatar_emoji, sprite_number, personality, status, current_task_id,
           stats_tasks_done, stats_xp, created_at
         )
@@ -180,6 +189,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
           oauth_account_id,
           api_provider_id,
           api_model,
+          ${contextWindowExpr},
           cli_model,
           cli_reasoning_level,
           avatar_emoji,

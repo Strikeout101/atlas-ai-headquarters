@@ -17,6 +17,12 @@ Agents support `cli_provider = 'api'`, `api_provider_id`, and `api_model`. Ollam
 
 The first recovery slice now treats an interrupted OpenAI compatible stream or a transient provider error as an outage. The task becomes `pending`, keeps its assigned agent and worktree, and records a `HANDOFF` task log. A disconnected worker becomes `offline`; an available department leader and the CEO are notified. A nonzero OpenCode exit with a healthy model endpoint also preserves work but leaves the worker idle for review. Once the agent is back online, the existing resume route can restart the task. That restart reattaches its worktree, including after a server restart, and the continuation prompt includes the handoff and prior output. Other run failures retain the existing failure behavior.
 
+## Context exhaustion recovery
+
+For Ollama workers using OpenCode, the runner reads completed-step token usage from its JSON event stream. Set an agent's optional **Context window (tokens)** when assigning its Ollama model under Settings > API. At 80% of that configured window, the runner interrupts after the step, stores a durable checkpoint, and starts a fresh OpenCode run in the same task worktree. A structured context-limit error also triggers this flow without the setting. A successful OpenCode exit remains a success even if OpenCode reported an error that it recovered internally.
+
+The checkpoint records the task goal, worktree changes, completed and remaining subtasks, available test evidence, and recent output. Automatic resumes use a compact prompt and do not reuse the exhausted chat. Recovery state survives server restarts; a user pause or cancellation stops automatic continuation. Two consecutive rollovers with no worktree or subtask progress, or a seventh rollover, pause the task for director review and the existing model upgrade decision. A failed checkpoint or restart leaves the task pending with its worktree intact.
+
 ## Next backend phase
 
 1. Add a durable reporting relationship from each local worker to one of the two directors, with a fallback director when the primary is unavailable. Department leader selection alone cannot express this roster.

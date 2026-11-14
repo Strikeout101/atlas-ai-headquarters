@@ -28,6 +28,7 @@ function makeApiState(): ApiStateBundle {
     apiTestResult: {},
     apiModelsExpanded: {},
     apiAssignTarget: { providerId: "provider-1", model: "gpt-4o" },
+    contextWindowTokensInput: "",
     apiAssignAgents: [
       {
         id: "agent-dev",
@@ -95,6 +96,7 @@ function makeApiState(): ApiStateBundle {
     setApiSaveError: vi.fn(),
     setApiModelsExpanded: vi.fn(),
     setApiAssignTarget: vi.fn(),
+    setContextWindowTokensInput: vi.fn(),
     loadApiProviders: vi.fn(),
     loadApiPresets: vi.fn(),
     handleApiProviderSave: vi.fn(),
@@ -117,5 +119,16 @@ describe("ApiAssignModal", () => {
     expect(screen.getByText("Video Lead")).toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
     expect(screen.getByText("Storyboard")).toBeInTheDocument();
+  });
+
+  it("shows the context window setting for Ollama assignments", () => {
+    const state = makeApiState();
+    state.apiProviders = [{ id: "provider-1", type: "ollama" } as ApiStateBundle["apiProviders"][number]];
+    state.apiAssignTarget = { providerId: "provider-1", model: "qwen" };
+    state.contextWindowTokensInput = "8192";
+    render(<ApiAssignModal t={t} localeTag="en-US" apiState={state} />);
+
+    expect(screen.getByLabelText("Context window (tokens)")).toHaveValue(8192);
+    expect(screen.getByText(/Roll over at 80%/)).toBeInTheDocument();
   });
 });

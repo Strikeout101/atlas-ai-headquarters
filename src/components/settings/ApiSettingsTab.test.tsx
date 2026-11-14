@@ -54,6 +54,7 @@ function TestHarness({
   const [apiSaveError, setApiSaveError] = useState<string | null>(null);
   const [apiModelsExpanded, setApiModelsExpanded] = useState<Record<string, boolean>>(initialExpanded);
   const [apiAssignTarget, setApiAssignTarget] = useState<ApiAssignTarget | null>(null);
+  const [contextWindowTokensInput, setContextWindowTokensInput] = useState("");
 
   const apiState: ApiStateBundle = {
     apiProviders: providers,
@@ -69,6 +70,7 @@ function TestHarness({
     apiTestResult: {},
     apiModelsExpanded,
     apiAssignTarget,
+    contextWindowTokensInput,
     apiAssignAgents: [],
     apiAssignDepts: [],
     apiAssigning: false,
@@ -78,6 +80,7 @@ function TestHarness({
     setApiSaveError,
     setApiModelsExpanded,
     setApiAssignTarget,
+    setContextWindowTokensInput,
     loadApiProviders: async () => {},
     loadApiPresets: async () => {},
     handleApiProviderSave: async () => {},
@@ -209,6 +212,8 @@ describe("ApiSettingsTab", () => {
     const setApiModelsExpanded = vi.fn();
     const apiAssignTarget = null;
     const setApiAssignTarget = vi.fn();
+    const contextWindowTokensInput = "";
+    const setContextWindowTokensInput = vi.fn();
 
     const apiState: ApiStateBundle = {
       apiProviders: [],
@@ -224,6 +229,7 @@ describe("ApiSettingsTab", () => {
       apiTestResult: {},
       apiModelsExpanded,
       apiAssignTarget,
+      contextWindowTokensInput,
       apiAssignAgents: [],
       apiAssignDepts: [],
       apiAssigning: false,
@@ -233,6 +239,7 @@ describe("ApiSettingsTab", () => {
       setApiSaveError,
       setApiModelsExpanded,
       setApiAssignTarget,
+      setContextWindowTokensInput,
       loadApiProviders,
       loadApiPresets,
       handleApiProviderSave: async () => {},

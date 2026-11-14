@@ -42,6 +42,7 @@ import { initializeOAuthRuntime } from "./modules/bootstrap/schema/oauth-runtime
 import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schema-migrations.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
+import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
 
@@ -60,6 +61,7 @@ configureLoginStore(db);
 const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);
+ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 
 const messageIdempotency = createMessageIdempotencyTools({

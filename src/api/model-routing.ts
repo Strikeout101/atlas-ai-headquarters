@@ -35,11 +35,15 @@ export function getModelDirector(): Promise<ModelDirectorConfig> {
   return request("/api/model-director");
 }
 
-export function saveModelDirector(input: Pick<ModelDirectorConfig, "directorAgentId" | "candidates">): Promise<ModelDirectorConfig> {
+export function saveModelDirector(
+  input: Pick<ModelDirectorConfig, "directorAgentId" | "candidates">,
+): Promise<ModelDirectorConfig> {
   return put("/api/model-director", input);
 }
 
-export function getTaskModelRoute(taskId: string): Promise<{ ok: true; route: TaskModelRoute | null; candidates: string[]; requests: ModelUpgradeRequest[] }> {
+export function getTaskModelRoute(
+  taskId: string,
+): Promise<{ ok: true; route: TaskModelRoute | null; candidates: string[]; requests: ModelUpgradeRequest[] }> {
   return request(`/api/tasks/${encodeURIComponent(taskId)}/model-route`);
 }
 
@@ -47,10 +51,18 @@ export function routeTaskModel(taskId: string, force = false): Promise<{ ok: tru
   return post(`/api/tasks/${encodeURIComponent(taskId)}/model-route`, { force });
 }
 
-export function requestModelUpgrade(taskId: string, reason: string, model?: string): Promise<{ ok: true; request: ModelUpgradeRequest }> {
+export function requestModelUpgrade(
+  taskId: string,
+  reason: string,
+  model?: string,
+): Promise<{ ok: true; request: ModelUpgradeRequest }> {
   return post(`/api/tasks/${encodeURIComponent(taskId)}/model-upgrades`, { reason, model });
 }
 
-export function decideModelUpgrade(id: string, approve: boolean, reason: string): Promise<{ ok: true; request: ModelUpgradeRequest }> {
+export function decideModelUpgrade(
+  id: string,
+  approve: boolean,
+  reason: string,
+): Promise<{ ok: true; request: ModelUpgradeRequest }> {
   return post(`/api/model-upgrades/${encodeURIComponent(id)}/decide`, { approve, reason });
 }

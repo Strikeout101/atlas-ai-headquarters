@@ -91,6 +91,7 @@ export function initializeWorkflow(
     startProgressTimer: runtime.startProgressTimer,
     scheduleNextReviewRound: runtime.scheduleNextReviewRound,
     startTaskExecutionForAgent: runtime.startTaskExecutionForAgent,
+    resumePendingContextRollovers: runtime.resumePendingContextRollovers,
     stopProgressTimer: runtime.stopProgressTimer,
     stopRequestModeByTask: runtime.stopRequestModeByTask,
     stopRequestedTasks: runtime.stopRequestedTasks,

@@ -292,6 +292,7 @@ export interface WorkflowOrchestrationExports {
   archivePlanningConsolidatedReport: (...args: any[]) => any;
   isAgentInMeeting: (...args: any[]) => any;
   startTaskExecutionForAgent: (...args: any[]) => any;
+  resumePendingContextRollovers: (...args: any[]) => any;
   startPlannedApprovalMeeting: (...args: any[]) => any;
   handleTaskRunComplete: (...args: any[]) => any;
   finishReview: (...args: any[]) => any;

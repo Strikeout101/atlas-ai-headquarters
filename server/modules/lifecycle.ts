@@ -8,6 +8,11 @@ import { notifyTaskStatus } from "../gateway/client.ts";
 import { startDiscordReceiver } from "../messenger/discord-receiver.ts";
 import { startTelegramReceiver } from "../messenger/telegram-receiver.ts";
 import { registerGracefulShutdownHandlers } from "./lifecycle/register-graceful-shutdown.ts";
+import {
+  getContextRollover,
+  releaseStaleContextRolloverClaims,
+  requeueOrphanContextRollover,
+} from "./workflow/agents/context-rollover-store.ts";
 
 export function startLifecycle(ctx: RuntimeContext): void {
   const {
@@ -44,6 +49,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     resolveLang,
     rollbackTaskWorktree,
     runInTransaction,
+    resumePendingContextRollovers,
     stopProgressTimer,
     stopRequestedTasks,
     wsClients,
@@ -275,6 +281,25 @@ export function startLifecycle(ctx: RuntimeContext): void {
         // 로그 파일이 없거나 접근 불가하면 기존 복구 로직 진행
       }
 
+      const contextRollover = getContextRollover(db, task.id);
+      if (contextRollover && (contextRollover.status === "running" || contextRollover.status === "resuming")) {
+        if (contextRollover.processPid && isPidAlive(contextRollover.processPid)) continue;
+        const moved = db
+          .prepare("UPDATE tasks SET status = 'pending', updated_at = ? WHERE id = ? AND status = 'in_progress'")
+          .run(now, task.id);
+        if (moved.changes > 0) {
+          requeueOrphanContextRollover(db, task.id, now);
+          db.prepare(
+            "UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ? AND current_task_id = ?",
+          ).run(task.assigned_agent_id, task.id);
+          appendTaskLog(task.id, "system", `Recovery (${reason}): orphan context run queued from durable checkpoint`);
+          broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(task.id));
+          if (task.assigned_agent_id)
+            broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id));
+        }
+        continue;
+      }
+
       const latestRunLog = db
         .prepare(
           `
@@ -359,6 +384,8 @@ export function startLifecycle(ctx: RuntimeContext): void {
 
     recoverOrphanInProgressTasks("startup");
     recoverOrphanWorkingAgents("startup");
+    releaseStaleContextRolloverClaims(db, nowMs());
+    resumePendingContextRollovers();
 
     const reviewTasks = db
       .prepare(
@@ -455,7 +482,11 @@ export function startLifecycle(ctx: RuntimeContext): void {
   setTimeout(rotateBreaks, 5_000);
   setInterval(rotateBreaks, 60_000);
   setTimeout(recoverInterruptedWorkflowOnStartup, 3_000);
-  setInterval(() => recoverOrphanInProgressTasks("interval"), IN_PROGRESS_ORPHAN_SWEEP_MS);
+  setInterval(() => {
+    recoverOrphanInProgressTasks("interval");
+    releaseStaleContextRolloverClaims(db, nowMs());
+    resumePendingContextRollovers();
+  }, IN_PROGRESS_ORPHAN_SWEEP_MS);
   setInterval(() => recoverOrphanWorkingAgents("interval"), IN_PROGRESS_ORPHAN_SWEEP_MS);
   setTimeout(sweepPendingSubtaskDelegations, 4_000);
   setInterval(sweepPendingSubtaskDelegations, SUBTASK_DELEGATION_SWEEP_MS);
