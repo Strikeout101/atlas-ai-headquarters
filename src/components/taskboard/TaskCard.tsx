@@ -45,6 +45,7 @@ interface TaskCardProps {
   onDiscardTask?: (id: string) => void;
   onHideTask?: (id: string) => void;
   onUnhideTask?: (id: string) => void;
+  onOpenDetails?: (id: string) => void;
 }
 
 const SUBTASK_STATUS_ICON: Record<string, string> = {
@@ -73,6 +74,7 @@ export default function TaskCard({
   onDiscardTask,
   onHideTask,
   onUnhideTask,
+  onOpenDetails,
 }: TaskCardProps) {
   void onMergeTask;
   void onDiscardTask;
@@ -105,7 +107,7 @@ export default function TaskCard({
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <button
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => (onOpenDetails ? onOpenDetails(task.id) : setExpanded((v) => !v))}
           className="flex-1 text-left text-[13.5px] font-medium leading-snug"
           style={{ color: "var(--th-text-heading)" }}
         >

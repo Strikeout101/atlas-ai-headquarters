@@ -22,10 +22,11 @@ import SettingsPanel from "../components/SettingsPanel";
 import { I18nProvider, localeName, pickLang } from "../i18n";
 import CommandPalette, { type CommandItem } from "../components/command/CommandPalette";
 import TodayView from "../components/today/TodayView";
+import TaskDrawer from "../components/work/TaskDrawer";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { NAV_ITEMS } from "./routes";
 import { usePendingApprovals } from "./usePendingApprovals";
-import { decidePendingApproval, type PendingApproval } from "../api";
+import { decidePendingApproval, type PendingApproval, type UpdateStatus } from "../api";
 import type {
   Agent,
   CeoOfficeCall,
@@ -40,7 +41,6 @@ import type {
   Task,
   WorkflowPackKey,
 } from "../types";
-import type { UpdateStatus } from "../api";
 import type { OAuthCallbackResult, RoomThemeMap, View } from "./types";
 import AppHeaderBar from "./AppHeaderBar";
 import {
@@ -157,6 +157,7 @@ interface AppMainLayoutProps {
   onResumeTask: (id: string) => Promise<void>;
   onOpenTerminal: (taskId: string) => void;
   onOpenMeetingMinutes: (taskId: string) => void;
+  onOpenTaskReport?: (taskId: string) => void;
   onAgentsChange: () => void;
   activeOfficeWorkflowPack: WorkflowPackKey;
   onChangeOfficeWorkflowPack: (packKey: WorkflowPackKey) => void;
@@ -220,6 +221,7 @@ export default function AppMainLayout({
   onResumeTask,
   onOpenTerminal,
   onOpenMeetingMinutes,
+  onOpenTaskReport,
   onAgentsChange,
   activeOfficeWorkflowPack,
   onChangeOfficeWorkflowPack,
@@ -417,17 +419,46 @@ export default function AppMainLayout({
 
   const reviewCount = useMemo(() => tasks.filter((task) => task.status === "review").length, [tasks]);
   const pendingApprovals = usePendingApprovals(true);
-  const refreshApprovals = pendingApprovals.refresh;
+  const { refresh: refreshApprovals, setItems: setApprovalItems } = pendingApprovals;
   useEffect(() => {
     if (view === "dashboard") void refreshApprovals();
   }, [view, refreshApprovals]);
   const handleDecideApproval = useCallback(
     async (item: PendingApproval, approve: boolean) => {
       await decidePendingApproval(item, approve);
-      pendingApprovals.setItems((prev) => prev.filter((p) => !(p.kind === item.kind && p.id === item.id)));
+      setApprovalItems((prev) => prev.filter((p) => !(p.kind === item.kind && p.id === item.id)));
       void refreshApprovals();
     },
-    [pendingApprovals, refreshApprovals],
+    [setApprovalItems, refreshApprovals],
+  );
+
+  // The task drawer. Its task id lives in the address (?task=...) so a link or reload reopens it.
+  const [openTaskId, setOpenTaskId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("task"),
+  );
+  const openTask = useCallback((taskId: string | null) => {
+    setOpenTaskId(taskId);
+    const url = new URL(window.location.href);
+    if (taskId) url.searchParams.set("task", taskId);
+    else url.searchParams.delete("task");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+  useEffect(() => {
+    const onPopState = () => setOpenTaskId(new URLSearchParams(window.location.search).get("task"));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+  const openTaskRecord = useMemo(
+    () => (openTaskId ? (tasks.find((task) => task.id === openTaskId) ?? null) : null),
+    [openTaskId, tasks],
+  );
+  const openTaskSubtasks = useMemo(
+    () => (openTaskId ? subtasks.filter((subtask) => subtask.task_id === openTaskId) : []),
+    [openTaskId, subtasks],
+  );
+  const openTaskApprovals = useMemo(
+    () => (openTaskId ? pendingApprovals.items.filter((item) => item.task_id === openTaskId) : []),
+    [openTaskId, pendingApprovals.items],
   );
   const needsYouCount = pendingApprovals.items.length + decisionInboxCount + reviewCount;
   const tr = useCallback(
@@ -531,8 +562,8 @@ export default function AppMainLayout({
         label: task.title,
         hint: task.status.replace(/_/g, " "),
         icon: <SquareTerminal size={15} strokeWidth={1.75} />,
-        keywords: `${task.agent_name ?? ""} ${task.status} log terminal`,
-        run: () => onOpenTerminal(task.id),
+        keywords: `${task.agent_name ?? ""} ${task.status} log terminal details`,
+        run: () => openTask(task.id),
       });
     }
     return items;
@@ -550,7 +581,7 @@ export default function AppMainLayout({
     onOpenDecisionInbox,
     onOpenReportHistory,
     onOpenRoomManager,
-    onOpenTerminal,
+    openTask,
     onSelectAgent,
     tasks,
     theme,
@@ -849,6 +880,7 @@ export default function AppMainLayout({
                 approvals={pendingApprovals.items}
                 onDecideApproval={handleDecideApproval}
                 onOpenHomelab={() => setView("homelab")}
+                onOpenTask={openTask}
               >
                 <Dashboard
                   stats={stats}
@@ -877,6 +909,7 @@ export default function AppMainLayout({
                 onResumeTask={onResumeTask}
                 onOpenTerminal={onOpenTerminal}
                 onOpenMeetingMinutes={onOpenMeetingMinutes}
+                onOpenDetails={openTask}
               />
             )}
 
@@ -925,6 +958,32 @@ export default function AppMainLayout({
 
         {children}
         <CommandPalette open={commandBarOpen} onClose={() => setCommandBarOpen(false)} commands={commands} />
+        {openTaskRecord && (
+          <TaskDrawer
+            key={openTaskRecord.id}
+            task={openTaskRecord}
+            agents={displayAgents}
+            departments={displayDepartments}
+            subtasks={openTaskSubtasks}
+            approvals={openTaskApprovals}
+            onClose={() => openTask(null)}
+            onUpdateTask={onUpdateTask}
+            onAssignTask={onAssignTask}
+            onRunTask={onRunTask}
+            onStopTask={onStopTask}
+            onPauseTask={onPauseTask}
+            onResumeTask={onResumeTask}
+            onDeleteTask={onDeleteTask}
+            onOpenTerminal={onOpenTerminal}
+            onOpenMeetingMinutes={onOpenMeetingMinutes}
+            onOpenReport={onOpenTaskReport}
+            onDecideApproval={handleDecideApproval}
+            onOpenHomelab={() => {
+              openTask(null);
+              setView("homelab");
+            }}
+          />
+        )}
       </div>
     </I18nProvider>
   );

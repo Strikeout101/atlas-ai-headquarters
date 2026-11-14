@@ -38,6 +38,8 @@ interface TaskBoardProps {
   onOpenMeetingMinutes?: (taskId: string) => void;
   onMergeTask?: (id: string) => void;
   onDiscardTask?: (id: string) => void;
+  /** Opens the task drawer. Without it, clicking a title expands the card as before. */
+  onOpenDetails?: (id: string) => void;
 }
 
 export function TaskBoard({
@@ -57,6 +59,7 @@ export function TaskBoard({
   onOpenMeetingMinutes,
   onMergeTask,
   onDiscardTask,
+  onOpenDetails,
 }: TaskBoardProps) {
   const { t } = useI18n();
   const [showCreate, setShowCreate] = useState(false);
@@ -295,6 +298,7 @@ export function TaskBoard({
                       onDiscardTask={onDiscardTask}
                       onHideTask={hideTask}
                       onUnhideTask={unhideTask}
+                      onOpenDetails={onOpenDetails}
                     />
                   ))
                 )}

@@ -467,6 +467,12 @@ export default function App() {
       onResumeTask={actions.handleResumeTask}
       onOpenTerminal={(taskId) => setTaskPanel({ taskId, tab: "terminal" })}
       onOpenMeetingMinutes={(taskId) => setTaskPanel({ taskId, tab: "minutes" })}
+      onOpenTaskReport={(taskId) => {
+        api
+          .getTaskReportDetail(taskId)
+          .then(setTaskReport)
+          .catch((error) => console.error("Load task report failed:", error));
+      }}
       onAgentsChange={actions.handleAgentsChange}
       activeOfficeWorkflowPack={settings.officeWorkflowPack ?? "development"}
       onChangeOfficeWorkflowPack={handleOfficeWorkflowPackChange}

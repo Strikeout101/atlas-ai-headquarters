@@ -69,7 +69,7 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
     setQuery("");
     setActive(0);
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    requestAnimationFrame(() => inputRef.current?.focus());
+    inputRef.current?.focus();
     return () => previouslyFocused?.focus?.();
   }, [open]);
 

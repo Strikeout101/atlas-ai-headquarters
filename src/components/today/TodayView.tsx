@@ -18,6 +18,8 @@ interface TodayViewProps {
   onOpenDecisionInbox: () => void;
   onOpenTerminal: (taskId: string) => void;
   onOpenWork: () => void;
+  /** Opens the task drawer for one task. */
+  onOpenTask?: (taskId: string) => void;
   /** SSH commands that could change a host, and model upgrades, decided in place. */
   approvals?: PendingApproval[];
   onDecideApproval?: (item: PendingApproval, approve: boolean) => Promise<void>;
@@ -79,6 +81,7 @@ export default function TodayView({
   onOpenDecisionInbox,
   onOpenTerminal,
   onOpenWork,
+  onOpenTask,
   approvals = [],
   onDecideApproval,
   onOpenHomelab,
@@ -256,8 +259,15 @@ export default function TodayView({
                       {task.title}
                     </p>
                   </div>
-                  <button type="button" onClick={onOpenWork} className={actionButtonClass} style={quietButtonStyle}>
-                    {t({ ko: "업무에서 열기", en: "Open in Work", ja: "業務で開く", zh: "在工作中打开" })}
+                  <button
+                    type="button"
+                    onClick={() => (onOpenTask ? onOpenTask(task.id) : onOpenWork())}
+                    className={actionButtonClass}
+                    style={quietButtonStyle}
+                  >
+                    {onOpenTask
+                      ? t({ ko: "검토하기", en: "Review", ja: "レビューする", zh: "去审核" })
+                      : t({ ko: "업무에서 열기", en: "Open in Work", ja: "業務で開く", zh: "在工作中打开" })}
                   </button>
                 </li>
               ))}
@@ -321,9 +331,20 @@ export default function TodayView({
                       />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium" style={{ color: "var(--th-text-primary)" }}>
-                        {task.title}
-                      </p>
+                      {onOpenTask ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenTask(task.id)}
+                          className="block max-w-full truncate text-left text-[13px] font-medium hover:underline"
+                          style={{ color: "var(--th-text-primary)" }}
+                        >
+                          {task.title}
+                        </button>
+                      ) : (
+                        <p className="truncate text-[13px] font-medium" style={{ color: "var(--th-text-primary)" }}>
+                          {task.title}
+                        </p>
+                      )}
                       <p className="truncate text-[12px] tabular-nums" style={{ color: "var(--th-text-muted)" }}>
                         {agentNameFor(task)}
                         {task.started_at ? ` · ${formatElapsed(task.started_at, nowMs)}` : ""}
