@@ -24,6 +24,8 @@ import CommandPalette, { type CommandItem } from "../components/command/CommandP
 import TodayView from "../components/today/TodayView";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { NAV_ITEMS } from "./routes";
+import { usePendingApprovals } from "./usePendingApprovals";
+import { decidePendingApproval, type PendingApproval } from "../api";
 import type {
   Agent,
   CeoOfficeCall,
@@ -414,7 +416,20 @@ export default function AppMainLayout({
   }, []);
 
   const reviewCount = useMemo(() => tasks.filter((task) => task.status === "review").length, [tasks]);
-  const needsYouCount = decisionInboxCount + reviewCount;
+  const pendingApprovals = usePendingApprovals(true);
+  const refreshApprovals = pendingApprovals.refresh;
+  useEffect(() => {
+    if (view === "dashboard") void refreshApprovals();
+  }, [view, refreshApprovals]);
+  const handleDecideApproval = useCallback(
+    async (item: PendingApproval, approve: boolean) => {
+      await decidePendingApproval(item, approve);
+      pendingApprovals.setItems((prev) => prev.filter((p) => !(p.kind === item.kind && p.id === item.id)));
+      void refreshApprovals();
+    },
+    [pendingApprovals, refreshApprovals],
+  );
+  const needsYouCount = pendingApprovals.items.length + decisionInboxCount + reviewCount;
   const tr = useCallback(
     (text: { ko: string; en: string; ja: string; zh: string }) => pickLang(uiLanguage, text),
     [uiLanguage],
@@ -831,6 +846,9 @@ export default function AppMainLayout({
                 onOpenDecisionInbox={onOpenDecisionInbox}
                 onOpenTerminal={onOpenTerminal}
                 onOpenWork={() => setView("tasks")}
+                approvals={pendingApprovals.items}
+                onDecideApproval={handleDecideApproval}
+                onOpenHomelab={() => setView("homelab")}
               >
                 <Dashboard
                   stats={stats}

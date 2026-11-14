@@ -3,6 +3,8 @@ import { ArrowRight, Loader2, Signpost, SquareTerminal } from "lucide-react";
 import type { Agent, Task } from "../../types";
 import { localeName, useI18n } from "../../i18n";
 import type { DecisionInboxItem } from "../chat/decision-inbox";
+import type { PendingApproval } from "../../api";
+import ApprovalRow from "./ApprovalRow";
 import AgentAvatar from "../AgentAvatar";
 import { timeAgo, useNow } from "../dashboard/model";
 
@@ -16,6 +18,10 @@ interface TodayViewProps {
   onOpenDecisionInbox: () => void;
   onOpenTerminal: (taskId: string) => void;
   onOpenWork: () => void;
+  /** SSH commands that could change a host, and model upgrades, decided in place. */
+  approvals?: PendingApproval[];
+  onDecideApproval?: (item: PendingApproval, approve: boolean) => Promise<void>;
+  onOpenHomelab?: () => void;
   /** The company overview (the previous dashboard) rendered below the attention queue. */
   children?: ReactNode;
 }
@@ -62,7 +68,8 @@ function Panel({ title, meta, children }: { title: string; meta?: ReactNode; chi
 
 /**
  * The landing page: what is waiting on the owner and what is running right now, with the company overview below.
- * Decisions are answered in the existing decision inbox, so every option it offers stays available.
+ * SSH and model-upgrade approvals are decided here; decisions open the existing decision inbox, so every option it
+ * offers stays available.
  */
 export default function TodayView({
   agents,
@@ -72,6 +79,9 @@ export default function TodayView({
   onOpenDecisionInbox,
   onOpenTerminal,
   onOpenWork,
+  approvals = [],
+  onDecideApproval,
+  onOpenHomelab,
   children,
 }: TodayViewProps) {
   const { t, language, locale: localeTag } = useI18n();
@@ -91,7 +101,7 @@ export default function TodayView({
     [tasks],
   );
 
-  const needsYouCount = decisionItems.length + inReview.length;
+  const needsYouCount = approvals.length + decisionItems.length + inReview.length;
   const shownDecisions = decisionItems.slice(0, NEEDS_YOU_LIMIT);
   const shownReviews = inReview.slice(0, Math.max(0, NEEDS_YOU_LIMIT - shownDecisions.length));
 
@@ -177,6 +187,15 @@ export default function TodayView({
             </p>
           ) : (
             <ul>
+              {onDecideApproval &&
+                approvals.map((item) => (
+                  <ApprovalRow
+                    key={`${item.kind}:${item.id}`}
+                    item={item}
+                    onDecide={onDecideApproval}
+                    onOpenHomelab={onOpenHomelab ?? onOpenWork}
+                  />
+                ))}
               {shownDecisions.map((item) => (
                 <li
                   key={item.id}

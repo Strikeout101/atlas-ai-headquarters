@@ -19,6 +19,7 @@ import { registerBusinessRoutes } from "./ops/business.ts";
 import { registerHomelabRoutes } from "./ops/homelab.ts";
 import { registerAgentToolRoutes } from "./ops/agent-tools.ts";
 import { registerSshApprovalRoutes } from "./ops/ssh-approvals.ts";
+import { registerApprovalRoutes } from "./ops/approvals.ts";
 
 export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   const __ctx: RuntimeContext = ctx;
@@ -220,6 +221,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   registerBusinessRoutes(app, db);
   registerHomelabRoutes(app, db);
   registerSshApprovalRoutes(app, db);
+  registerApprovalRoutes(app, db);
   registerAgentToolRoutes(app, db, runAgentOneShot);
 
   const { normalizeSkillLearnProviders } = registerSkillRoutes(__ctx);
