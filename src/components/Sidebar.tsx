@@ -45,16 +45,18 @@ export default function Sidebar({
 
   const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
-  const renderItem = ({ view, icon: Icon, label }: NavItem) => {
+  const sidebarItems = NAV_ITEMS.filter((item) => item.inSidebar !== false);
+  const renderItem = ({ view, icon: Icon, label, activeFor }: NavItem) => {
     const text = t(label);
+    const isActive = currentView === view || (activeFor?.includes(currentView) ?? false);
     const badge = view === "dashboard" && needsYouCount > 0 ? needsYouCount : 0;
     return (
       <button
         key={view}
         type="button"
         onClick={() => onChangeView(view)}
-        className={`sidebar-nav-item ${currentView === view ? "active" : ""} ${collapsed ? "justify-center !px-0" : ""}`}
-        aria-current={currentView === view ? "page" : undefined}
+        className={`sidebar-nav-item ${isActive ? "active" : ""} ${collapsed ? "justify-center !px-0" : ""}`}
+        aria-current={isActive ? "page" : undefined}
         title={collapsed ? text : undefined}
       >
         <span className="relative flex">
@@ -162,13 +164,13 @@ export default function Sidebar({
           </button>
         )}
 
-        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "primary").map(renderItem)}</div>
+        <div className="space-y-0.5">{sidebarItems.filter((item) => item.section === "primary").map(renderItem)}</div>
         {sectionHeading("workspaces")}
-        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "workspaces").map(renderItem)}</div>
-        {sectionHeading("team")}
-        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "team").map(renderItem)}</div>
+        <div className="space-y-0.5">
+          {sidebarItems.filter((item) => item.section === "workspaces").map(renderItem)}
+        </div>
         <div className="mx-2 my-3 h-px" style={{ background: "var(--th-border)" }} aria-hidden />
-        <div className="space-y-0.5">{NAV_ITEMS.filter((item) => item.section === "system").map(renderItem)}</div>
+        <div className="space-y-0.5">{sidebarItems.filter((item) => item.section === "system").map(renderItem)}</div>
       </nav>
 
       {!collapsed && departments.length > 0 && (

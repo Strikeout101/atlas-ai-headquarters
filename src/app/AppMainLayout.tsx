@@ -7,6 +7,7 @@ import {
   Megaphone,
   MessageSquare,
   Moon,
+  Settings,
   Signpost,
   SquareTerminal,
   Wrench,
@@ -23,8 +24,10 @@ import { I18nProvider, localeName, pickLang } from "../i18n";
 import CommandPalette, { type CommandItem } from "../components/command/CommandPalette";
 import TodayView from "../components/today/TodayView";
 import TaskDrawer from "../components/work/TaskDrawer";
+import TeamTabs from "../components/team/TeamTabs";
+import { SETTINGS_TAB_EVENT, type SettingsTab } from "../components/settings/types";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
-import { NAV_ITEMS } from "./routes";
+import { NAV_ITEMS, TEAM_VIEWS } from "./routes";
 import { usePendingApprovals } from "./usePendingApprovals";
 import { useReadyDrafts } from "./useReadyDrafts";
 import { decidePendingApproval, type PendingApproval, type UpdateStatus } from "../api";
@@ -481,6 +484,34 @@ export default function AppMainLayout({
       keywords: `${keywords} ${label.en}`,
       run: () => handleViewChange(target),
     }));
+    const settingsTabs: Array<[SettingsTab, { ko: string; en: string; ja: string; zh: string }, string]> = [
+      ["general", { ko: "일반", en: "General", ja: "一般", zh: "常规" }, "company name language preferences"],
+      [
+        "security",
+        { ko: "보안", en: "Security", ja: "セキュリティ", zh: "安全" },
+        "password login trusted networks sign out",
+      ],
+      ["cli", { ko: "CLI 도구", en: "CLI tools", ja: "CLI ツール", zh: "CLI 工具" }, "claude codex gemini opencode"],
+      ["oauth", { ko: "OAuth", en: "OAuth", ja: "OAuth", zh: "OAuth" }, "accounts sign in providers"],
+      ["api", { ko: "API", en: "API", ja: "API", zh: "API" }, "providers ollama models keys"],
+      ["gateway", { ko: "채널", en: "Channels", ja: "チャネル", zh: "频道" }, "telegram discord messenger"],
+    ];
+    for (const [tab, label, keywords] of settingsTabs) {
+      items.push({
+        id: `settings:${tab}`,
+        group: "navigate",
+        label: `${tr({ ko: "설정", en: "Settings", ja: "設定", zh: "设置" })} › ${tr(label)}`,
+        icon: <Settings size={15} strokeWidth={1.75} />,
+        keywords: `settings ${keywords}`,
+        run: () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set("tab", tab);
+          window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+          handleViewChange("settings");
+          window.dispatchEvent(new CustomEvent(SETTINGS_TAB_EVENT, { detail: tab }));
+        },
+      });
+    }
     const action = (id: string, label: string, icon: ReactNode, run: () => void, keywords = "") =>
       items.push({ id: `action:${id}`, group: "actions", label, icon, run, keywords });
     action(
@@ -951,6 +982,7 @@ export default function AppMainLayout({
               />
             )}
             {view === "homelab" && <HomelabWorkspace agents={agents} />}
+            {TEAM_VIEWS.includes(view) && <TeamTabs current={view} onChange={setView} />}
             {view === "model_director" && <ModelDirectorWorkspace />}
 
             {view === "agents" && (
@@ -987,6 +1019,7 @@ export default function AppMainLayout({
                 }}
                 oauthResult={oauthResult}
                 onOauthResultClear={onOauthResultClear}
+                onOpenHomelab={() => setView("homelab")}
               />
             )}
           </div>

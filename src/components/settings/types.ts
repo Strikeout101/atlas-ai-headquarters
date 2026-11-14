@@ -23,7 +23,21 @@ export type Locale = UiLanguage;
 export type TFunction = (messages: Record<Locale, string>) => string;
 
 export type LocalSettings = Omit<CompanySettings, "language"> & { language: Locale };
-export type SettingsTab = "general" | "security" | "cli" | "oauth" | "api" | "gateway" | "ssh";
+export const SETTINGS_TABS = ["general", "security", "cli", "oauth", "api", "gateway", "ssh"] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+/** Fired on window to switch the open Settings page to a tab (the command bar uses it). */
+export const SETTINGS_TAB_EVENT = "atlas:settings-tab";
+
+export function isSettingsTab(value: unknown): value is SettingsTab {
+  return typeof value === "string" && (SETTINGS_TABS as readonly string[]).includes(value);
+}
+
+export function settingsTabFromUrl(): SettingsTab | null {
+  if (typeof window === "undefined") return null;
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return isSettingsTab(tab) ? tab : null;
+}
 
 export type SetLocalSettings = Dispatch<SetStateAction<LocalSettings>>;
 

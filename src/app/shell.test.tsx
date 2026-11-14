@@ -29,6 +29,15 @@ describe("view routes", () => {
     for (const view of ALL_VIEWS) expect(viewFromPath(VIEW_PATHS[view])).toBe(view);
   });
 
+  it("shows Team as one sidebar item that stays active on all three Team tabs", () => {
+    const sidebar = NAV_ITEMS.filter((item) => item.inSidebar !== false).map((item) => item.view);
+    expect(sidebar).toContain("agents");
+    expect(sidebar).not.toContain("skills");
+    expect(sidebar).not.toContain("model_director");
+    const team = NAV_ITEMS.find((item) => item.view === "agents");
+    expect(team?.activeFor).toEqual(["skills", "model_director"]);
+  });
+
   it("tolerates trailing slashes and case, and sends unknown paths to Today", () => {
     expect(viewFromPath("/Work/")).toBe("tasks");
     expect(viewFromPath("/team/library")).toBe("skills");

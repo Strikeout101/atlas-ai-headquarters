@@ -58,7 +58,11 @@ export function useViewRoute(): [View, (next: View) => void] {
     setViewState(next);
     const path = VIEW_PATHS[next];
     if (window.location.pathname !== path) {
-      window.history.pushState({ view: next }, "", `${path}${window.location.search}`);
+      const params = new URLSearchParams(window.location.search);
+      // The settings tab only means something on the Settings page.
+      if (next !== "settings") params.delete("tab");
+      const search = params.toString();
+      window.history.pushState({ view: next }, "", `${path}${search ? `?${search}` : ""}`);
     }
   }, []);
 
@@ -67,7 +71,7 @@ export function useViewRoute(): [View, (next: View) => void] {
 
 type Localized = { ko: string; en: string; ja: string; zh: string };
 
-export type NavSection = "primary" | "workspaces" | "team" | "system";
+export type NavSection = "primary" | "workspaces" | "system";
 
 export interface NavItem {
   view: View;
@@ -76,7 +80,14 @@ export interface NavItem {
   label: Localized;
   /** Extra words the command bar matches on. */
   keywords: string;
+  /** False for pages reached through another page's tabs (they stay in the command bar). */
+  inSidebar?: boolean;
+  /** Other views that highlight this sidebar item, e.g. the Team tabs. */
+  activeFor?: View[];
 }
+
+/** The Team area: one sidebar item, three tabs. */
+export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director"];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -124,21 +135,24 @@ export const NAV_ITEMS: NavItem[] = [
   {
     view: "agents",
     icon: Bot,
-    section: "team",
-    label: { ko: "에이전트", en: "Agents", ja: "エージェント", zh: "代理" },
-    keywords: "team staff employees departments",
+    section: "system",
+    label: { ko: "팀", en: "Team", ja: "チーム", zh: "团队" },
+    keywords: "agents staff employees departments hire",
+    activeFor: ["skills", "model_director"],
   },
   {
     view: "skills",
     icon: BookOpen,
-    section: "team",
+    section: "system",
+    inSidebar: false,
     label: { ko: "문서고", en: "Library", ja: "ライブラリ", zh: "文档库" },
     keywords: "skills knowledge learn",
   },
   {
     view: "model_director",
     icon: Clapperboard,
-    section: "team",
+    section: "system",
+    inSidebar: false,
     label: { ko: "모델 디렉터", en: "Model Director", ja: "モデルディレクター", zh: "模型主管" },
     keywords: "models routing upgrades llm",
   },
@@ -160,5 +174,4 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const NAV_SECTION_LABELS: Record<Exclude<NavSection, "primary" | "system">, Localized> = {
   workspaces: { ko: "워크스페이스", en: "Workspaces", ja: "ワークスペース", zh: "工作区" },
-  team: { ko: "팀", en: "Team", ja: "チーム", zh: "团队" },
 };

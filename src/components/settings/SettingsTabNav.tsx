@@ -7,27 +7,42 @@ interface SettingsTabNavProps {
   t: TFunction;
 }
 
-const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunction) => string }> = [
+/** Tabs in groups: the account, AI providers, messaging channels, and the pointer to Homelab. */
+const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunction) => string; group: number }> = [
   {
     key: "general",
+    group: 0,
     icon: SlidersHorizontal,
     label: (t) => t({ ko: "일반 설정", en: "General", ja: "一般設定", zh: "常规设置" }),
   },
   {
     key: "security",
+    group: 0,
     icon: ShieldCheck,
     label: (t) => t({ ko: "보안", en: "Security", ja: "セキュリティ", zh: "安全" }),
   },
-  { key: "cli", icon: Wrench, label: (t) => t({ ko: "CLI 도구", en: "CLI tools", ja: "CLI ツール", zh: "CLI 工具" }) },
+  {
+    key: "cli",
+    group: 1,
+    icon: Wrench,
+    label: (t) => t({ ko: "CLI 도구", en: "CLI tools", ja: "CLI ツール", zh: "CLI 工具" }),
+  },
   {
     key: "oauth",
+    group: 1,
     icon: KeyRound,
     label: (t) => t({ ko: "OAuth 인증", en: "OAuth", ja: "OAuth 認証", zh: "OAuth 认证" }),
   },
-  { key: "api", icon: Cable, label: (t) => t({ ko: "API 연동", en: "API", ja: "API 連携", zh: "API 集成" }) },
-  { key: "gateway", icon: Radio, label: (t) => t({ ko: "채널 메시지", en: "Channels", ja: "チャネル", zh: "频道" }) },
+  { key: "api", group: 1, icon: Cable, label: (t) => t({ ko: "API 연동", en: "API", ja: "API 連携", zh: "API 集成" }) },
+  {
+    key: "gateway",
+    group: 2,
+    icon: Radio,
+    label: (t) => t({ ko: "채널 메시지", en: "Channels", ja: "チャネル", zh: "频道" }),
+  },
   {
     key: "ssh",
+    group: 3,
     icon: Server,
     label: (t) => t({ ko: "SSH 호스트", en: "SSH hosts", ja: "SSH ホスト", zh: "SSH 主机" }),
   },
@@ -36,7 +51,15 @@ const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunctio
 export default function SettingsTabNav({ tab, setTab, t }: SettingsTabNavProps) {
   return (
     <div role="tablist" className="ax-tabs">
-      {TAB_ITEMS.map(({ key, icon: Icon, label }) => (
+      {TAB_ITEMS.map(({ key, icon: Icon, label, group }, index) => [
+        index > 0 && TAB_ITEMS[index - 1].group !== group ? (
+          <span
+            key={`divider-${key}`}
+            aria-hidden
+            className="-mx-2 my-2 w-px shrink-0 self-stretch"
+            style={{ background: "var(--th-border)" }}
+          />
+        ) : null,
         <button
           key={key}
           type="button"
@@ -47,8 +70,8 @@ export default function SettingsTabNav({ tab, setTab, t }: SettingsTabNavProps) 
         >
           <Icon size={15} strokeWidth={1.75} />
           {label(t)}
-        </button>
-      ))}
+        </button>,
+      ])}
     </div>
   );
 }

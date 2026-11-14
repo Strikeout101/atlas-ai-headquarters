@@ -13,6 +13,7 @@ import SecuritySettingsTab from "./settings/SecuritySettingsTab";
 import SettingsTabNav from "./settings/SettingsTabNav";
 import HomelabWorkspace from "./HomelabWorkspace";
 import type { AccountDraftMap, AccountDraftPatch, LocalSettings, SettingsTab } from "./settings/types";
+import { isSettingsTab, SETTINGS_TAB_EVENT, settingsTabFromUrl } from "./settings/types";
 import { useApiProvidersState } from "./settings/useApiProvidersState";
 
 interface SettingsPanelProps {
@@ -22,6 +23,8 @@ interface SettingsPanelProps {
   onRefreshCli: () => void;
   oauthResult?: OAuthCallbackResult | null;
   onOauthResultClear?: () => void;
+  /** SSH hosts live on the Homelab page; the SSH hosts tab links there. */
+  onOpenHomelab?: () => void;
 }
 
 export default function SettingsPanel({
@@ -31,11 +34,27 @@ export default function SettingsPanel({
   onRefreshCli,
   oauthResult,
   onOauthResultClear,
+  onOpenHomelab,
 }: SettingsPanelProps) {
   const [form, setForm] = useState<LocalSettings>(settings as LocalSettings);
   const { t, locale: localeTag } = useI18n(form.language);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<SettingsTab>(oauthResult ? "oauth" : "general");
+  const [tab, setTabState] = useState<SettingsTab>(() => (oauthResult ? "oauth" : (settingsTabFromUrl() ?? "general")));
+  // The open tab is kept in the address (?tab=api) so links, reloads and the command bar land on it.
+  const setTab = useCallback((next: SettingsTab) => {
+    setTabState(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+  useEffect(() => {
+    const onTab = (event: Event) => {
+      const next = (event as CustomEvent<unknown>).detail;
+      if (isSettingsTab(next)) setTab(next);
+    };
+    window.addEventListener(SETTINGS_TAB_EVENT, onTab);
+    return () => window.removeEventListener(SETTINGS_TAB_EVENT, onTab);
+  }, [setTab]);
 
   const [oauthStatus, setOauthStatus] = useState<OAuthStatus | null>(null);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -126,7 +145,7 @@ export default function SettingsPanel({
         setModels(null);
       }
     }
-  }, [oauthResult]);
+  }, [oauthResult, setTab]);
 
   useEffect(() => {
     if (tab === "oauth" && !oauthStatus) {
@@ -397,7 +416,9 @@ export default function SettingsPanel({
   return (
     <div
       className={
-        tab === "ssh" ? "mx-auto max-w-7xl space-y-4 sm:space-y-6" : "mx-auto max-w-2xl space-y-4 sm:space-y-6"
+        tab === "ssh" && !onOpenHomelab
+          ? "mx-auto max-w-7xl space-y-4 sm:space-y-6"
+          : "mx-auto max-w-2xl space-y-4 sm:space-y-6"
       }
     >
       <h2 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
@@ -464,7 +485,35 @@ export default function SettingsPanel({
         <GatewaySettingsTab t={t} form={form} setForm={setForm} persistSettings={persistSettings} />
       )}
 
-      {tab === "ssh" && <HomelabWorkspace />}
+      {tab === "ssh" &&
+        (onOpenHomelab ? (
+          <div
+            className="rounded-xl p-5"
+            style={{ border: "1px solid var(--th-border)", background: "var(--th-card-bg)" }}
+          >
+            <h3 className="text-[15px] font-semibold" style={{ color: "var(--th-text-heading)" }}>
+              {t({
+                ko: "SSH 호스트는 홈랩으로 이동했습니다",
+                en: "SSH hosts moved to Homelab",
+                ja: "SSH ホストはホームラボに移動しました",
+                zh: "SSH 主机已移至家庭实验室",
+              })}
+            </h3>
+            <p className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
+              {t({
+                ko: "호스트, 지문, 에이전트 권한, 명령 승인과 실행 기록을 한곳에서 관리합니다.",
+                en: "Hosts, pinned fingerprints, agent access, command approvals and the run log are all managed there.",
+                ja: "ホスト、フィンガープリント、エージェント権限、コマンド承認、実行ログをまとめて管理します。",
+                zh: "主机、指纹、代理权限、命令审批和运行日志都在那里管理。",
+              })}
+            </p>
+            <button type="button" onClick={onOpenHomelab} className="ax-btn-primary mt-4 h-9 rounded-lg px-4 text-sm">
+              {t({ ko: "홈랩 열기", en: "Open Homelab", ja: "ホームラボを開く", zh: "打开家庭实验室" })}
+            </button>
+          </div>
+        ) : (
+          <HomelabWorkspace />
+        ))}
     </div>
   );
 }
