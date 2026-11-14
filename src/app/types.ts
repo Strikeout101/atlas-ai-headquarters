@@ -1,6 +1,17 @@
 import type { RoomTheme } from "../types";
 
-export type View = "office" | "agents" | "dashboard" | "tasks" | "business" | "homelab" | "model_director" | "skills" | "settings";
+export type View =
+  | "office"
+  | "agents"
+  | "dashboard"
+  | "tasks"
+  | "tech"
+  | "events"
+  | "outreach"
+  | "homelab"
+  | "model_director"
+  | "skills"
+  | "settings";
 export type TaskPanelTab = "terminal" | "minutes";
 export type RuntimeOs = "windows" | "mac" | "linux" | "unknown";
 

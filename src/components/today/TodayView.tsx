@@ -1,9 +1,10 @@
 import { useMemo, type ReactNode } from "react";
-import { ArrowRight, Loader2, Signpost, SquareTerminal } from "lucide-react";
+import { ArrowRight, Loader2, Send, Signpost, SquareTerminal } from "lucide-react";
 import type { Agent, Task } from "../../types";
 import { localeName, useI18n } from "../../i18n";
 import type { DecisionInboxItem } from "../chat/decision-inbox";
 import type { PendingApproval } from "../../api";
+import type { CommunicationDraft } from "../../api/business";
 import ApprovalRow from "./ApprovalRow";
 import AgentAvatar from "../AgentAvatar";
 import { timeAgo, useNow } from "../dashboard/model";
@@ -20,6 +21,9 @@ interface TodayViewProps {
   onOpenWork: () => void;
   /** Opens the task drawer for one task. */
   onOpenTask?: (taskId: string) => void;
+  /** Outreach drafts marked ready for review. */
+  readyDrafts?: CommunicationDraft[];
+  onOpenOutreach?: () => void;
   /** SSH commands that could change a host, and model upgrades, decided in place. */
   approvals?: PendingApproval[];
   onDecideApproval?: (item: PendingApproval, approve: boolean) => Promise<void>;
@@ -82,6 +86,8 @@ export default function TodayView({
   onOpenTerminal,
   onOpenWork,
   onOpenTask,
+  readyDrafts = [],
+  onOpenOutreach,
   approvals = [],
   onDecideApproval,
   onOpenHomelab,
@@ -104,7 +110,7 @@ export default function TodayView({
     [tasks],
   );
 
-  const needsYouCount = approvals.length + decisionItems.length + inReview.length;
+  const needsYouCount = approvals.length + decisionItems.length + inReview.length + readyDrafts.length;
   const shownDecisions = decisionItems.slice(0, NEEDS_YOU_LIMIT);
   const shownReviews = inReview.slice(0, Math.max(0, NEEDS_YOU_LIMIT - shownDecisions.length));
 
@@ -231,6 +237,53 @@ export default function TodayView({
                   <button type="button" onClick={onOpenDecisionInbox} className={`${actionButtonClass} ax-btn-primary`}>
                     {t({ ko: "결정하기", en: "Decide", ja: "決定する", zh: "去决定" })}
                   </button>
+                </li>
+              ))}
+              {readyDrafts.slice(0, NEEDS_YOU_LIMIT).map((draft) => (
+                <li
+                  key={`draft:${draft.id}`}
+                  className="flex items-start gap-3 px-5 py-3.5"
+                  style={{ borderBottom: "1px solid var(--th-border)" }}
+                >
+                  <Send
+                    size={15}
+                    strokeWidth={1.75}
+                    className="mt-0.5 shrink-0"
+                    style={{ color: "var(--ax-signal)" }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="flex flex-wrap items-baseline gap-x-2 text-[12px]"
+                      style={{ color: "var(--th-text-muted)" }}
+                    >
+                      <span className="font-medium" style={{ color: "var(--th-text-secondary)" }}>
+                        {t({ ko: "초안 검토", en: "Draft ready", ja: "下書き確認", zh: "草稿待审" })}
+                      </span>
+                      <span>
+                        {draft.business === "tech" ? "Tech Services" : "Events and Rentals"} · {draft.channel}
+                      </span>
+                      <span>· {timeAgo(draft.updated_at, localeTag)}</span>
+                    </div>
+                    <p className="mt-1 truncate text-[13px]" style={{ color: "var(--th-text-primary)" }}>
+                      {draft.subject || plainSnippet(draft.body, 90)}
+                    </p>
+                  </div>
+                  {onOpenOutreach && (
+                    <button
+                      type="button"
+                      onClick={onOpenOutreach}
+                      className={actionButtonClass}
+                      style={quietButtonStyle}
+                    >
+                      {t({
+                        ko: "아웃리치에서 열기",
+                        en: "Open in Outreach",
+                        ja: "アウトリーチで開く",
+                        zh: "在外联中打开",
+                      })}
+                    </button>
+                  )}
                 </li>
               ))}
               {shownReviews.map((task) => (

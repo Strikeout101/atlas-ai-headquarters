@@ -12,7 +12,9 @@ const ALL_VIEWS: View[] = [
   "agents",
   "dashboard",
   "tasks",
-  "business",
+  "tech",
+  "events",
+  "outreach",
   "homelab",
   "model_director",
   "skills",
@@ -31,6 +33,7 @@ describe("view routes", () => {
     expect(viewFromPath("/Work/")).toBe("tasks");
     expect(viewFromPath("/team/library")).toBe("skills");
     expect(viewFromPath("/nope")).toBe("dashboard");
+    expect(viewFromPath("/business")).toBe("tech");
     expect(viewFromPath("/")).toBe("dashboard");
   });
 });

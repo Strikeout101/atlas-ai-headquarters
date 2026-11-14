@@ -19,6 +19,7 @@ const QUOTE_STATUSES = ["draft", "shared", "accepted", "declined", "archived"] a
 const DRAFT_STATUSES = ["draft", "ready", "archived"] as const;
 const CHANNELS = ["email", "social", "sms"] as const;
 const PURPOSES = ["outreach", "promotion", "follow_up", "checkin", "checkout", "general"] as const;
+const FLAG_VALUES = ["0", "1"] as const;
 
 const ENTITIES: readonly Entity[] = [
   {
@@ -30,6 +31,7 @@ const ENTITIES: readonly Entity[] = [
       { name: "email", max: 320 },
       { name: "phone", max: 80 },
       { name: "notes", max: 4000 },
+      { name: "do_not_contact", values: FLAG_VALUES },
     ],
   },
   {
@@ -125,6 +127,18 @@ export function ensureBusinessSchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_business_quotes_status ON business_quotes(status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_business_drafts_business ON business_drafts(business, status, updated_at DESC);
   `);
+  const contactColumns = db.prepare("PRAGMA table_info(business_contacts)").all() as Array<{ name: string }>;
+  if (!contactColumns.some((column) => column.name === "do_not_contact")) {
+    db.exec("ALTER TABLE business_contacts ADD COLUMN do_not_contact INTEGER NOT NULL DEFAULT 0");
+  }
+}
+
+function isDoNotContact(db: DatabaseSync, contactId: unknown): boolean {
+  if (typeof contactId !== "string" || !contactId) return false;
+  const row = db.prepare("SELECT do_not_contact FROM business_contacts WHERE id = ?").get(contactId) as
+    | { do_not_contact: number }
+    | undefined;
+  return Number(row?.do_not_contact ?? 0) === 1;
 }
 
 function isBody(value: unknown): value is Body {
@@ -207,6 +221,13 @@ export function registerBusinessRoutes(app: Express, db: DatabaseSync): void {
       if (!contactBelongsToBusiness(db, parsed.values.contact_id, business)) {
         return res.status(400).json({ error: "contact_business_mismatch" });
       }
+      if (
+        entity.path === "drafts" &&
+        parsed.values.status === "ready" &&
+        isDoNotContact(db, parsed.values.contact_id)
+      ) {
+        return res.status(409).json({ error: "contact_do_not_contact" });
+      }
       const id = randomUUID();
       const now = Date.now();
       const columns = [
@@ -247,6 +268,12 @@ export function registerBusinessRoutes(app: Express, db: DatabaseSync): void {
       if (!contactBelongsToBusiness(db, contactId, business)) {
         return res.status(400).json({ error: "contact_business_mismatch" });
       }
+      if (entity.path === "drafts") {
+        const status = "status" in parsed.values ? parsed.values.status : current.status;
+        if (status === "ready" && isDoNotContact(db, contactId)) {
+          return res.status(409).json({ error: "contact_do_not_contact" });
+        }
+      }
       delete parsed.values.business;
       const columns = Object.keys(parsed.values);
       if (columns.length === 0) return res.status(400).json({ error: "no_fields_to_update" });
@@ -254,6 +281,12 @@ export function registerBusinessRoutes(app: Express, db: DatabaseSync): void {
       db.prepare(
         `UPDATE ${entity.table} SET ${columns.map((column) => `${column} = ?`).join(", ")}, updated_at = ? WHERE id = ?`,
       ).run(...values, Date.now(), id);
+      // Someone who asked not to be contacted must not have messages waiting to go out.
+      if (entity.path === "contacts" && parsed.values.do_not_contact === "1") {
+        db.prepare(
+          "UPDATE business_drafts SET status = 'draft', updated_at = ? WHERE contact_id = ? AND status = 'ready'",
+        ).run(Date.now(), id);
+      }
       const item = db.prepare(`SELECT * FROM ${entity.table} WHERE id = ?`).get(id);
       return res.json({ ok: true, item });
     });

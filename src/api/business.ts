@@ -11,9 +11,13 @@ export interface BusinessContact {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  /** 1 when this person asked not to be contacted. Drafts to them can't be marked ready. */
+  do_not_contact?: number;
   created_at: number;
   updated_at: number;
 }
+
+type ContactFlag = { do_not_contact?: "0" | "1" };
 
 export interface TechTicket {
   id: string;
@@ -61,10 +65,14 @@ export const businessApi = {
     list: async (business: BusinessKind) =>
       (await request<ListResponse<BusinessContact>>(`/api/business/contacts?business=${business}`)).items,
     create: async (
-      input: Pick<BusinessContact, "business" | "name"> & Partial<Pick<BusinessContact, "email" | "phone" | "notes">>,
+      input: Pick<BusinessContact, "business" | "name"> &
+        Partial<Pick<BusinessContact, "email" | "phone" | "notes">> &
+        ContactFlag,
     ) => (await post<ItemResponse<BusinessContact>>("/api/business/contacts", input)).item,
-    update: async (id: string, input: Partial<Pick<BusinessContact, "name" | "email" | "phone" | "notes">>) =>
-      (await patch<ItemResponse<BusinessContact>>(`/api/business/contacts/${encodeURIComponent(id)}`, input)).item,
+    update: async (
+      id: string,
+      input: Partial<Pick<BusinessContact, "name" | "email" | "phone" | "notes">> & ContactFlag,
+    ) => (await patch<ItemResponse<BusinessContact>>(`/api/business/contacts/${encodeURIComponent(id)}`, input)).item,
     remove: async (id: string) => del(`/api/business/contacts/${encodeURIComponent(id)}`),
   },
   tickets: {

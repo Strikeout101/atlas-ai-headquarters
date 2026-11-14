@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   BookOpen,
+  CalendarDays,
+  Laptop,
+  Send,
   Bot,
-  Briefcase,
   Building2,
   Clapperboard,
   Inbox,
@@ -20,7 +22,9 @@ import type { View } from "./types";
 export const VIEW_PATHS: Record<View, string> = {
   dashboard: "/",
   tasks: "/work",
-  business: "/business",
+  tech: "/tech",
+  events: "/events",
+  outreach: "/outreach",
   homelab: "/homelab",
   agents: "/team",
   skills: "/team/library",
@@ -30,6 +34,8 @@ export const VIEW_PATHS: Record<View, string> = {
 };
 
 const PATH_TO_VIEW = new Map<string, View>(Object.entries(VIEW_PATHS).map(([view, path]) => [path, view as View]));
+/** Old addresses that still work. The Business page was split into Tech Services, Events and Outreach. */
+PATH_TO_VIEW.set("/business", "tech");
 
 export function viewFromPath(pathname: string): View {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -88,11 +94,25 @@ export const NAV_ITEMS: NavItem[] = [
     keywords: "tasks board projects kanban",
   },
   {
-    view: "business",
-    icon: Briefcase,
+    view: "tech",
+    icon: Laptop,
     section: "workspaces",
-    label: { ko: "비즈니스", en: "Business", ja: "ビジネス", zh: "业务" },
-    keywords: "tech services events rentals outreach clients contacts quotes",
+    label: { ko: "기술 서비스", en: "Tech Services", ja: "テックサービス", zh: "技术服务" },
+    keywords: "business tickets clients contacts devices repairs small business",
+  },
+  {
+    view: "events",
+    icon: CalendarDays,
+    section: "workspaces",
+    label: { ko: "이벤트 및 렌탈", en: "Events and Rentals", ja: "イベント・レンタル", zh: "活动与租赁" },
+    keywords: "business rentals quotes party bounce events calendar primrose",
+  },
+  {
+    view: "outreach",
+    icon: Send,
+    section: "workspaces",
+    label: { ko: "아웃리치", en: "Outreach", ja: "アウトリーチ", zh: "外联" },
+    keywords: "business drafts email social sms marketing promotion do not contact",
   },
   {
     view: "homelab",

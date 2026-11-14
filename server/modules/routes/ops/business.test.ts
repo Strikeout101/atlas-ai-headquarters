@@ -159,4 +159,53 @@ describe("business records", () => {
     const remaining = await request(app).get(`/api/business/tickets/${ticket.body.item.id}`).expect(200);
     expect(remaining.body.item.contact_id).toBeNull();
   });
+
+  it("never lets a draft to a do-not-contact contact be ready, and pulls back ready drafts when a contact opts out", async () => {
+    const { app } = harness();
+    const contact = await request(app)
+      .post("/api/business/contacts")
+      .send({ business: "rental", name: "Marisol Okafor" })
+      .expect(201);
+    const contactId = contact.body.item.id as string;
+    expect(contact.body.item.do_not_contact).toBe(0);
+    const draft = await request(app)
+      .post("/api/business/drafts")
+      .send({
+        business: "rental",
+        contact_id: contactId,
+        channel: "email",
+        purpose: "promotion",
+        body: "Spring deals",
+        status: "ready",
+      })
+      .expect(201);
+
+    const optedOut = await request(app)
+      .patch(`/api/business/contacts/${contactId}`)
+      .send({ do_not_contact: "1" })
+      .expect(200);
+    expect(optedOut.body.item.do_not_contact).toBe(1);
+    const pulled = await request(app).get(`/api/business/drafts/${draft.body.item.id}`).expect(200);
+    expect(pulled.body.item.status).toBe("draft");
+
+    await request(app)
+      .patch(`/api/business/drafts/${draft.body.item.id}`)
+      .send({ status: "ready" })
+      .expect(409, { error: "contact_do_not_contact" });
+    await request(app)
+      .post("/api/business/drafts")
+      .send({
+        business: "rental",
+        contact_id: contactId,
+        channel: "sms",
+        purpose: "general",
+        body: "Hi",
+        status: "ready",
+      })
+      .expect(409);
+    await request(app).patch(`/api/business/contacts/${contactId}`).send({ do_not_contact: "maybe" }).expect(400);
+
+    await request(app).patch(`/api/business/contacts/${contactId}`).send({ do_not_contact: "0" }).expect(200);
+    await request(app).patch(`/api/business/drafts/${draft.body.item.id}`).send({ status: "ready" }).expect(200);
+  });
 });

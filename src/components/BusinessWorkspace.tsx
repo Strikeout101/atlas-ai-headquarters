@@ -10,7 +10,49 @@ import {
   type TechTicket,
 } from "../api/business";
 
-type Section = "contacts" | "work" | "drafts";
+export type BusinessSection = "work" | "calendar" | "contacts" | "drafts";
+type Section = BusinessSection;
+
+export interface BusinessWorkspaceProps {
+  /** Lock the page to one business; without it the page shows the Tech/Rentals switch. */
+  business?: BusinessKind;
+  /** Tabs to show, in order; the first opens by default. */
+  sections?: BusinessSection[];
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+}
+
+const API_ERROR_TEXT: Record<string, string> = {
+  contact_do_not_contact: "This contact asked not to be contacted, so the draft can't be marked ready.",
+  contact_business_mismatch: "That contact belongs to the other business.",
+};
+
+function friendlyError(cause: unknown, fallback: string): string {
+  const message = cause instanceof Error ? cause.message : "";
+  return API_ERROR_TEXT[message] ?? (message || fallback);
+}
+
+function isDoNotContact(contact: BusinessContact | undefined): boolean {
+  return Number(contact?.do_not_contact ?? 0) === 1;
+}
+
+/** Quotes grouped for the events view: dated upcoming events by month, then undated, then past. */
+export function groupEvents(quotes: RentalQuote[], todayIso: string) {
+  const live = quotes.filter((quote) => quote.status !== "archived" && quote.status !== "declined");
+  const dated = live.filter((quote) => quote.event_date).sort((a, b) => a.event_date!.localeCompare(b.event_date!));
+  const upcoming = dated.filter((quote) => quote.event_date! >= todayIso);
+  const past = dated.filter((quote) => quote.event_date! < todayIso).reverse();
+  const undated = live.filter((quote) => !quote.event_date);
+  const months: Array<{ month: string; quotes: RentalQuote[] }> = [];
+  for (const quote of upcoming) {
+    const month = quote.event_date!.slice(0, 7);
+    const last = months[months.length - 1];
+    if (last?.month === month) last.quotes.push(quote);
+    else months.push({ month, quotes: [quote] });
+  }
+  return { months, undated, past };
+}
 
 const inputClass =
   "w-full rounded-lg border border-slate-500/40 bg-[var(--th-bg-surface)] px-3 py-2 text-sm text-[var(--th-text-primary)] outline-none focus:border-sky-500";
@@ -32,6 +74,48 @@ function displayStatus(value: string): string {
 
 function contactName(contacts: BusinessContact[], id: string | null): string {
   return contacts.find((contact) => contact.id === id)?.name ?? "No linked contact";
+}
+
+function sectionLabel(section: BusinessSection, business: BusinessKind): string {
+  if (section === "work") return business === "tech" ? "Service tickets" : "Rental quotes";
+  if (section === "calendar") return "Upcoming events";
+  if (section === "contacts") return "Contacts";
+  return "Communications";
+}
+
+function EventRow({ quote, contact, onOpen }: { quote: RentalQuote; contact: string; onOpen: () => void }) {
+  const date = quote.event_date ? new Date(`${quote.event_date}T00:00:00`) : null;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-4 rounded-xl border border-slate-500/20 p-3 text-left transition hover:bg-slate-500/5"
+      >
+        <div className="w-12 shrink-0 text-center">
+          {date ? (
+            <>
+              <div className="text-[11px] font-semibold uppercase text-sky-500">
+                {date.toLocaleDateString(undefined, { weekday: "short" })}
+              </div>
+              <div className="text-xl font-semibold tabular-nums">{date.getDate()}</div>
+            </>
+          ) : (
+            <div className="text-xs text-[var(--th-text-secondary)]">TBD</div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold">{quote.event_name}</div>
+          <div className="truncate text-xs text-[var(--th-text-secondary)]">
+            {contact} · {quote.items.split("\n")[0]}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full border border-slate-500/30 px-2 py-0.5 text-xs">
+          {displayStatus(quote.status)}
+        </span>
+      </button>
+    </li>
+  );
 }
 
 function StatusSelect<T extends string>({
@@ -59,9 +143,16 @@ function StatusSelect<T extends string>({
   );
 }
 
-export default function BusinessWorkspace() {
-  const [business, setBusiness] = useState<BusinessKind>("tech");
-  const [section, setSection] = useState<Section>("work");
+export default function BusinessWorkspace({
+  business: fixedBusiness,
+  sections = ["work", "contacts", "drafts"],
+  eyebrow = "Operations",
+  title = "Business workspace",
+  description = "Keep customer work and outreach drafts together. Drafts stay here until you choose how to send or publish them.",
+}: BusinessWorkspaceProps = {}) {
+  const [business, setBusiness] = useState<BusinessKind>(fixedBusiness ?? "tech");
+  const [section, setSection] = useState<Section>(sections[0]);
+  const [showDoNotContactOnly, setShowDoNotContactOnly] = useState(false);
   const [contacts, setContacts] = useState<BusinessContact[]>([]);
   const [tickets, setTickets] = useState<TechTicket[]>([]);
   const [quotes, setQuotes] = useState<RentalQuote[]>([]);
@@ -72,7 +163,7 @@ export default function BusinessWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [contactId, setContactId] = useState<string | null>(null);
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
   const [workId, setWorkId] = useState<string | null>(null);
   const [workForm, setWorkForm] = useState({
     contact_id: "",
@@ -105,7 +196,7 @@ export default function BusinessWorkspace() {
       if (kind === "tech") setTickets(nextWork as TechTicket[]);
       else setQuotes(nextWork as RentalQuote[]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load business records.");
+      setError(friendlyError(cause, "Could not load business records."));
     } finally {
       setLoading(false);
     }
@@ -117,14 +208,26 @@ export default function BusinessWorkspace() {
 
   const selectBusiness = (kind: BusinessKind) => {
     setBusiness(kind);
-    setSection("work");
+    setSection(sections[0]);
     setContactId(null);
     setWorkId(null);
     setDraftId(null);
-    setContactForm({ name: "", email: "", phone: "", notes: "" });
+    setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
     setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "" });
     setDraftForm({ contact_id: "", channel: "email", purpose: "outreach", subject: "", body: "" });
     setNotice(null);
+  };
+
+  const openQuote = (quote: RentalQuote) => {
+    setWorkId(quote.id);
+    setWorkForm({
+      contact_id: quote.contact_id ?? "",
+      title: quote.event_name,
+      device: "",
+      event_date: quote.event_date ?? "",
+      details: quote.items,
+      extra: quote.quote_text ?? "",
+    });
   };
 
   const run = async (operation: () => Promise<unknown>, success: string) => {
@@ -136,7 +239,7 @@ export default function BusinessWorkspace() {
       await reload(business);
       setNotice(success);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not save the record.");
+      setError(friendlyError(cause, "Could not save the record."));
     } finally {
       setBusy(false);
     }
@@ -147,10 +250,11 @@ export default function BusinessWorkspace() {
     if (!contactForm.name.trim()) return setError("Contact name is required.");
     await run(
       async () => {
-        if (contactId) await businessApi.contacts.update(contactId, contactForm);
-        else await businessApi.contacts.create({ business, ...contactForm });
+        const input = { ...contactForm, do_not_contact: contactForm.do_not_contact ? ("1" as const) : ("0" as const) };
+        if (contactId) await businessApi.contacts.update(contactId, input);
+        else await businessApi.contacts.create({ business, ...input });
         setContactId(null);
-        setContactForm({ name: "", email: "", phone: "", notes: "" });
+        setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
       },
       contactId ? "Contact updated." : "Contact added.",
     );
@@ -214,27 +318,33 @@ export default function BusinessWorkspace() {
     }, "Record deleted.");
   };
 
+  const visibleContacts = showDoNotContactOnly ? contacts.filter(isDoNotContact) : contacts;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const events = groupEvents(quotes, todayIso);
   const count =
     section === "contacts"
-      ? contacts.length
-      : section === "drafts"
-        ? drafts.length
-        : business === "tech"
-          ? tickets.length
-          : quotes.length;
+      ? visibleContacts.length
+      : section === "calendar"
+        ? events.months.reduce((n, m) => n + m.quotes.length, 0) + events.undated.length + events.past.length
+        : section === "drafts"
+          ? drafts.length
+          : business === "tech"
+            ? tickets.length
+            : quotes.length;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 text-[var(--th-text-primary)] md:px-6">
       <div className="grid gap-4 border-b border-slate-500/20 pb-5 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-500">Operations</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Business workspace</h1>
-          <p className="mt-2 max-w-[65ch] text-sm text-[var(--th-text-secondary)]">
-            Keep customer work and outreach drafts together. Drafts stay here until you choose how to send or publish
-            them.
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-500">{eyebrow}</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
+          <p className="mt-2 max-w-[65ch] text-sm text-[var(--th-text-secondary)]">{description}</p>
         </div>
-        <div className="flex rounded-xl border border-slate-500/30 p-1" role="group" aria-label="Business">
+        <div
+          className={`${fixedBusiness ? "hidden" : "flex"} rounded-xl border border-slate-500/30 p-1`}
+          role="group"
+          aria-label="Business"
+        >
           {(["tech", "rental"] as const).map((kind) => (
             <button
               key={kind}
@@ -243,31 +353,27 @@ export default function BusinessWorkspace() {
               onClick={() => selectBusiness(kind)}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${business === kind ? "bg-sky-600 text-white" : "text-[var(--th-text-secondary)] hover:bg-slate-500/10"}`}
             >
-              {kind === "tech" ? "Tech services" : "Party rentals"}
+              {kind === "tech" ? "Tech Services" : "Events and Rentals"}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Business records">
-        {(
-          [
-            ["work", business === "tech" ? "Service tickets" : "Rental quotes"],
-            ["contacts", "Contacts"],
-            ["drafts", "Communications"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={section === key}
-            onClick={() => setSection(key)}
-            className={`rounded-full border px-4 py-2 text-sm transition active:scale-[0.98] ${section === key ? "border-sky-500 bg-sky-500/10 text-sky-500" : "border-slate-500/30 hover:bg-slate-500/10"}`}
-          >
-            {label}
-          </button>
-        ))}
+        {sections
+          .map((key) => [key, sectionLabel(key, business)] as const)
+          .map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={section === key}
+              onClick={() => setSection(key)}
+              className={`rounded-full border px-4 py-2 text-sm transition active:scale-[0.98] ${section === key ? "border-sky-500 bg-sky-500/10 text-sky-500" : "border-slate-500/30 hover:bg-slate-500/10"}`}
+            >
+              {label}
+            </button>
+          ))}
       </div>
 
       {error && (
@@ -293,15 +399,21 @@ export default function BusinessWorkspace() {
           <div className="min-w-0 space-y-3">
             <div className="flex items-baseline justify-between border-b border-slate-500/20 pb-3">
               <h2 className="text-lg font-semibold">
-                {section === "contacts"
-                  ? "Contacts"
-                  : section === "drafts"
-                    ? "Communication drafts"
-                    : business === "tech"
-                      ? "Service tickets"
-                      : "Rental quotes"}
+                {section === "drafts" ? "Communication drafts" : sectionLabel(section, business)}
               </h2>
-              <span className="text-xs text-[var(--th-text-secondary)]">{count} records</span>
+              <div className="flex items-center gap-3">
+                {section === "contacts" && (
+                  <label className="flex items-center gap-1.5 text-xs text-[var(--th-text-secondary)]">
+                    <input
+                      type="checkbox"
+                      checked={showDoNotContactOnly}
+                      onChange={(event) => setShowDoNotContactOnly(event.target.checked)}
+                    />
+                    Do not contact only
+                  </label>
+                )}
+                <span className="text-xs text-[var(--th-text-secondary)]">{count} records</span>
+              </div>
             </div>
             {count === 0 && (
               <div className="rounded-xl border border-dashed border-slate-500/30 px-5 py-12 text-center text-sm text-[var(--th-text-secondary)]">
@@ -309,12 +421,78 @@ export default function BusinessWorkspace() {
               </div>
             )}
 
+            {section === "calendar" && (
+              <div className="space-y-6">
+                {events.months.map(({ month, quotes: monthQuotes }) => (
+                  <section key={month}>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--th-text-secondary)]">
+                      {new Date(`${month}-01T00:00:00`).toLocaleDateString(undefined, {
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </h3>
+                    <ul className="space-y-2">
+                      {monthQuotes.map((quote) => (
+                        <EventRow
+                          key={quote.id}
+                          quote={quote}
+                          contact={contactName(contacts, quote.contact_id)}
+                          onOpen={() => openQuote(quote)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                {events.undated.length > 0 && (
+                  <section>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--th-text-secondary)]">
+                      Date not set
+                    </h3>
+                    <ul className="space-y-2">
+                      {events.undated.map((quote) => (
+                        <EventRow
+                          key={quote.id}
+                          quote={quote}
+                          contact={contactName(contacts, quote.contact_id)}
+                          onOpen={() => openQuote(quote)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {events.past.length > 0 && (
+                  <details>
+                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[var(--th-text-secondary)]">
+                      Past events ({events.past.length})
+                    </summary>
+                    <ul className="mt-2 space-y-2">
+                      {events.past.map((quote) => (
+                        <EventRow
+                          key={quote.id}
+                          quote={quote}
+                          contact={contactName(contacts, quote.contact_id)}
+                          onOpen={() => openQuote(quote)}
+                        />
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )}
+
             {section === "contacts" &&
-              contacts.map((contact) => (
+              visibleContacts.map((contact) => (
                 <article key={contact.id} className="rounded-xl border border-slate-500/20 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="font-semibold">{contact.name}</h3>
+                      <h3 className="flex flex-wrap items-center gap-2 font-semibold">
+                        {contact.name}
+                        {isDoNotContact(contact) && (
+                          <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400">
+                            Do not contact
+                          </span>
+                        )}
+                      </h3>
                       <p className="mt-1 text-xs text-[var(--th-text-secondary)]">
                         {[contact.email, contact.phone].filter(Boolean).join(" · ") || "No contact details"}
                       </p>
@@ -330,6 +508,7 @@ export default function BusinessWorkspace() {
                             email: contact.email ?? "",
                             phone: contact.phone ?? "",
                             notes: contact.notes ?? "",
+                            do_not_contact: isDoNotContact(contact),
                           });
                         }}
                       >
@@ -423,21 +602,7 @@ export default function BusinessWorkspace() {
                     </p>
                   )}
                   <div className="mt-4 flex gap-2">
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      onClick={() => {
-                        setWorkId(quote.id);
-                        setWorkForm({
-                          contact_id: quote.contact_id ?? "",
-                          title: quote.event_name,
-                          device: "",
-                          event_date: quote.event_date ?? "",
-                          details: quote.items,
-                          extra: quote.quote_text ?? "",
-                        });
-                      }}
-                    >
+                    <button type="button" className={buttonClass} onClick={() => openQuote(quote)}>
                       Edit
                     </button>
                     <button type="button" className={buttonClass} onClick={() => void remove("quote", quote.id)}>
@@ -458,6 +623,9 @@ export default function BusinessWorkspace() {
                       <h3 className="mt-1 font-semibold">{draft.subject || "Untitled draft"}</h3>
                       <p className="mt-1 text-xs text-[var(--th-text-secondary)]">
                         {contactName(contacts, draft.contact_id)}
+                        {isDoNotContact(contacts.find((c) => c.id === draft.contact_id)) && (
+                          <span className="ml-2 font-medium text-red-400">· Do not contact</span>
+                        )}
                       </p>
                     </div>
                     <StatusSelect
@@ -504,11 +672,13 @@ export default function BusinessWorkspace() {
                   ? draftId
                     ? "Edit draft"
                     : "New draft"
-                  : workId
-                    ? "Edit record"
-                    : business === "tech"
-                      ? "New service ticket"
-                      : "New rental quote"}
+                  : section === "calendar" && !workId
+                    ? "New event quote"
+                    : workId
+                      ? "Edit record"
+                      : business === "tech"
+                        ? "New service ticket"
+                        : "New rental quote"}
             </h2>
             {section === "contacts" && (
               <form onSubmit={(event) => void saveContact(event)} className="mt-5 grid gap-4">
@@ -551,6 +721,20 @@ export default function BusinessWorkspace() {
                     onChange={(event) => setContactForm({ ...contactForm, notes: event.target.value })}
                   />
                 </label>
+                <label className="flex items-start gap-2 text-sm text-[var(--th-text-primary)]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={contactForm.do_not_contact}
+                    onChange={(event) => setContactForm({ ...contactForm, do_not_contact: event.target.checked })}
+                  />
+                  <span>
+                    Do not contact
+                    <span className="block text-xs text-[var(--th-text-secondary)]">
+                      Drafts to this person can&apos;t be marked ready, and any ready drafts go back to draft.
+                    </span>
+                  </span>
+                </label>
                 <div className="flex gap-2">
                   <button type="submit" disabled={busy} className={primaryClass}>
                     {busy ? "Saving…" : "Save contact"}
@@ -561,7 +745,7 @@ export default function BusinessWorkspace() {
                       className={buttonClass}
                       onClick={() => {
                         setContactId(null);
-                        setContactForm({ name: "", email: "", phone: "", notes: "" });
+                        setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
                       }}
                     >
                       Cancel
@@ -571,7 +755,7 @@ export default function BusinessWorkspace() {
               </form>
             )}
 
-            {section === "work" && (
+            {(section === "work" || section === "calendar") && (
               <form onSubmit={(event) => void saveWork(event)} className="mt-5 grid gap-4">
                 <label className={labelClass}>
                   {business === "tech" ? "Ticket title" : "Event name"}
@@ -705,6 +889,7 @@ export default function BusinessWorkspace() {
                     {contacts.map((contact) => (
                       <option key={contact.id} value={contact.id}>
                         {contact.name}
+                        {isDoNotContact(contact) ? " (do not contact)" : ""}
                       </option>
                     ))}
                   </select>

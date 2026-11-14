@@ -26,6 +26,7 @@ import TaskDrawer from "../components/work/TaskDrawer";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { NAV_ITEMS } from "./routes";
 import { usePendingApprovals } from "./usePendingApprovals";
+import { useReadyDrafts } from "./useReadyDrafts";
 import { decidePendingApproval, type PendingApproval, type UpdateStatus } from "../api";
 import type {
   Agent,
@@ -460,7 +461,12 @@ export default function AppMainLayout({
     () => (openTaskId ? pendingApprovals.items.filter((item) => item.task_id === openTaskId) : []),
     [openTaskId, pendingApprovals.items],
   );
-  const needsYouCount = pendingApprovals.items.length + decisionInboxCount + reviewCount;
+  const readyDrafts = useReadyDrafts(true);
+  const refreshReadyDrafts = readyDrafts.refresh;
+  useEffect(() => {
+    if (view === "dashboard") void refreshReadyDrafts();
+  }, [view, refreshReadyDrafts]);
+  const needsYouCount = pendingApprovals.items.length + decisionInboxCount + reviewCount + readyDrafts.items.length;
   const tr = useCallback(
     (text: { ko: string; en: string; ja: string; zh: string }) => pickLang(uiLanguage, text),
     [uiLanguage],
@@ -881,6 +887,8 @@ export default function AppMainLayout({
                 onDecideApproval={handleDecideApproval}
                 onOpenHomelab={() => setView("homelab")}
                 onOpenTask={openTask}
+                readyDrafts={readyDrafts.items}
+                onOpenOutreach={() => setView("outreach")}
               >
                 <Dashboard
                   stats={stats}
@@ -913,7 +921,35 @@ export default function AppMainLayout({
               />
             )}
 
-            {view === "business" && <BusinessWorkspace />}
+            {view === "tech" && (
+              <BusinessWorkspace
+                key="tech"
+                business="tech"
+                sections={["work", "contacts"]}
+                eyebrow="Small Business Tech"
+                title="Tech Services"
+                description="Service tickets and the clients behind them. Draft messages to these clients in Outreach."
+              />
+            )}
+            {view === "events" && (
+              <BusinessWorkspace
+                key="events"
+                business="rental"
+                sections={["calendar", "work", "contacts"]}
+                eyebrow="Primrose Events"
+                title="Events and Rentals"
+                description="Upcoming events by date, rental quotes and customers. Draft messages to customers in Outreach."
+              />
+            )}
+            {view === "outreach" && (
+              <BusinessWorkspace
+                key="outreach"
+                sections={["drafts", "contacts"]}
+                eyebrow="Both businesses"
+                title="Outreach"
+                description="Email, social and SMS drafts for both businesses. Nothing is sent from here: mark a draft ready when it is good to go. Contacts marked do-not-contact can't receive ready drafts."
+              />
+            )}
             {view === "homelab" && <HomelabWorkspace agents={agents} />}
             {view === "model_director" && <ModelDirectorWorkspace />}
 
