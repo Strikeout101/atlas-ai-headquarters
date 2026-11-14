@@ -16,6 +16,7 @@ import type {
 import AgentAvatar from "./AgentAvatar";
 import AgentDetailTabContent from "./agent-detail/AgentDetailTabContent";
 import { CLI_LABELS, oauthAccountLabel, roleLabel, STATUS_CONFIG, statusLabel } from "./agent-detail/constants";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface AgentDetailProps {
   agent: Agent;
@@ -56,6 +57,7 @@ export default function AgentDetail({
   onOpenTerminal,
   onAgentUpdated,
 }: AgentDetailProps) {
+  useEscapeToClose(onClose);
   const { t, language } = useI18n();
   const [tab, setTab] = useState<"info" | "tasks" | "alba">("info");
   const [editingCli, setEditingCli] = useState(false);

@@ -20,6 +20,7 @@ import AgentAvatar from "../AgentAvatar";
 import DiffModal from "../taskboard/DiffModal";
 import { getTaskTypeBadge, priorityLabel, STATUS_OPTIONS, taskStatusLabel } from "../taskboard/constants";
 import ApprovalRow from "../today/ApprovalRow";
+import { hasOpenEscapeLayer } from "../../hooks/useEscapeToClose";
 
 const LOG_POLL_MS = 3000;
 const ACTIVITY_LINES = 12;
@@ -116,7 +117,7 @@ export default function TaskDrawer({
   useEffect(() => {
     panelRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || showDiff) return;
+      if (event.key !== "Escape" || showDiff || event.defaultPrevented || hasOpenEscapeLayer()) return;
       // Leave Escape to any dialog opened on top of the drawer.
       const dialogs = document.querySelectorAll('[role="dialog"]');
       if (dialogs.length > 1 || (dialogs.length === 1 && !panelRef.current?.contains(dialogs[0]))) return;

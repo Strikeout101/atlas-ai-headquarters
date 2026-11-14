@@ -7,6 +7,7 @@ import { getTaskReports, getTaskReportDetail } from "../api";
 import AgentAvatar from "./AgentAvatar";
 import TaskReportPopup from "./TaskReportPopup";
 import { resolveReportAgent } from "./task-report-agent";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface ReportHistoryProps {
   agents: Agent[];
@@ -35,6 +36,7 @@ function projectNameFromSummary(report: TaskReportSummary): string {
 }
 
 export default function ReportHistory({ agents, departments, uiLanguage, onClose }: ReportHistoryProps) {
+  useEscapeToClose(onClose);
   const t = (text: { ko: string; en: string; ja?: string; zh?: string }) => pickLang(uiLanguage, text);
   const [reports, setReports] = useState<TaskReportSummary[]>([]);
   const [loading, setLoading] = useState(true);

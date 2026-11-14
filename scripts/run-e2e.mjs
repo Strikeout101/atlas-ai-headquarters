@@ -11,6 +11,8 @@ function run(command, args) {
     const child = spawn(command, args, {
       stdio: "inherit",
       env: process.env,
+      // Node refuses to spawn .cmd files (pnpm.cmd) on Windows without a shell (EINVAL).
+      shell: isWindows && command.endsWith(".cmd"),
     });
 
     child.on("error", reject);

@@ -350,6 +350,7 @@ export function useProjectPickerState({
   const handleProjectInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setProjectDropdownOpen(false);
         setProjectActiveIndex(-1);
         return;

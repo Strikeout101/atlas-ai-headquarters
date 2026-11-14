@@ -6,6 +6,7 @@ import type { UiLanguage } from "../i18n";
 import { pickLang } from "../i18n";
 import AgentAvatar from "./AgentAvatar";
 import { resolveReportAgent } from "./task-report-agent";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface TaskReportPopupProps {
   report: TaskReportDetail;
@@ -48,6 +49,7 @@ function statusClass(status: string): string {
 }
 
 export default function TaskReportPopup({ report, agents, departments, uiLanguage, onClose }: TaskReportPopupProps) {
+  useEscapeToClose(onClose);
   const t = (text: { ko: string; en: string; ja?: string; zh?: string }) => pickLang(uiLanguage, text);
 
   const [currentReport, setCurrentReport] = useState<TaskReportDetail>(report);

@@ -5,6 +5,7 @@ import type { UiLanguage } from "../i18n";
 import { pickLang, localeName } from "../i18n";
 import { getActiveAgents, getCliProcesses, killCliProcess, stopTask } from "../api";
 import AgentAvatar from "./AgentAvatar";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface AgentStatusPanelProps {
   agents: Agent[];
@@ -40,6 +41,7 @@ function displayCliProvider(provider: CliProcessInfo["provider"]): string {
 }
 
 export default function AgentStatusPanel({ agents, uiLanguage, onClose }: AgentStatusPanelProps) {
+  useEscapeToClose(onClose);
   const t = (text: { ko: string; en: string; ja?: string; zh?: string }) => pickLang(uiLanguage, text);
   const [activeAgents, setActiveAgents] = useState<ActiveAgentInfo[]>([]);
   const [loading, setLoading] = useState(true);

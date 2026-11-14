@@ -1,4 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { CornerDownLeft, Search } from "lucide-react";
 import { useI18n } from "../../i18n";
 
@@ -64,7 +73,8 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
   const listId = useId();
   const results = useMemo(() => filterCommands(commands, query), [commands, query]);
 
-  useEffect(() => {
+  // Clear and focus before the first paint, so keys typed right after Ctrl+K are kept.
+  useLayoutEffect(() => {
     if (!open) return;
     setQuery("");
     setActive(0);

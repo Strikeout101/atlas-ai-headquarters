@@ -9,6 +9,8 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // Optional: use an already-installed Chromium instead of downloading the pinned build.
+    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : undefined,
   },
   webServer: {
     command: "pnpm dev:e2e",

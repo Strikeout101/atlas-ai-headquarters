@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 /* ================================================================== */
 /*  Types                                                               */
@@ -248,6 +249,7 @@ export default function OfficeRoomManager({
   onClose,
   language,
 }: OfficeRoomManagerProps) {
+  useEscapeToClose(onClose);
   const [deptStates, setDeptStates] = useState<Record<string, DeptState>>(() => {
     const result: Record<string, DeptState> = {};
     for (const dept of departments) {
