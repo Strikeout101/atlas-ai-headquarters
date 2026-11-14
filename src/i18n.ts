@@ -120,6 +120,11 @@ export function I18nProvider({ language, children }: I18nProviderProps) {
     [normalizedLanguage],
   );
 
+  // Tell the browser which language the page is in, so it doesn't offer to translate an English UI.
+  useEffect(() => {
+    if (typeof document !== "undefined") document.documentElement.lang = normalizedLanguage;
+  }, [normalizedLanguage]);
+
   const value = useMemo(
     () => ({
       language: normalizedLanguage,

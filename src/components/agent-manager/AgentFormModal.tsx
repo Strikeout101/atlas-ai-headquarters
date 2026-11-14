@@ -1,6 +1,7 @@
 import { Image as ImageIcon, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { Department } from "../../types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Agent, Department } from "../../types";
+import AgentAvatar from "../AgentAvatar";
 import { localeName, useI18n } from "../../i18n";
 import * as api from "../../api";
 import { CLI_PROVIDERS, ROLE_BADGE, ROLE_LABEL, ROLES } from "./constants";
@@ -27,6 +28,8 @@ export default function AgentFormModal({
   saving,
   onSave,
   onClose,
+  agents = [],
+  agentId = null,
 }: {
   isKo: boolean;
   locale: string;
@@ -38,6 +41,10 @@ export default function AgentFormModal({
   saving: boolean;
   onSave: () => void;
   onClose: () => void;
+  /** All agents, so the preview shows the same headshot the agent will get on its card. */
+  agents?: Agent[];
+  /** The agent being edited; null when hiring. */
+  agentId?: string | null;
 }) {
   const { t } = useI18n();
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -45,6 +52,14 @@ export default function AgentFormModal({
   const [processing, setProcessing] = useState(false);
   const [previews, setPreviews] = useState<Record<string, string> | null>(null);
   const [spriteNum, setSpriteNum] = useState(form.sprite_number ?? 0);
+  const draftId = agentId ?? "__draft_agent__";
+  const previewAgents = useMemo<Agent[]>(() => {
+    const others = agents.filter((agent) => agent.id !== draftId);
+    const base = agents.find((agent) => agent.id === draftId);
+    const draft = { ...(base ?? ({ id: draftId, name: form.name } as Agent)), sprite_number: spriteNum };
+    return [...others, draft];
+  }, [agents, draftId, form.name, spriteNum]);
+  const previewAgent = previewAgents[previewAgents.length - 1];
   const [registering, setRegistering] = useState(false);
   const [registered, setRegistered] = useState(false);
 
@@ -123,12 +138,7 @@ export default function AgentFormModal({
                   style={{ border: "2px solid var(--th-input-border)" }}
                 >
                   {spriteNum > 0 ? (
-                    <img
-                      src={`/sprites/${spriteNum}-D-1.png`}
-                      alt={`sprite ${spriteNum}`}
-                      className="w-full h-full object-cover"
-                      style={{ imageRendering: "pixelated" }}
-                    />
+                    <AgentAvatar agent={previewAgent} agents={previewAgents} size={56} rounded="xl" />
                   ) : (
                     <span className="text-2xl">{form.avatar_emoji || "🤖"}</span>
                   )}
@@ -161,7 +171,7 @@ export default function AgentFormModal({
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="DORO"
+                    placeholder="Marcus"
                     className={inputCls}
                     style={inputStyle}
                   />

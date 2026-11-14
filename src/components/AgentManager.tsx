@@ -585,6 +585,8 @@ export default function AgentManager({
           saving={saving}
           onSave={handleSave}
           onClose={closeModal}
+          agents={agents}
+          agentId={modalAgent?.id ?? null}
         />
       )}
 

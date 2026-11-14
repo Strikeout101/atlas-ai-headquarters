@@ -22,6 +22,214 @@ export const LEGACY_KOREAN_SEED_PERSONALITIES: ReadonlyArray<readonly [string, s
   ["꼼꼼한 품질관리 주니어", "Meticulous junior QA"],
 ];
 
+interface DefaultAgent {
+  name: string;
+  nameKo: string;
+  nameJa: string;
+  nameZh: string;
+  /** Name this agent had in installs seeded before the rename. */
+  legacyName: string;
+  department: string;
+  role: "team_leader" | "senior" | "junior";
+  cli: string;
+  emoji: string;
+  personality: string;
+  /** Sprite, and so headshot, for new installs; matched to the name. */
+  sprite: number;
+  /**
+   * Sprite to pin when renaming an existing install. The old "DORO" got sprite 13 by name, which the rename would
+   * lose; everyone else keeps the face they already have.
+   */
+  legacySprite?: number;
+}
+
+/** The default team. Names suit the headshot each agent gets (atlas-office/agentLooks.ts). */
+export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
+  {
+    name: "Marcus",
+    nameKo: "마커스",
+    nameJa: "マーカス",
+    nameZh: "马库斯",
+    legacyName: "Aria",
+    department: "dev",
+    role: "team_leader",
+    cli: "claude",
+    emoji: "👨‍💻",
+    personality: "Meticulous senior developer",
+    sprite: 1,
+  },
+  {
+    name: "Elena",
+    nameKo: "엘레나",
+    nameJa: "エレナ",
+    nameZh: "埃琳娜",
+    legacyName: "Bolt",
+    department: "dev",
+    role: "senior",
+    cli: "codex",
+    emoji: "⚡",
+    personality: "Fast coding specialist",
+    sprite: 2,
+  },
+  {
+    name: "Owen",
+    nameKo: "오웬",
+    nameJa: "オーウェン",
+    nameZh: "欧文",
+    legacyName: "Nova",
+    department: "dev",
+    role: "junior",
+    cli: "copilot",
+    emoji: "🌟",
+    personality: "Creative junior",
+    sprite: 3,
+  },
+  {
+    name: "Iris",
+    nameKo: "아이리스",
+    nameJa: "アイリス",
+    nameZh: "艾丽丝",
+    legacyName: "Pixel",
+    department: "design",
+    role: "team_leader",
+    cli: "claude",
+    emoji: "🎨",
+    personality: "Design leader",
+    sprite: 4,
+  },
+  {
+    name: "Felix",
+    nameKo: "펠릭스",
+    nameJa: "フェリックス",
+    nameZh: "费利克斯",
+    legacyName: "Luna",
+    department: "design",
+    role: "junior",
+    cli: "gemini",
+    emoji: "🖌️",
+    personality: "Empathetic UI designer",
+    sprite: 5,
+  },
+  {
+    name: "Adrian",
+    nameKo: "에이드리언",
+    nameJa: "エイドリアン",
+    nameZh: "阿德里安",
+    legacyName: "Sage",
+    department: "planning",
+    role: "team_leader",
+    cli: "codex",
+    emoji: "🧠",
+    personality: "Strategic analyst",
+    sprite: 7,
+  },
+  {
+    name: "Claire",
+    nameKo: "클레어",
+    nameJa: "クレア",
+    nameZh: "克莱尔",
+    legacyName: "Clio",
+    department: "planning",
+    role: "senior",
+    cli: "claude",
+    emoji: "📝",
+    personality: "Data-driven planner",
+    sprite: 6,
+  },
+  {
+    name: "Diana",
+    nameKo: "다이애나",
+    nameJa: "ダイアナ",
+    nameZh: "黛安娜",
+    legacyName: "Atlas",
+    department: "operations",
+    role: "team_leader",
+    cli: "claude",
+    emoji: "🗺️",
+    personality: "Operations expert",
+    sprite: 8,
+  },
+  {
+    name: "Priya",
+    nameKo: "프리야",
+    nameJa: "プリヤ",
+    nameZh: "普丽娅",
+    legacyName: "Turbo",
+    department: "operations",
+    role: "senior",
+    cli: "codex",
+    emoji: "🚀",
+    personality: "Automation specialist",
+    sprite: 10,
+  },
+  {
+    name: "Victor",
+    nameKo: "빅터",
+    nameJa: "ビクター",
+    nameZh: "维克多",
+    legacyName: "Hawk",
+    department: "qa",
+    role: "team_leader",
+    cli: "claude",
+    emoji: "🔍",
+    personality: "Sharp-eyed quality guardian",
+    sprite: 9,
+  },
+  {
+    name: "Hannah",
+    nameKo: "해나",
+    nameJa: "ハンナ",
+    nameZh: "汉娜",
+    legacyName: "Lint",
+    department: "qa",
+    role: "senior",
+    cli: "codex",
+    emoji: "🔬",
+    personality: "Meticulous testing specialist",
+    sprite: 12,
+  },
+  {
+    name: "Leo",
+    nameKo: "레오",
+    nameJa: "レオ",
+    nameZh: "利奥",
+    legacyName: "DORO",
+    department: "qa",
+    role: "junior",
+    cli: "gemini",
+    emoji: "🧪",
+    personality: "Meticulous junior QA",
+    sprite: 13,
+    legacySprite: 13,
+  },
+  {
+    name: "Rafael",
+    nameKo: "라파엘",
+    nameJa: "ラファエル",
+    nameZh: "拉斐尔",
+    legacyName: "Vault",
+    department: "devsecops",
+    role: "team_leader",
+    cli: "claude",
+    emoji: "🛡️",
+    personality: "Security architect",
+    sprite: 11,
+  },
+  {
+    name: "Nadia",
+    nameKo: "나디아",
+    nameJa: "ナディア",
+    nameZh: "娜迪亚",
+    legacyName: "Pipe",
+    department: "devsecops",
+    role: "senior",
+    cli: "codex",
+    emoji: "🔧",
+    personality: "CI/CD pipeline specialist",
+    sprite: 14,
+  },
+];
+
 export function applyDefaultSeeds(db: DbLike): void {
   seedDefaultWorkflowPacks(db);
 
@@ -54,49 +262,47 @@ export function applyDefaultSeeds(db: DbLike): void {
 
   if (agentCount === 0) {
     const insertAgent = db.prepare(
-      `INSERT INTO agents (id, name, name_ko, department_id, role, cli_provider, avatar_emoji, personality)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO agents (id, name, name_ko, name_ja, name_zh, department_id, role, cli_provider, avatar_emoji, personality, sprite_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
-    // Development (3)
-    insertAgent.run(
-      randomUUID(),
-      "Aria",
-      "아리아",
-      "dev",
-      "team_leader",
-      "claude",
-      "👩‍💻",
-      "Meticulous senior developer",
-    );
-    insertAgent.run(randomUUID(), "Bolt", "볼트", "dev", "senior", "codex", "⚡", "Fast coding specialist");
-    insertAgent.run(randomUUID(), "Nova", "노바", "dev", "junior", "copilot", "🌟", "Creative junior");
-    // Design (2)
-    insertAgent.run(randomUUID(), "Pixel", "픽셀", "design", "team_leader", "claude", "🎨", "Design leader");
-    insertAgent.run(randomUUID(), "Luna", "루나", "design", "junior", "gemini", "🌙", "Empathetic UI designer");
-    // Planning (2)
-    insertAgent.run(randomUUID(), "Sage", "세이지", "planning", "team_leader", "codex", "🧠", "Strategic analyst");
-    insertAgent.run(randomUUID(), "Clio", "클리오", "planning", "senior", "claude", "📝", "Data-driven planner");
-    // Operations (2)
-    insertAgent.run(
-      randomUUID(),
-      "Atlas",
-      "아틀라스",
-      "operations",
-      "team_leader",
-      "claude",
-      "🗺️",
-      "Operations expert",
-    );
-    insertAgent.run(randomUUID(), "Turbo", "터보", "operations", "senior", "codex", "🚀", "Automation specialist");
-    // QA/QC (2)
-    insertAgent.run(randomUUID(), "Hawk", "호크", "qa", "team_leader", "claude", "🦅", "Sharp-eyed quality guardian");
-    insertAgent.run(randomUUID(), "Lint", "린트", "qa", "senior", "codex", "🔬", "Meticulous testing specialist");
-    // DevSecOps (2)
-    insertAgent.run(randomUUID(), "Vault", "볼트S", "devsecops", "team_leader", "claude", "🛡️", "Security architect");
-    insertAgent.run(randomUUID(), "Pipe", "파이프", "devsecops", "senior", "codex", "🔧", "CI/CD pipeline specialist");
-    // QA Junior (1)
-    insertAgent.run(randomUUID(), "DORO", "도로롱", "qa", "junior", "gemini", "🩷", "Meticulous junior QA");
+    for (const agent of DEFAULT_AGENTS) {
+      insertAgent.run(
+        randomUUID(),
+        agent.name,
+        agent.nameKo,
+        agent.nameJa,
+        agent.nameZh,
+        agent.department,
+        agent.role,
+        agent.cli,
+        agent.emoji,
+        agent.personality,
+        agent.sprite,
+      );
+    }
     console.log("[Claw-Empire] Seeded default agents");
+  }
+
+  // Earlier installs seeded playful names (Aria, Bolt, DORO, ...). Rename a default agent only while it still has
+  // its original seed name, department and role, so agents the owner renamed or moved are left alone.
+  {
+    const rename = db.prepare(
+      `UPDATE agents SET name = ?, name_ko = ?, name_ja = ?, name_zh = ?,
+        sprite_number = COALESCE(sprite_number, ?)
+      WHERE name = ? AND department_id = ? AND role = ? AND COALESCE(workflow_pack_key, 'development') = 'development'`,
+    );
+    for (const agent of DEFAULT_AGENTS) {
+      rename.run(
+        agent.name,
+        agent.nameKo,
+        agent.nameJa,
+        agent.nameZh,
+        agent.legacySprite ?? null,
+        agent.legacyName,
+        agent.department,
+        agent.role,
+      );
+    }
   }
 
   // Earlier installs seeded these personalities in Korean. They are part of every agent prompt, so a Korean
@@ -271,39 +477,42 @@ export function applyDefaultSeeds(db: DbLike): void {
     }
 
     const insertAgentIfMissing = db.prepare(
-      `INSERT OR IGNORE INTO agents (id, name, name_ko, department_id, role, cli_provider, avatar_emoji, personality)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO agents (id, name, name_ko, name_ja, name_zh, department_id, role, cli_provider, avatar_emoji, personality)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
-    // Check which agents exist by name to avoid duplicates
+    // Check which agents exist by name to avoid duplicates. An agent counts as present under its current or its
+    // pre-rename name, so renamed installs don't get the old agents back.
     const existingNames = new Set(
       (db.prepare("SELECT name FROM agents").all() as { name: string }[]).map((r) => r.name),
     );
 
-    const newAgents: [string, string, string, string, string, string, string][] = [
-      // [name, name_ko, dept, role, provider, emoji, personality]
-      ["Luna", "루나", "design", "junior", "gemini", "🌙", "감성적인 UI 디자이너"],
-      ["Clio", "클리오", "planning", "senior", "claude", "📝", "데이터 기반 기획자"],
-      ["Turbo", "터보", "operations", "senior", "codex", "🚀", "자동화 전문가"],
-      ["Hawk", "호크", "qa", "team_leader", "claude", "🦅", "날카로운 품질 감시자"],
-      ["Lint", "린트", "qa", "senior", "opencode", "🔬", "꼼꼼한 테스트 전문가"],
-      ["Vault", "볼트S", "devsecops", "team_leader", "claude", "🛡️", "보안 아키텍트"],
-      ["Pipe", "파이프", "devsecops", "senior", "codex", "🔧", "CI/CD 파이프라인 전문가"],
-    ];
-
+    // Agents added to installs that predate them (originally Luna, Clio, Turbo, Hawk, Lint, Vault, Pipe).
+    const LATER_DEFAULTS = new Set(["Luna", "Clio", "Turbo", "Hawk", "Lint", "Vault", "Pipe"]);
     let added = 0;
-    for (const [name, nameKo, dept, role, provider, emoji, personality] of newAgents) {
-      if (!existingNames.has(name)) {
-        if (!existingDeptIds.has(dept)) {
-          console.warn(`[Claw-Empire] Skip adding agent "${name}": missing department "${dept}"`);
-          continue;
-        }
-        try {
-          insertAgentIfMissing.run(randomUUID(), name, nameKo, dept, role, provider, emoji, personality);
-          added++;
-        } catch (err) {
-          console.warn(`[Claw-Empire] Skip adding agent "${name}":`, err);
-        }
+    for (const agent of DEFAULT_AGENTS) {
+      if (!LATER_DEFAULTS.has(agent.legacyName)) continue;
+      if (existingNames.has(agent.name) || existingNames.has(agent.legacyName)) continue;
+      if (!existingDeptIds.has(agent.department)) {
+        console.warn(`[Claw-Empire] Skip adding agent "${agent.name}": missing department "${agent.department}"`);
+        continue;
+      }
+      try {
+        insertAgentIfMissing.run(
+          randomUUID(),
+          agent.name,
+          agent.nameKo,
+          agent.nameJa,
+          agent.nameZh,
+          agent.department,
+          agent.role,
+          agent.cli,
+          agent.emoji,
+          agent.personality,
+        );
+        added++;
+      } catch (err) {
+        console.warn(`[Claw-Empire] Skip adding agent "${agent.name}":`, err);
       }
     }
     if (added > 0) console.log(`[Claw-Empire] Added ${added} new agents`);

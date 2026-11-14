@@ -2,6 +2,7 @@ import { MessageSquare, ListChecks, UserRound } from "lucide-react";
 import { localeName, type UiLanguage } from "../../i18n";
 import type { Agent, Department, SubAgent, SubTask, Task } from "../../types";
 import { getSubAgentSpriteNum, SUBTASK_STATUS_ICON, taskStatusLabel, taskTypeLabel, type TFunction } from "./constants";
+import { lookForSprite, portraitUrl } from "../atlas-office/agentLooks";
 
 interface AgentDetailTabContentProps {
   tab: "info" | "tasks" | "alba";
@@ -229,10 +230,15 @@ export default function AgentDetailTabContent({
           >
             <div className="w-8 h-8 rounded-full bg-amber-500/20 overflow-hidden flex items-center justify-center">
               <img
-                src={`/sprites/${getSubAgentSpriteNum(subAgent.id)}-D-1.png`}
+                src={portraitUrl(lookForSprite(getSubAgentSpriteNum(subAgent.id)))}
                 alt={t({ ko: "알바생", en: "Sub-agent", ja: "サブエージェント", zh: "子代理" })}
                 className="w-full h-full object-cover"
-                style={{ imageRendering: "pixelated" }}
+                onError={(event) => {
+                  const img = event.currentTarget;
+                  img.onerror = null;
+                  img.src = `/sprites/${getSubAgentSpriteNum(subAgent.id)}-D-1.png`;
+                  img.style.imageRendering = "pixelated";
+                }}
               />
             </div>
             <div className="flex-1 min-w-0">
