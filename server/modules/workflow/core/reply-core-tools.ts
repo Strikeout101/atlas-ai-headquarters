@@ -52,7 +52,7 @@ export function createReplyCoreTools(deps: CreateReplyCoreToolsDeps) {
   function normalizeMeetingLang(value: unknown): Lang {
     if (isLang(value)) return value;
     const preferred = getPreferredLanguage();
-    return isLang(preferred) ? preferred : "ko";
+    return isLang(preferred) ? preferred : "en";
   }
 
   function sleepMs(ms: number): Promise<void> {
