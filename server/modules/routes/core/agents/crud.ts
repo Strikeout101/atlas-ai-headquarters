@@ -467,6 +467,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
     if (nextProvider !== "api" && !("api_provider_id" in body) && "cli_provider" in body) {
       body.api_provider_id = null;
       body.api_model = null;
+      body.context_window_tokens = null;
     }
     if ((!supportsCliModelOverride || providerChanged) && !("cli_model" in body)) {
       body.cli_model = null;
@@ -510,6 +511,17 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       }
       if (body.cli_model && !supportsCliModelOverride) {
         return res.status(400).json({ error: "cli_model_requires_cli_provider" });
+      }
+    }
+
+    if ("context_window_tokens" in body) {
+      const value = body.context_window_tokens;
+      if (value === "" || value === undefined) body.context_window_tokens = null;
+      else if (value !== null && (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0)) {
+        return res.status(400).json({ error: "invalid_context_window_tokens" });
+      }
+      if (body.context_window_tokens !== null && nextProvider !== "api") {
+        return res.status(400).json({ error: "context_window_requires_api_provider" });
       }
     }
 
@@ -575,6 +587,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       "oauth_account_id",
       "api_provider_id",
       "api_model",
+      "context_window_tokens",
       "cli_model",
       "cli_reasoning_level",
       "avatar_emoji",

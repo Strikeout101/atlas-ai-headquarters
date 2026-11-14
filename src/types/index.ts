@@ -39,6 +39,7 @@ export interface Agent {
   oauth_account_id?: string | null;
   api_provider_id?: string | null;
   api_model?: string | null;
+  context_window_tokens?: number | null;
   cli_model?: string | null;
   cli_reasoning_level?: string | null;
   avatar_emoji: string;

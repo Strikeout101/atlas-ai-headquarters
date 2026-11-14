@@ -12,6 +12,10 @@ import {
   queueInterruptPrompt,
   sanitizeInterruptPrompt,
 } from "../../../workflow/core/interrupt-injection-tools.ts";
+import {
+  holdContextRollover,
+  markContextRolloverManualResume,
+} from "../../../workflow/agents/context-rollover-store.ts";
 
 export type TaskExecutionControlRouteDeps = Pick<
   RuntimeContext,
@@ -300,6 +304,11 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
     if (!task) return res.status(404).json({ error: "not_found" });
     const lang = resolveLang(task.title);
 
+    try {
+      holdContextRollover(db as any, id, nowMs());
+    } catch {
+      /* Optional schema in isolated tests. */
+    }
     stopProgressTimer(id);
 
     const activeChild = activeProcesses.get(id);
@@ -505,6 +514,11 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
     const targetStatus = task.assigned_agent_id ? "planned" : "inbox";
     const t = nowMs();
     db.prepare("UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?").run(targetStatus, t, id);
+    try {
+      markContextRolloverManualResume(db as any, id, t);
+    } catch {
+      /* Optional schema in isolated tests. */
+    }
 
     appendTaskLog(id, "system", `RESUME: ${task.status} → ${targetStatus}`);
 

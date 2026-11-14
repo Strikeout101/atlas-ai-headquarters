@@ -55,6 +55,7 @@ function createHarness(): { db: DatabaseSync; routes: Map<string, RouteHandler> 
       oauth_account_id TEXT,
       api_provider_id TEXT,
       api_model TEXT,
+      context_window_tokens INTEGER,
       cli_model TEXT,
       cli_reasoning_level TEXT,
       avatar_emoji TEXT NOT NULL DEFAULT '🤖',
@@ -105,6 +106,36 @@ function createHarness(): { db: DatabaseSync; routes: Map<string, RouteHandler> 
 }
 
 describe("agent CRUD seed filter", () => {
+  it("stores a positive context window for API agents and clears it when the provider changes", () => {
+    const { db, routes } = createHarness();
+    try {
+      db.prepare(
+        "INSERT INTO agents (id, name, role, cli_provider) VALUES ('local-1', 'Local', 'junior', 'api')",
+      ).run();
+      const patch = routes.get("PATCH /api/agents/:id");
+      const request = (body: Record<string, unknown>) => {
+        const res = createFakeResponse();
+        patch?.({ params: { id: "local-1" }, body }, res);
+        return res;
+      };
+
+      expect(request({ context_window_tokens: 8192 }).statusCode).toBe(200);
+      expect(
+        (db.prepare("SELECT context_window_tokens FROM agents WHERE id = 'local-1'").get() as any)
+          .context_window_tokens,
+      ).toBe(8192);
+      expect((request({ context_window_tokens: 0 }).payload as any).error).toBe("invalid_context_window_tokens");
+      expect((request({ context_window_tokens: 8.5 }).payload as any).error).toBe("invalid_context_window_tokens");
+      expect(request({ cli_provider: "claude" }).statusCode).toBe(200);
+      expect(
+        (db.prepare("SELECT context_window_tokens FROM agents WHERE id = 'local-1'").get() as any)
+          .context_window_tokens,
+      ).toBeNull();
+    } finally {
+      db.close();
+    }
+  });
+
   it("GET /api/agents 기본 응답은 seed 에이전트를 제외한다", () => {
     const { db, routes } = createHarness();
     try {

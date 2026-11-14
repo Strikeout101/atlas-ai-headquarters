@@ -119,6 +119,7 @@ export interface ApiStateBundle {
   apiTestResult: ApiTestResultMap;
   apiModelsExpanded: Record<string, boolean>;
   apiAssignTarget: ApiAssignTarget | null;
+  contextWindowTokensInput: string;
   apiAssignAgents: Agent[];
   apiAssignDepts: ApiAssignDepartment[];
   apiAssigning: boolean;
@@ -128,6 +129,7 @@ export interface ApiStateBundle {
   setApiSaveError: Dispatch<SetStateAction<string | null>>;
   setApiModelsExpanded: Dispatch<SetStateAction<Record<string, boolean>>>;
   setApiAssignTarget: Dispatch<SetStateAction<ApiAssignTarget | null>>;
+  setContextWindowTokensInput: Dispatch<SetStateAction<string>>;
   loadApiProviders: () => Promise<void>;
   loadApiPresets: () => Promise<void>;
   handleApiProviderSave: () => Promise<void>;

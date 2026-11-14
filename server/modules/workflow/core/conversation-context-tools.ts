@@ -1,4 +1,5 @@
 import type { Lang } from "../../../types/lang.ts";
+import { getContextRollover } from "../agents/context-rollover-store.ts";
 
 type DbLike = {
   prepare: (sql: string) => {
@@ -65,6 +66,14 @@ export function createConversationContextTools(deps: CreateConversationContextTo
   }
 
   function getTaskContinuationContext(taskId: string): string {
+    try {
+      const rollover = getContextRollover(db as any, taskId);
+      if (rollover && rollover.status !== "complete") {
+        return `\n\n--- Durable context rollover checkpoint ---\n${rollover.checkpointText}\n--- End checkpoint ---`;
+      }
+    } catch {
+      // Older isolated test databases may not have the optional rollover schema.
+    }
     const runCountRow = db
       .prepare(
         `

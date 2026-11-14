@@ -229,6 +229,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     model?: string,
     reasoningLevel?: string,
     extraEnv?: Record<string, string>,
+    onRawOutput?: (chunk: Buffer, stream: "stdout" | "stderr") => void,
   ): ChildProcess {
     clearCliOutputDedup(taskId);
     // Save prompt for debugging
@@ -351,6 +352,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     // Pipe agent output to log file AND broadcast via WebSocket
     stdoutListener = (chunk: Buffer) => {
       touchIdleTimer();
+      onRawOutput?.(chunk, "stdout");
       const text = normalizeStreamChunk(chunk, { dropCliNoise: true });
       if (!text) return;
       if (shouldSkipDuplicateCliOutput(taskId, "stdout", text)) return;
@@ -360,6 +362,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     };
     stderrListener = (chunk: Buffer) => {
       touchIdleTimer();
+      onRawOutput?.(chunk, "stderr");
       const text = normalizeStreamChunk(chunk, { dropCliNoise: true });
       if (!text) return;
       if (shouldSkipDuplicateCliOutput(taskId, "stderr", text)) return;

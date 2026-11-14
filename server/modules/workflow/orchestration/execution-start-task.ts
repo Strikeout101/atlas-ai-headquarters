@@ -5,6 +5,8 @@ import { ensureVideoPreprodRemotionBestPracticesSkill } from "../core/video-skil
 import { buildWorkflowPackExecutionGuidance } from "../packs/execution-guidance.ts";
 import { resolveVideoArtifactSpecForTask } from "../packs/video-artifact.ts";
 import { routeTaskModel } from "../../model-routing.ts";
+import { getContextRollover, markContextRolloverStarted } from "../agents/context-rollover-store.ts";
+import { buildCompactContextRolloverPrompt } from "../agents/context-rollover-prompt.ts";
 import {
   buildInterruptPromptBlock,
   consumeInterruptPrompts,
@@ -200,9 +202,16 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     const deptPromptRaw = deptId ? getDepartmentPromptForPack(db as any, taskData.workflow_pack_key, deptId) : null;
     const deptPrompt = typeof deptPromptRaw === "string" ? deptPromptRaw.trim() : "";
     const deptPromptBlock = deptPrompt ? `[Department Shared Prompt]\n${deptPrompt}` : "";
-    const conversationCtx = getRecentConversationContext(execAgent.id);
+    let rollover = null;
+    try {
+      rollover = getContextRollover(db as any, taskId);
+    } catch {
+      /* Optional schema in isolated tests. */
+    }
+    const compactRollover = rollover && rollover.status !== "complete";
+    const conversationCtx = compactRollover ? "" : getRecentConversationContext(execAgent.id);
     const continuationCtx = getTaskContinuationContext(taskId);
-    const recentChanges = getRecentChanges(projPath, taskId);
+    const recentChanges = compactRollover ? "" : getRecentChanges(projPath, taskId);
     if (provider === "claude") {
       ensureClaudeMd(projPath, worktreePath);
     }
@@ -239,33 +248,48 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       taskLang,
     );
     const availableSkillsPromptBlock = buildAvailableSkillsPromptBlock(provider);
-    const spawnPrompt = buildTaskExecutionPrompt(
-      [
-        availableSkillsPromptBlock,
-        `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
-        "This session is scoped to this task only. Keep context continuity inside this task session and do not mix with other projects.",
-        recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
-        `[Task] ${taskData.title}`,
-        taskData.description ? `\n${taskData.description}` : "",
-        workflowPackGuidance ? `\n[Workflow Pack Execution Rules]\n${workflowPackGuidance}` : "",
-        continuationCtx,
-        conversationCtx,
-        `\n---`,
-        `Agent: ${execAgent.name} (${roleLabel}, ${deptName})`,
-        execAgent.personality ? `Personality: ${execAgent.personality}` : "",
-        deptConstraint,
-        deptPromptBlock,
-        `NOTE: You are working in an isolated Git worktree branch (climpire/${taskId.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
-        `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
-        `Task tools: ${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs (run with Node and a JSON operation or --file). Business resources: contacts/tickets/quotes/drafts. For SSH: homelab.targets lists your granted hosts; homelab.request with target_id and command registers that exact command: known read-only checks are approved immediately (status approved), anything that could change the host waits for the owner; homelab.approval_status checks the request; homelab.run requires target_id, command, and an approved approval_id. Never run agent SSH without an approved request, and never split or disguise a change to make it look read-only. model.request_upgrade requests a stronger model. The task token is in the process environment. Do not handle payments or money movement. Keep outbound business messages as drafts until approved.`,
-        interruptPromptBlock,
-        continuationInstruction,
-        runInstruction,
-      ],
-      {
-        allowWarningFix: hasExplicitWarningFixRequest(taskData.title, taskData.description),
-      },
-    );
+    const promptOptions = { allowWarningFix: hasExplicitWarningFixRequest(taskData.title, taskData.description) };
+    const spawnPrompt = compactRollover
+      ? buildCompactContextRolloverPrompt(
+          {
+            taskId,
+            title: taskData.title,
+            checkpointText: rollover!.checkpointText,
+            contextWindowTokens: execAgent.context_window_tokens,
+            workflowGuidance: workflowPackGuidance,
+            departmentConstraint: deptConstraint,
+            departmentSharedPrompt: deptPromptBlock,
+            interruptPrompt: interruptPromptBlock,
+            taskToolsPath: `${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs`,
+            worktreeBranch: `climpire/${taskId.slice(0, 8)}`,
+          },
+          (parts) => buildTaskExecutionPrompt(parts, promptOptions),
+        )
+      : buildTaskExecutionPrompt(
+          [
+            availableSkillsPromptBlock,
+            `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
+            "This session is scoped to this task only. Keep context continuity inside this task session and do not mix with other projects.",
+            recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
+            `[Task] ${taskData.title}`,
+            taskData.description ? `\n${taskData.description}` : "",
+            workflowPackGuidance ? `\n[Workflow Pack Execution Rules]\n${workflowPackGuidance}` : "",
+            continuationCtx,
+            conversationCtx,
+            `\n---`,
+            `Agent: ${execAgent.name} (${roleLabel}, ${deptName})`,
+            execAgent.personality ? `Personality: ${execAgent.personality}` : "",
+            deptConstraint,
+            deptPromptBlock,
+            `NOTE: You are working in an isolated Git worktree branch (climpire/${taskId.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
+            `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
+            `Task tools: ${process.cwd().replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs (run with Node and a JSON operation or --file). Business resources: contacts/tickets/quotes/drafts. For SSH: homelab.targets lists your granted hosts; homelab.request with target_id and command registers that exact command: known read-only checks are approved immediately (status approved), anything that could change the host waits for the owner; homelab.approval_status checks the request; homelab.run requires target_id, command, and an approved approval_id. Never run agent SSH without an approved request, and never split or disguise a change to make it look read-only. model.request_upgrade requests a stronger model. The task token is in the process environment. Do not handle payments or money movement. Keep outbound business messages as drafts until approved.`,
+            interruptPromptBlock,
+            continuationInstruction,
+            runInstruction,
+          ],
+          promptOptions,
+        );
 
     if (pendingInterruptPrompts.length > 0) {
       consumeInterruptPrompts(
@@ -282,6 +306,11 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
 
     appendTaskLog(taskId, "system", `RUN start (agent=${execAgent.name}, provider=${provider})`);
     if (provider === "api") {
+      try {
+        markContextRolloverStarted(db as any, taskId, nowMs());
+      } catch {
+        /* Optional schema in isolated tests. */
+      }
       const controller = new AbortController();
       const fakePid = getNextHttpAgentPid();
       launchApiProviderAgent(

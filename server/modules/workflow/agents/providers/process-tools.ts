@@ -51,7 +51,12 @@ export function createProcessTools(deps: CreateProcessToolsDeps) {
 
     signalTree("SIGTERM");
     setTimeout(() => {
-      if (isPidAlive(pid)) signalTree("SIGKILL");
+      try {
+        process.kill(-pid, 0);
+        signalTree("SIGKILL");
+      } catch {
+        // The detached process group has already exited.
+      }
     }, 1200);
   }
 

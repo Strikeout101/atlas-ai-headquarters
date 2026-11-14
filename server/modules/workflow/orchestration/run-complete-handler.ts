@@ -1,6 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { consumeModelUpgradeMarker, decideModelUpgrade } from "../../model-routing.ts";
+import {
+  consumeModelUpgradeMarker,
+  createModelUpgradeRequest,
+  decideModelUpgrade,
+  getCurrentTaskModelRoute,
+} from "../../model-routing.ts";
+import { buildContextRolloverCheckpoint } from "../agents/context-rollover-checkpoint.ts";
+import {
+  approveEscalatedContextRollover,
+  holdContextRollover,
+  markContextRolloverComplete,
+  recordContextRollover,
+} from "../agents/context-rollover-store.ts";
 import {
   discoverVideoArtifact,
   resolveVideoArtifactRelativeCandidates,
@@ -53,12 +65,13 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     getWorktreeDiffSummary,
     hasVisibleDiffSummary,
     runAgentOneShot,
+    scheduleContextRolloverResume,
   } = deps;
 
   function handleTaskRunComplete(
     taskId: string,
     exitCode: number,
-    failureKind?: "provider_unavailable" | "worker_interrupted",
+    failureKind?: "provider_unavailable" | "worker_interrupted" | "context_exhausted" | "context_near_limit",
   ): void {
     activeProcesses.delete(taskId);
     stopProgressTimer(taskId);
@@ -188,7 +201,99 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       );
       return;
     }
+    if (failureKind === "context_exhausted" || failureKind === "context_near_limit") {
+      let checkpointError: string | null = null;
+      try {
+        if (!worktreePath || !task.assigned_agent_id) throw new Error("worktree_or_agent_missing");
+        const checkpoint = buildContextRolloverCheckpoint({
+          db,
+          taskId,
+          title: task.title,
+          description: task.description,
+          worktreePath,
+          logPath,
+          reason: failureKind,
+        });
+        const agent = db.prepare("SELECT api_model FROM agents WHERE id = ?").get(task.assigned_agent_id) as
+          | { api_model: string | null }
+          | undefined;
+        const route = getCurrentTaskModelRoute(db, taskId);
+        const model = route?.provider === "api" ? route.model : agent?.api_model || "unknown";
+        const rollover = recordContextRollover(db, {
+          taskId,
+          agentId: task.assigned_agent_id,
+          model,
+          attemptId: String(task.started_at ?? t),
+          reason: failureKind,
+          checkpointText: checkpoint.checkpointText,
+          progressFingerprint: checkpoint.progressFingerprint,
+          now: t,
+        });
+        db.prepare(
+          "UPDATE tasks SET status = 'pending', result = ?, updated_at = ? WHERE id = ? AND status = 'in_progress'",
+        ).run(result, t, taskId);
+        db.prepare("UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ?").run(
+          task.assigned_agent_id,
+        );
+        appendTaskLog(
+          taskId,
+          "system",
+          `CONTEXT rollover ${rollover.rolloverCount}: ${failureKind}; stalled=${rollover.stalledCount}; ${rollover.status}`,
+        );
+        broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
+        broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id));
+        if (rollover.status === "pending_resume") {
+          if (!rollover.duplicate) scheduleContextRolloverResume(taskId);
+        } else {
+          const report = `Local agent reached its context limit during '${task.title}' after ${rollover.rolloverCount} rollovers (${rollover.stalledCount} stalled). Worktree and checkpoint are preserved. Review model upgrade or split the task.`;
+          const leader = findTeamLeader(task.department_id);
+          if (leader && leader.status !== "offline" && leader.id !== task.assigned_agent_id) {
+            sendAgentMessage(leader, report, "report", "all", null, taskId);
+          }
+          notifyCeo(report, taskId);
+          try {
+            const request = createModelUpgradeRequest(db, taskId, report);
+            void decideModelUpgrade(db, String(request.id), null, "", runAgentOneShot)
+              .then((decision) => {
+                appendTaskLog(taskId, "system", `Context rollover model decision: ${String(decision.status)}`);
+                if (String(decision.status) === "approved" && approveEscalatedContextRollover(db, taskId, nowMs())) {
+                  scheduleContextRolloverResume(taskId);
+                }
+              })
+              .catch((error) =>
+                appendTaskLog(taskId, "error", `Context rollover director decision failed: ${String(error)}`),
+              );
+          } catch (error) {
+            appendTaskLog(taskId, "system", `Context rollover requires director review: ${String(error)}`);
+          }
+        }
+        return;
+      } catch (error) {
+        checkpointError = String(error);
+      }
+      try {
+        holdContextRollover(db, taskId, t);
+      } catch {
+        /* Preserve pending task if checkpoint storage failed. */
+      }
+      db.prepare("UPDATE tasks SET status = 'pending', result = ?, updated_at = ? WHERE id = ?").run(result, t, taskId);
+      if (task.assigned_agent_id) {
+        db.prepare("UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ?").run(
+          task.assigned_agent_id,
+        );
+        broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id));
+      }
+      appendTaskLog(taskId, "error", `Context rollover paused; checkpoint or restart setup failed: ${checkpointError}`);
+      broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
+      notifyCeo(`Context rollover paused for '${task.title}'. Worktree preserved; review is needed.`, taskId);
+      return;
+    }
     if (failureKind && exitCode !== 0) {
+      try {
+        holdContextRollover(db, taskId, t);
+      } catch {
+        /* Optional schema in isolated tests. */
+      }
       const reason =
         failureKind === "provider_unavailable" ? "Provider connection lost" : "Local coding worker stopped";
       const handoff = `HANDOFF: ${reason} while ${task.assigned_agent_id ?? "unassigned agent"} worked on '${task.title}'. Task remains assigned and pending. Preserve the worktree and resume from the previous output after the worker is ready.`;
@@ -362,6 +467,11 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
 
     // Auto-complete own-department subtasks on CLI success; foreign ones get delegated
     if (finalExitCode === 0) {
+      try {
+        markContextRolloverComplete(db, taskId, t);
+      } catch {
+        /* Optional schema in isolated tests. */
+      }
       const pendingSubtasks = db
         .prepare(
           "SELECT id, target_department_id FROM subtasks WHERE task_id = ? AND status NOT IN ('done', 'cancelled')",

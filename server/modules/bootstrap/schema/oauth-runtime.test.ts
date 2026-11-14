@@ -117,6 +117,7 @@ describe("initializeOAuthRuntime", () => {
     ).sql;
 
     expect(agentSql).toContain("'kimi'");
+    expect(agentSql).toContain("context_window_tokens");
     expect(historySql).toContain("'kimi'");
   });
 
@@ -210,6 +211,7 @@ describe("initializeOAuthRuntime", () => {
 
     expect(transactionRuns).toBeGreaterThan(0);
     expect(agentSql).toContain("workflow_pack_key");
+    expect(agentSql).toContain("context_window_tokens");
     expect(agentSql).toContain("'kimi'");
     expect(historySql).toContain("'kimi'");
     expect(row).toEqual({

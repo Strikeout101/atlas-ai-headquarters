@@ -1,9 +1,17 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
 import { createRunCompleteHandler } from "./run-complete-handler.ts";
+import {
+  approveEscalatedContextRollover,
+  claimContextRolloverResume,
+  ensureContextRolloverSchema,
+  getContextRollover,
+  markContextRolloverStarted,
+} from "../agents/context-rollover-store.ts";
 
 function createDb(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -21,6 +29,7 @@ function createDb(): DatabaseSync {
       assigned_agent_id TEXT,
       department_id TEXT,
       result TEXT,
+      started_at INTEGER,
       updated_at INTEGER DEFAULT 0
     );
 
@@ -34,6 +43,7 @@ function createDb(): DatabaseSync {
       cli_tool_use_id TEXT,
       completed_at INTEGER,
       blocked_reason TEXT
+      ,created_at INTEGER
     );
 
     CREATE TABLE agents (
@@ -43,6 +53,7 @@ function createDb(): DatabaseSync {
       status TEXT,
       current_task_id TEXT,
       department_id TEXT,
+      api_model TEXT,
       stats_tasks_done INTEGER DEFAULT 0,
       stats_xp INTEGER DEFAULT 0
     );
@@ -97,17 +108,97 @@ function createDeps(db: DatabaseSync, logsDir = "/tmp") {
     prettyStreamJson: vi.fn((raw: string) => raw),
     getWorktreeDiffSummary: vi.fn(() => ""),
     hasVisibleDiffSummary: vi.fn(() => false),
+    scheduleContextRolloverResume: vi.fn(),
   } as any;
 }
 
 describe("run complete handler - video preprod review transition", () => {
+  it("checkpoints context exhaustion, ignores duplicate completion, and preserves the worktree", () => {
+    const db = createDb();
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "climpire-context-run-"));
+    try {
+      execFileSync("git", ["init"], { cwd: repo });
+      execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repo });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+      fs.writeFileSync(path.join(repo, "feature.txt"), "before\n");
+      execFileSync("git", ["add", "feature.txt"], { cwd: repo });
+      execFileSync("git", ["commit", "-m", "fixture"], { cwd: repo });
+      fs.writeFileSync(path.join(repo, "feature.txt"), "after\n");
+      ensureContextRolloverSchema(db);
+      db.prepare(
+        "INSERT INTO tasks (id,title,description,status,assigned_agent_id,started_at) VALUES (?,?,?,?,?,?)",
+      ).run("context-task", "Implement feature", "Finish feature and test it", "in_progress", "worker-1", 100);
+      db.prepare("INSERT INTO agents (id,name,status,current_task_id,api_model) VALUES (?,?,?,?,?)").run(
+        "worker-1",
+        "Local worker",
+        "working",
+        "context-task",
+        "qwen-local",
+      );
+      const deps = createDeps(db, repo);
+      deps.taskWorktrees.set("context-task", { worktreePath: repo, projectPath: repo });
+      fs.writeFileSync(path.join(repo, "context-task.log"), "===== task run start now =====\n1 test passed\n");
+      const { handleTaskRunComplete } = createRunCompleteHandler(deps);
+
+      handleTaskRunComplete("context-task", 1, "context_exhausted");
+      handleTaskRunComplete("context-task", 1, "context_exhausted");
+
+      expect(deps.appendTaskLog.mock.calls.filter((call: any[]) => call[1] === "error")).toEqual([]);
+      expect((db.prepare("SELECT status FROM tasks WHERE id = ?").get("context-task") as any).status).toBe("pending");
+      expect(getContextRollover(db, "context-task")).toMatchObject({
+        status: "pending_resume",
+        rolloverCount: 1,
+        stalledCount: 0,
+        agentId: "worker-1",
+      });
+      expect(getContextRollover(db, "context-task")?.checkpointText).toContain("1 test passed");
+      expect(deps.scheduleContextRolloverResume).toHaveBeenCalledTimes(1);
+      expect(deps.cleanupWorktree).not.toHaveBeenCalled();
+      expect(fs.readFileSync(path.join(repo, "feature.txt"), "utf8")).toBe("after\n");
+
+      expect(claimContextRolloverResume(db, "context-task", 200)).toBe(true);
+      db.prepare("UPDATE tasks SET status = 'in_progress', started_at = 200 WHERE id = ?").run("context-task");
+      expect(markContextRolloverStarted(db, "context-task", 201)).toBe(true);
+      handleTaskRunComplete("context-task", 1, "context_exhausted");
+      expect(getContextRollover(db, "context-task")).toMatchObject({ rolloverCount: 2, stalledCount: 1 });
+      expect(deps.scheduleContextRolloverResume).toHaveBeenCalledTimes(2);
+
+      expect(claimContextRolloverResume(db, "context-task", 300)).toBe(true);
+      db.prepare("UPDATE tasks SET status = 'in_progress', started_at = 300 WHERE id = ?").run("context-task");
+      expect(markContextRolloverStarted(db, "context-task", 301)).toBe(true);
+      handleTaskRunComplete("context-task", 1, "context_exhausted");
+      expect(getContextRollover(db, "context-task")).toMatchObject({
+        status: "escalated",
+        rolloverCount: 3,
+        stalledCount: 2,
+      });
+      expect(deps.scheduleContextRolloverResume).toHaveBeenCalledTimes(2);
+      expect(deps.cleanupWorktree).not.toHaveBeenCalled();
+
+      expect(approveEscalatedContextRollover(db, "context-task", 350)).toBe(true);
+      expect(claimContextRolloverResume(db, "context-task", 400)).toBe(true);
+      db.prepare("UPDATE tasks SET status = 'in_progress', started_at = 400 WHERE id = ?").run("context-task");
+      expect(markContextRolloverStarted(db, "context-task", 401)).toBe(true);
+      handleTaskRunComplete("context-task", 0);
+      expect((db.prepare("SELECT status FROM tasks WHERE id = ?").get("context-task") as any).status).toBe("review");
+      expect(getContextRollover(db, "context-task")?.status).toBe("complete");
+    } finally {
+      db.close();
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("holds a disconnected API worker's task and preserves its worktree for the manager", () => {
     const db = createDb();
     try {
-      db.prepare(`INSERT INTO tasks (id, title, status, assigned_agent_id, department_id, updated_at)
-        VALUES ('disconnect-task', 'Implement feature', 'in_progress', 'worker-1', 'dev', 1)`).run();
-      db.prepare(`INSERT INTO agents (id, name, status, current_task_id, department_id)
-        VALUES ('worker-1', 'Local worker', 'working', 'disconnect-task', 'dev')`).run();
+      db.prepare(
+        `INSERT INTO tasks (id, title, status, assigned_agent_id, department_id, updated_at)
+        VALUES ('disconnect-task', 'Implement feature', 'in_progress', 'worker-1', 'dev', 1)`,
+      ).run();
+      db.prepare(
+        `INSERT INTO agents (id, name, status, current_task_id, department_id)
+        VALUES ('worker-1', 'Local worker', 'working', 'disconnect-task', 'dev')`,
+      ).run();
       const deps = createDeps(db);
       deps.taskWorktrees.set("disconnect-task", { worktreePath: "preserved", projectPath: "project" });
       deps.findTeamLeader.mockReturnValue({ id: "manager-1", status: "idle" });
@@ -115,14 +206,20 @@ describe("run complete handler - video preprod review transition", () => {
 
       handleTaskRunComplete("disconnect-task", 1, "provider_unavailable");
 
-      expect((db.prepare("SELECT status FROM tasks WHERE id = ?").get("disconnect-task") as any).status).toBe("pending");
+      expect((db.prepare("SELECT status FROM tasks WHERE id = ?").get("disconnect-task") as any).status).toBe(
+        "pending",
+      );
       expect((db.prepare("SELECT status FROM agents WHERE id = ?").get("worker-1") as any).status).toBe("offline");
       expect(deps.cleanupWorktree).not.toHaveBeenCalled();
       expect(deps.taskWorktrees.has("disconnect-task")).toBe(true);
       expect(deps.appendTaskLog).toHaveBeenCalledWith("disconnect-task", "system", expect.stringContaining("HANDOFF:"));
       expect(deps.sendAgentMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "manager-1" }), expect.stringContaining("Provider connection lost"),
-        "report", "all", null, "disconnect-task",
+        expect.objectContaining({ id: "manager-1" }),
+        expect.stringContaining("Provider connection lost"),
+        "report",
+        "all",
+        null,
+        "disconnect-task",
       );
     } finally {
       db.close();
