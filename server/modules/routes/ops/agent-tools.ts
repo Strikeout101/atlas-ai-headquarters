@@ -10,6 +10,14 @@ import { SSH_AGENT_ACCESS_SQL } from "../../ssh-access.ts";
 import { requestEmailApproval, getEmailApprovalStatus } from "./business-email.ts";
 import { listAgentMailboxes } from "./business-mailboxes.ts";
 import { isBusinessKey } from "../../businesses.ts";
+import {
+  createListing,
+  ensureListingSchema,
+  getListing,
+  listingsOverview,
+  submitListing,
+  updateListing,
+} from "../../listings.ts";
 import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
 import {
   createDeal,
@@ -99,6 +107,46 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           return res.status(operation === "finance.deals.create" ? 201 : 200).json({ ok: true, item });
         }
         return res.status(403).json({ error: "finance_operation_forbidden" });
+      }
+      if (typeof operation === "string" && operation.startsWith("listings.")) {
+        ensureListingSchema(db);
+        const payload =
+          body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+            ? (body.payload as Record<string, unknown>)
+            : {};
+        const id = typeof body.id === "string" ? body.id : "";
+        // Workers prepare and submit their own packages. Approving, publishing and the fee budget are not theirs.
+        const own = () => {
+          const listing = getListing(db, id);
+          if (!listing || listing.agent_id !== claims.agentId) throw new Error("listing_not_found");
+          return listing;
+        };
+        try {
+          if (operation === "listings.list") {
+            const all = listingsOverview(db, {
+              business: typeof body.business === "string" ? body.business : undefined,
+              status: typeof body.status === "string" ? body.status : undefined,
+            });
+            return res.json({ ok: true, items: all.items, fees: all.fees });
+          }
+          if (operation === "listings.get") return res.json({ ok: true, item: own() });
+          if (operation === "listings.create") {
+            const item = createListing(db, payload, { agentId: claims.agentId, taskId: claims.taskId });
+            return res.status(201).json({ ok: true, item });
+          }
+          if (operation === "listings.update") {
+            own();
+            return res.json({ ok: true, item: updateListing(db, id, payload) });
+          }
+          if (operation === "listings.submit") {
+            own();
+            return res.json({ ok: true, item: submitListing(db, id) });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "listing_request_failed";
+          return res.status(message === "listing_not_found" ? 404 : 400).json({ error: message });
+        }
+        return res.status(403).json({ error: "listing_operation_forbidden" });
       }
       if (operation === "org.request_status") {
         const request = db

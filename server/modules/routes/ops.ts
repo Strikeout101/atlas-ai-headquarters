@@ -1,5 +1,6 @@
 import { registerSquareRoutes } from "./ops/square.ts";
 import { registerFinanceRoutes } from "./ops/finance.ts";
+import { registerListingRoutes } from "./ops/listings.ts";
 import { registerAutonomyRoutes } from "./ops/autonomy.ts";
 import { registerOrgRequestRoutes } from "./ops/org-requests.ts";
 import { registerVpReviewRoutes } from "./ops/vp-reviews.ts";
@@ -244,6 +245,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   registerOrgRequestRoutes(app, db, broadcast);
   registerAutonomyRoutes(app, db, broadcast);
   registerFinanceRoutes(app, db, broadcast);
+  registerListingRoutes(app, db, broadcast);
   registerControlRoutes(app, db, {
     nowMs,
     broadcast,

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { decideProposal, type DecideDeps } from "./agent-proposals.ts";
 import { decideModelUpgrade } from "./model-routing.ts";
 import { decideOrgRequest } from "./org-requests.ts";
+import { decideListing } from "./listings.ts";
 import { decideBusinessEmail } from "./routes/ops/business-email.ts";
 import { listPendingApprovals, type PendingApproval } from "./routes/ops/approvals.ts";
 import { approvalRoute, approvalSnapshot } from "./approval-review-state.ts";
@@ -37,5 +38,9 @@ export async function executeVpApproval(
     decideOrgRequest(db, item.id, approve, decidedBy);
     deps.broadcast?.("agents_changed", {});
     deps.broadcast?.("departments_changed", {});
+  } else if (item.kind === "listing_publish") {
+    // Re-checks the business and the month's fee budget in the same transaction that records the decision.
+    decideListing(db, item.id, approve, decidedBy, reason);
+    deps.broadcast?.("listings_changed", {});
   } else throw new Error("vp_approval_kind_forbidden");
 }

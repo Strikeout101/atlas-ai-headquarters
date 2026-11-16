@@ -3,12 +3,37 @@ import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret } from "../../../oauth/helpers.ts";
 import type { BusinessKey } from "../../businesses.ts";
 import { getApprovalVpState, isOwnerApproval } from "../../approval-review-state.ts";
+import { feeNeedsOwner, getListing } from "../../listings.ts";
 
 /**
  * One list of everything waiting on the owner's approval (including tasks agents suggested), for the Today page.
  * Each item is still decided through its own endpoint (listed in `decide_path`), so approval rules stay in one place.
  */
 export type PendingApproval = (
+  | {
+      /** A listing package an agent prepared and wants published on a storefront. */
+      kind: "listing_publish";
+      id: string;
+      created_at: number;
+      task_id: string | null;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: BusinessKey;
+      platform: string;
+      title: string;
+      description: string;
+      tags: string[];
+      price_minor: number;
+      currency: string;
+      files: string[];
+      mockups: string[];
+      fee_minor: number;
+      fee_currency: string;
+      /** Worked out by the server: true when this fee does not fit the owner's monthly listing-fee budget. */
+      fee_over_budget: boolean;
+      decide_path: string;
+    }
   | {
       kind: "spend_request";
       id: string;
@@ -304,6 +329,40 @@ export function listPendingApprovals(
         opportunity_id: row.opportunity_id as string | null,
         decide_path: `/api/finance/spend-requests/${encodeURIComponent(String(row.id))}/decide`,
       });
+  }
+  if (tableExists(db, "listing_packages")) {
+    const rows = db
+      .prepare(
+        `SELECT r.*,${taskTitle} AS task_title,${agentName} AS agent_name
+      FROM listing_packages r ${taskJoin} ${agentJoin} WHERE r.status='ready' ORDER BY r.submitted_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows) {
+      const listing = getListing(db, String(row.id));
+      if (!listing) continue;
+      items.push({
+        kind: "listing_publish",
+        id: listing.id,
+        created_at: Number(listing.submitted_at ?? listing.updated_at),
+        task_id: listing.task_id,
+        task_title: row.task_title as string | null,
+        agent_id: String(listing.agent_id ?? "owner"),
+        agent_name: row.agent_name as string | null,
+        business: listing.business,
+        platform: listing.platform,
+        title: listing.title,
+        description: listing.description,
+        tags: listing.tags,
+        price_minor: listing.price_minor,
+        currency: listing.currency,
+        files: listing.files,
+        mockups: listing.mockups,
+        fee_minor: listing.fee_minor,
+        fee_currency: listing.fee_currency,
+        fee_over_budget: feeNeedsOwner(db, listing),
+        decide_path: `/api/listings/${encodeURIComponent(listing.id)}/decide`,
+      });
+    }
   }
   return items
     .sort((a, b) => b.created_at - a.created_at)

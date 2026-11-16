@@ -22,6 +22,22 @@ interface PendingApprovalBase {
 
 export type PendingApproval =
   | (PendingApprovalBase & {
+      /** A storefront listing package an agent prepared. Approving allows it to be published; it publishes nothing. */
+      kind: "listing_publish";
+      business: BusinessKind;
+      platform: string;
+      title: string;
+      description: string;
+      tags: string[];
+      price_minor: number;
+      currency: string;
+      files: string[];
+      mockups: string[];
+      fee_minor: number;
+      fee_currency: string;
+      fee_over_budget: boolean;
+    })
+  | (PendingApprovalBase & {
       kind: "spend_request";
       business: BusinessKind;
       amount_minor: number;
@@ -83,6 +99,10 @@ export async function getPendingApprovals(): Promise<PendingApproval[]> {
 export async function decidePendingApproval(item: PendingApproval, approve: boolean): Promise<void> {
   if (item.kind === "spend_request") {
     await post(`/api/finance/spend-requests/${encodeURIComponent(item.id)}/decide`, { approve });
+    return;
+  }
+  if (item.kind === "listing_publish") {
+    await post(`/api/listings/${encodeURIComponent(item.id)}/decide`, { approve });
     return;
   }
   if (item.kind === "business_email") {

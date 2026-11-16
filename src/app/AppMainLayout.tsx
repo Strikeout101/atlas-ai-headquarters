@@ -53,6 +53,7 @@ import { DEFAULT_OFFICE_POSE } from "../components/atlas-office/layout";
 import BusinessWorkspace from "../components/BusinessWorkspace";
 import HomelabWorkspace from "../components/HomelabWorkspace";
 import { EmergencyBanner } from "../components/control/EmergencyControls";
+import ListingsPanel from "../components/listings/ListingsPanel";
 import ModelDirectorWorkspace from "../components/ModelDirectorWorkspace";
 
 const AtlasOffice = lazy(() => import("../components/atlas-office/AtlasOffice"));
@@ -815,6 +816,7 @@ export default function AppMainLayout({
                 description="Upcoming events by date, rental quotes and customers. Draft messages to customers in Outreach."
               />
             )}
+            {view === "ventures" && <ListingsPanel business="ventures" />}
             {view === "ventures" && (
               <BusinessWorkspace
                 key="ventures"

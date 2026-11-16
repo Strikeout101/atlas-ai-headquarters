@@ -51,6 +51,10 @@ export function approvalSnapshot(item: ReviewableApproval): string {
 }
 
 export function approvalRoute(item: ReviewableApproval): "owner" | "vp" {
+  // Product copy is full of words like "buy" and "purchase"; they describe the product, not a spend by ATLAS.
+  // The only money a listing spends is the platform fee, and the server works that out against the owner's budget.
+  if (item.kind === "listing_publish")
+    return routeApproval(item.kind, item.business, { spendsMoney: item.fee_over_budget !== false });
   return routeApproval(item.kind, item.business, {
     ...factsFromContent(JSON.stringify(item)),
     orgKind: item.org_kind,

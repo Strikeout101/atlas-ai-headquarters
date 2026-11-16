@@ -58,17 +58,19 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
       ? "Email to send"
       : isProposal
         ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
-        : item.kind === "spend_request"
-          ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
-          : item.kind === "org_request"
-            ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
-            : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+        : item.kind === "listing_publish"
+          ? t({ ko: "게시할 상품", en: "Listing to publish", ja: "公開する出品", zh: "待发布的商品" })
+          : item.kind === "spend_request"
+            ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
+            : item.kind === "org_request"
+              ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
+              : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
       ? item.project_name
       : null;
-  const heading = isProposal ? item.title : item.task_title;
+  const heading = isProposal || item.kind === "listing_publish" ? item.title : item.task_title;
 
   return (
     <li className="flex items-start gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid var(--th-border)" }}>
@@ -149,6 +151,37 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             </pre>
             <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
               Approving sends this exact message once. No attachments or other recipients.
+            </p>
+          </div>
+        ) : item.kind === "listing_publish" ? (
+          <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <p className="font-medium">
+              {item.platform === "etsy" ? "Etsy" : "itch.io"} ·{" "}
+              {formatMoney(item.price_minor, item.currency, localeTag)}
+            </p>
+            <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words">{item.description}</p>
+            {item.tags.length > 0 && (
+              <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-secondary)" }}>
+                {item.tags.join(", ")}
+              </p>
+            )}
+            <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-secondary)" }}>
+              {[...item.files, ...item.mockups].join(" · ")}
+            </p>
+            <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {item.fee_minor > 0
+                ? t({
+                    ko: `게시하면 플랫폼 수수료 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)}가 발생합니다${item.fee_over_budget ? " (이번 달 수수료 예산 초과)" : ""}. 승인해도 자동으로 게시되지 않습니다.`,
+                    en: `Publishing costs a ${formatMoney(item.fee_minor, item.fee_currency, localeTag)} platform fee${item.fee_over_budget ? ", which is outside this month's listing fee budget" : ""}. Approving does not publish it; you publish it from Ventures.`,
+                    ja: `公開にはプラットフォーム手数料 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)} がかかります${item.fee_over_budget ? "（今月の手数料予算を超過）" : ""}。承認しても自動では公開されません。`,
+                    zh: `发布需支付平台费用 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)}${item.fee_over_budget ? "（超出本月费用预算）" : ""}。批准后不会自动发布。`,
+                  })
+                : t({
+                    ko: "수수료가 없습니다. 승인해도 자동으로 게시되지 않습니다.",
+                    en: "No platform fee. Approving does not publish it; you publish it from Ventures.",
+                    ja: "手数料はありません。承認しても自動では公開されません。",
+                    zh: "无平台费用。批准后不会自动发布。",
+                  })}
             </p>
           </div>
         ) : item.kind === "spend_request" ? (

@@ -1,6 +1,8 @@
 import { BUSINESSES, isBusinessKey } from "./businesses.ts";
 
 export const DEFAULT_DEPARTMENT_IDS = ["planning", "dev", "design", "qa", "devsecops", "operations"] as const;
+/** Actions a customer can see. Owner-approved businesses always route these to the owner. */
+const CUSTOMER_FACING_KINDS = ["business_email", "social_send", "customer_send", "listing_publish"];
 export interface ApprovalFacts {
   spendsMoney?: boolean;
   newPaidAccount?: boolean;
@@ -22,13 +24,9 @@ export function routeApproval(kind: string, business?: string | null, facts: App
   )
     return "owner";
   const registered = isBusinessKey(business) ? BUSINESSES[business] : undefined;
-  if (
-    (facts.customerFacing || ["business_email", "social_send", "customer_send"].includes(kind)) &&
-    registered?.approval !== "vp"
-  )
-    return "owner";
+  if ((facts.customerFacing || CUSTOMER_FACING_KINDS.includes(kind)) && registered?.approval !== "vp") return "owner";
   if (["task_proposal", "model_upgrade", "org_request"].includes(kind)) return "vp";
-  if (["business_email", "social_send", "customer_send"].includes(kind) && registered?.approval === "vp") return "vp";
+  if (CUSTOMER_FACING_KINDS.includes(kind) && registered?.approval === "vp") return "vp";
   return "owner";
 }
 
