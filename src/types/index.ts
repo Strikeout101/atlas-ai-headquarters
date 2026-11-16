@@ -35,6 +35,8 @@ export interface Agent {
   department?: Department;
   role: AgentRole;
   acts_as_planning_leader?: number | null;
+  /** 1 when this agent may suggest tasks on its own. Team leaders always can, whatever this says. */
+  autonomy_enabled?: number | null;
   cli_provider: CliProvider;
   oauth_account_id?: string | null;
   api_provider_id?: string | null;

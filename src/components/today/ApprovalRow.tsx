@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, TerminalSquare } from "lucide-react";
+import { Cpu, Lightbulb, Mail, TerminalSquare } from "lucide-react";
 import type { PendingApproval } from "../../api";
 import { useI18n } from "../../i18n";
 import { timeAgo } from "../dashboard/model";
@@ -18,7 +18,7 @@ const quietStyle = {
   color: "var(--th-text-primary)",
 };
 
-/** One SSH command or model upgrade waiting on the owner, decided in place. */
+/** One email, SSH command, model upgrade or agent task suggestion waiting on the owner, decided in place. */
 export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalRowProps) {
   const { t, locale: localeTag } = useI18n();
   const [busy, setBusy] = useState(false);
@@ -48,11 +48,22 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
   };
 
   const isSsh = item.kind === "ssh_command";
-  const Icon = isSsh ? TerminalSquare : Cpu;
+  const isEmail = item.kind === "business_email";
+  const isProposal = item.kind === "task_proposal";
+  const Icon = isEmail ? Mail : isSsh ? TerminalSquare : isProposal ? Lightbulb : Cpu;
   const kindLabel = isSsh
     ? t({ ko: "SSH 명령", en: "SSH command", ja: "SSH コマンド", zh: "SSH 命令" })
-    : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
-  const where = isSsh ? (item.target_name ?? item.target_host ?? item.target_id) : null;
+    : isEmail
+      ? "Email to send"
+      : isProposal
+        ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
+        : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+  const where = isSsh
+    ? (item.target_name ?? item.target_host ?? item.target_id)
+    : isProposal
+      ? item.project_name
+      : null;
+  const heading = isProposal ? item.title : item.task_title;
 
   return (
     <li className="flex items-start gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid var(--th-border)" }}>
@@ -72,9 +83,12 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
           <span>· {item.agent_name ?? item.agent_id}</span>
           <span>· {timeAgo(item.created_at, localeTag)}</span>
         </div>
-        {item.task_title && (
-          <p className="mt-1 truncate text-[13px]" style={{ color: "var(--th-text-primary)" }}>
-            {item.task_title}
+        {heading && (
+          <p
+            className={`mt-1 text-[13px] ${isProposal ? "font-medium" : "truncate"}`}
+            style={{ color: "var(--th-text-primary)" }}
+          >
+            {heading}
           </p>
         )}
         {isSsh ? (
@@ -99,6 +113,39 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
               })}
             </p>
           )
+        ) : item.kind === "task_proposal" ? (
+          <div className="mt-1 space-y-1 text-[12.5px] leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
+            {item.description && <p className="break-words">{item.description}</p>}
+            {item.reason && (
+              <p className="break-words" style={{ color: "var(--th-text-muted)" }}>
+                {t({ ko: "이유: ", en: "Why: ", ja: "理由: ", zh: "原因：" })}
+                {item.reason}
+              </p>
+            )}
+            <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {t({
+                ko: "승인하면 이 에이전트에게 배정된 작업이 생성됩니다. 실행은 직접 시작합니다.",
+                en: "Approving adds a planned task assigned to this agent. You start it when you want.",
+                ja: "承認するとこのエージェントに割り当てられたタスクが作成されます。実行はいつでも開始できます。",
+                zh: "批准后会创建一个分配给该代理的计划任务，由你决定何时开始。",
+              })}
+            </p>
+          </div>
+        ) : item.kind === "business_email" ? (
+          <div className="mt-2 space-y-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <p className="break-all">From: {item.sender}</p>
+            <p className="break-all">To: {item.recipient}</p>
+            <p className="break-words">Subject: {item.subject || "(no subject)"}</p>
+            <pre
+              className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border p-3 font-sans text-sm"
+              style={{ borderColor: "var(--th-border)" }}
+            >
+              {item.body}
+            </pre>
+            <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
+              Approving sends this exact message once. No attachments or other recipients.
+            </p>
+          </div>
         ) : (
           <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
             <span className="font-mono" style={{ color: "var(--th-text-heading)" }}>
@@ -127,7 +174,9 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
                 className={buttonClass}
                 style={quietStyle}
               >
-                {t({ ko: "거부", en: "Deny", ja: "拒否", zh: "拒绝" })}
+                {isProposal
+                  ? t({ ko: "넘기기", en: "Dismiss", ja: "見送る", zh: "忽略" })
+                  : t({ ko: "거부", en: "Deny", ja: "拒否", zh: "拒绝" })}
               </button>
               <button
                 type="button"
@@ -135,9 +184,13 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
                 onClick={() => void decide(true)}
                 className={`${buttonClass} ax-btn-primary`}
               >
-                {isSsh
-                  ? t({ ko: "한 번 승인", en: "Approve once", ja: "一度だけ承認", zh: "批准一次" })
-                  : t({ ko: "승인", en: "Approve", ja: "承認", zh: "批准" })}
+                {isEmail
+                  ? "Approve and send"
+                  : isSsh
+                    ? t({ ko: "한 번 승인", en: "Approve once", ja: "一度だけ承認", zh: "批准一次" })
+                    : isProposal
+                      ? t({ ko: "업무에 추가", en: "Add to tasks", ja: "タスクに追加", zh: "添加到任务" })
+                      : t({ ko: "승인", en: "Approve", ja: "承認", zh: "批准" })}
               </button>
             </>
           )}

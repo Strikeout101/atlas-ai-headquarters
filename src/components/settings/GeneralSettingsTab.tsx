@@ -1,5 +1,6 @@
 import type { CliProvider } from "../../types";
 import type { LocalSettings, SetLocalSettings, TFunction } from "./types";
+import SettingsSection from "./SettingsSection";
 
 interface GeneralSettingsTabProps {
   t: TFunction;
@@ -46,14 +47,10 @@ function ToggleSettingCard({ label, checked, onToggle, title }: ToggleSettingCar
 export default function GeneralSettingsTab({ t, form, setForm, saved, onSave }: GeneralSettingsTabProps) {
   return (
     <>
-      <section
-        className="rounded-xl p-5 sm:p-6 space-y-5"
-        style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
+      <SettingsSection
+        title={t({ ko: "회사 정보", en: "Company and preferences", ja: "会社情報と設定", zh: "公司与偏好" })}
+        defaultOpen
       >
-        <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
-          {t({ ko: "회사 정보", en: "Company", ja: "会社情報", zh: "公司信息" })}
-        </h3>
-
         <div>
           <label className="block text-xs mb-1" style={{ color: "var(--th-text-secondary)" }}>
             {t({ ko: "회사명", en: "Company Name", ja: "会社名", zh: "公司名称" })}
@@ -183,7 +180,7 @@ export default function GeneralSettingsTab({ t, form, setForm, saved, onSave }: 
             <option value="zh">{t({ ko: "중국어", en: "Chinese", ja: "中国語", zh: "中文" })}</option>
           </select>
         </div>
-      </section>
+      </SettingsSection>
 
       <div className="flex justify-end gap-3">
         {saved && (

@@ -6,6 +6,7 @@ import { Client, type ConnectConfig } from "ssh2";
 import { decryptSecret, encryptSecret } from "../../../oauth/helpers.ts";
 import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
 import { consumeSshApproval, ensureSshApprovalSchema } from "../../ssh-approvals.ts";
+import { hasSshHostAccess } from "../../ssh-access.ts";
 
 type AuthMethod = "password" | "private_key" | "legacy_key_path";
 type TargetRow = {
@@ -15,6 +16,7 @@ type TargetRow = {
   ssh_user: string;
   port: number;
   enabled: number;
+  restrict_agents: number;
   auth_method: AuthMethod;
   credential_enc: string | null;
   passphrase_enc: string | null;
@@ -84,6 +86,7 @@ export function ensureHomelabSchema(db: DatabaseSync): void {
     ["credential_enc", "TEXT"],
     ["passphrase_enc", "TEXT"],
     ["host_fingerprint", "TEXT"],
+    ["restrict_agents", "INTEGER NOT NULL DEFAULT 0"],
   ] as const)
     if (!columns.has(name)) db.exec(`ALTER TABLE homelab_ssh_targets ADD COLUMN ${name} ${definition}`);
   const grantColumns = new Set(
@@ -112,6 +115,7 @@ function targetView(db: DatabaseSync, row: TargetRow) {
     ssh_user: row.ssh_user,
     port: row.port,
     enabled: Boolean(row.enabled),
+    restrict_agents: Boolean(row.restrict_agents),
     auth_method: row.auth_method,
     has_credential: Boolean(row.credential_enc),
     has_passphrase: Boolean(row.passphrase_enc),
@@ -130,6 +134,7 @@ function parseTarget(
   ssh_user: string;
   port: number;
   enabled: number;
+  restrict_agents: number;
   auth_method: AuthMethod;
   credential_enc: string | null;
   passphrase_enc: string | null;
@@ -140,6 +145,7 @@ function parseTarget(
   const sshUser = input.ssh_user === undefined ? old?.ssh_user : input.ssh_user;
   const port = input.port === undefined ? old?.port : input.port;
   const enabled = input.enabled === undefined ? Boolean(old?.enabled ?? true) : input.enabled;
+  const restrictAgents = input.restrict_agents === undefined ? Boolean(old?.restrict_agents) : input.restrict_agents;
   const authMethod = input.auth_method === undefined ? old?.auth_method : input.auth_method;
   const endpointChanged = old && (host !== old.host || port !== old.port);
   const pin = endpointChanged
@@ -160,6 +166,7 @@ function parseTarget(
     port < 1 ||
     port > 65535 ||
     typeof enabled !== "boolean" ||
+    typeof restrictAgents !== "boolean" ||
     (authMethod !== "password" && authMethod !== "private_key") ||
     (pin !== null && (typeof pin !== "string" || !FINGERPRINT.test(pin)))
   )
@@ -192,6 +199,7 @@ function parseTarget(
     ssh_user: sshUser,
     port,
     enabled: enabled ? 1 : 0,
+    restrict_agents: restrictAgents ? 1 : 0,
     auth_method: authMethod,
     credential_enc: credentialEnc,
     passphrase_enc: passphraseEnc,
@@ -353,8 +361,8 @@ export function registerHomelabRoutes(app: Express, db: DatabaseSync, options: H
       timestamp = now();
     db.prepare(
       `INSERT INTO homelab_ssh_targets
-      (id,name,host,ssh_user,port,key_path,known_hosts_path,enabled,auth_method,credential_enc,passphrase_enc,host_fingerprint,created_at,updated_at)
-      VALUES (?,?,?,?,?,'','',?,?,?,?,?,?,?)`,
+      (id,name,host,ssh_user,port,key_path,known_hosts_path,enabled,restrict_agents,auth_method,credential_enc,passphrase_enc,host_fingerprint,created_at,updated_at)
+      VALUES (?,?,?,?,?,'','',?,?,?,?,?,?,?,?)`,
     ).run(
       id,
       parsed.name,
@@ -362,6 +370,7 @@ export function registerHomelabRoutes(app: Express, db: DatabaseSync, options: H
       parsed.ssh_user,
       parsed.port,
       parsed.enabled,
+      parsed.restrict_agents,
       parsed.auth_method,
       parsed.credential_enc,
       parsed.passphrase_enc,
@@ -388,7 +397,7 @@ export function registerHomelabRoutes(app: Express, db: DatabaseSync, options: H
       return;
     }
     db.prepare(
-      `UPDATE homelab_ssh_targets SET name=?,host=?,ssh_user=?,port=?,enabled=?,auth_method=?,credential_enc=?,
+      `UPDATE homelab_ssh_targets SET name=?,host=?,ssh_user=?,port=?,enabled=?,restrict_agents=?,auth_method=?,credential_enc=?,
       passphrase_enc=?,host_fingerprint=?,updated_at=? WHERE id=?`,
     ).run(
       parsed.name,
@@ -396,6 +405,7 @@ export function registerHomelabRoutes(app: Express, db: DatabaseSync, options: H
       parsed.ssh_user,
       parsed.port,
       parsed.enabled,
+      parsed.restrict_agents,
       parsed.auth_method,
       parsed.credential_enc,
       parsed.passphrase_enc,
@@ -529,9 +539,7 @@ export function registerHomelabRoutes(app: Express, db: DatabaseSync, options: H
       }
       taskId = req.body.task_id;
       agentId = task.assigned_agent_id;
-      if (
-        !db.prepare("SELECT 1 FROM homelab_ssh_grants WHERE target_id = ? AND agent_id = ?").get(target.id, agentId)
-      ) {
+      if (!hasSshHostAccess(db, target.id, agentId)) {
         error(res, 403, "ssh_agent_not_granted");
         return;
       }

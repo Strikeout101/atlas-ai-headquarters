@@ -328,6 +328,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       const sprite_number =
         typeof body.sprite_number === "number" && body.sprite_number > 0 ? body.sprite_number : null;
       const personality = typeof body.personality === "string" ? body.personality.trim() || null : null;
+      const autonomyEnabled = body.autonomy_enabled === true || body.autonomy_enabled === 1;
 
       const id = randomUUID();
       try {
@@ -373,6 +374,13 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
           return res.status(400).json({ error: "department_not_found" });
         }
         throw err;
+      }
+      if (autonomyEnabled) {
+        try {
+          db.prepare("UPDATE agents SET autonomy_enabled = 1 WHERE id = ?").run(id);
+        } catch {
+          /* column added by the autonomy module; older test schemas lack it */
+        }
       }
 
       let created: unknown;
@@ -548,6 +556,13 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       }
     }
 
+    if ("autonomy_enabled" in body) {
+      const raw = body.autonomy_enabled;
+      if (raw === true || raw === 1) body.autonomy_enabled = 1;
+      else if (raw === false || raw === 0 || raw === null) body.autonomy_enabled = 0;
+      else return res.status(400).json({ error: "invalid_autonomy_enabled" });
+    }
+
     const requestedPackKey = parseWorkflowPackKey(body.workflow_pack_key);
     if ("workflow_pack_key" in body) {
       if (!requestedPackKey) {
@@ -596,6 +611,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       "status",
       "current_task_id",
       "acts_as_planning_leader",
+      "autonomy_enabled",
     ];
     const forcePlanningLeadOverride =
       body.force_planning_leader_override === true ||

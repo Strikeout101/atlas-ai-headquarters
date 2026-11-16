@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import SettingsSection from "./SettingsSection";
 import * as api from "../../api";
 import AgentAvatar, { useSpriteMap } from "../AgentAvatar";
 import {
@@ -484,11 +485,11 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
   const selectedChatTransportReady = selectedChat ? CHANNEL_META[selectedChat.channel].transportReady : false;
 
   return (
-    <section className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/60 p-4 sm:p-5">
+    <SettingsSection
+      title={t({ ko: "채널 메시지 설정", en: "Messaging channels", ja: "メッセージチャネル", zh: "消息渠道" })}
+      defaultOpen
+    >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-300">
-          {t({ ko: "채널 메시지 설정", en: "Channel Messaging", ja: "チャネルメッセージ設定", zh: "频道消息设置" })}
-        </h3>
         {saved && <span className={`text-xs ${saved.ok ? "text-emerald-400" : "text-red-400"}`}>{saved.msg}</span>}
       </div>
 
@@ -785,6 +786,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
           discordChannelsError={discordChannelsError}
         />
       )}
-    </section>
+    </SettingsSection>
   );
 }

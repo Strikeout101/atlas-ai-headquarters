@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
+import { discoverCodexCliModels } from "../../codex-cli-models.ts";
 
 interface CliModelInfoServer {
   slug: string;
@@ -201,11 +202,15 @@ export function registerModelRoutes(ctx: RuntimeContext): void {
     const refresh = req.query.refresh === "true";
 
     if (!refresh) {
-      if (cachedCliModels) {
+      if (cachedCliModels && Date.now() - cachedCliModels.loadedAt < 5 * 60_000) {
         return res.json({ models: cachedCliModels.data });
       }
       const dbCached = readModelCache("cli_models_cache");
       if (dbCached) {
+        // Shared desktop caches may belong to a different client identity. Ask the executable
+        // used for task runs before offering its account's models, even after an app restart.
+        const liveCodex = await discoverCodexCliModels();
+        dbCached.codex = liveCodex.length ? liveCodex : readCodexModelsCache();
         cachedCliModels = { data: dbCached, loadedAt: Date.now() };
         return res.json({ models: dbCached });
       }
@@ -225,11 +230,8 @@ export function registerModelRoutes(ctx: RuntimeContext): void {
       opencode: [],
     };
 
-    const codexModels = readCodexModelsCache();
-    models.codex =
-      codexModels.length > 0
-        ? codexModels
-        : ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.2", "gpt-5.1-codex-mini"].map(toModelInfo);
+    const codexModels = await discoverCodexCliModels();
+    models.codex = codexModels.length > 0 ? codexModels : readCodexModelsCache();
 
     try {
       const ocModels = await fetchOpenCodeModels();

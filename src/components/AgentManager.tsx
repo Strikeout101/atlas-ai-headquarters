@@ -119,6 +119,7 @@ export default function AgentManager({
         avatar_emoji: agent.avatar_emoji,
         sprite_number: computed,
         personality: agent.personality || "",
+        autonomy_enabled: Number(agent.autonomy_enabled ?? 0) === 1,
       });
       setShowModal(true);
     },
@@ -145,6 +146,7 @@ export default function AgentManager({
         avatar_emoji: form.avatar_emoji || "🤖",
         sprite_number: form.sprite_number,
         personality: form.personality.trim() || null,
+        autonomy_enabled: form.autonomy_enabled ? 1 : 0,
       };
       if (isIsolatedPack) {
         if (useDbBackedPack) {

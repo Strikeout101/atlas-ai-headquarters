@@ -70,6 +70,7 @@ export const BLANK: FormData = {
   avatar_emoji: "🤖",
   sprite_number: null,
   personality: "",
+  autonomy_enabled: false,
 };
 
 export const DEPT_COLORS = [

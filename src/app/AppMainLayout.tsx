@@ -1019,7 +1019,6 @@ export default function AppMainLayout({
                 }}
                 oauthResult={oauthResult}
                 onOauthResultClear={onOauthResultClear}
-                onOpenHomelab={() => setView("homelab")}
               />
             )}
           </div>

@@ -125,6 +125,7 @@ export async function updateAgent(
       | "department_id"
       | "role"
       | "acts_as_planning_leader"
+      | "autonomy_enabled"
       | "cli_provider"
       | "oauth_account_id"
       | "api_provider_id"
@@ -155,6 +156,7 @@ export async function createAgent(data: {
   avatar_emoji: string;
   sprite_number?: number | null;
   personality: string | null;
+  autonomy_enabled?: number;
   workflow_pack_key?: WorkflowPackKey;
 }): Promise<Agent> {
   const j = (await post("/api/agents", data)) as { ok: boolean; agent: Agent };

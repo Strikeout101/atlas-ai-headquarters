@@ -16,10 +16,14 @@ import { registerApiDocsRoutes } from "./ops/api-docs.ts";
 import { registerWorkflowPackRoutes } from "./ops/workflow-packs.ts";
 import { registerModelRoutingRoutes } from "./ops/model-routing.ts";
 import { registerBusinessRoutes } from "./ops/business.ts";
+import { registerBusinessMailboxRoutes } from "./ops/business-mailboxes.ts";
+import { registerBusinessEmailRoutes } from "./ops/business-email.ts";
+import { registerBusinessSocialRoutes } from "./ops/business-social.ts";
 import { registerHomelabRoutes } from "./ops/homelab.ts";
 import { registerAgentToolRoutes } from "./ops/agent-tools.ts";
 import { registerSshApprovalRoutes } from "./ops/ssh-approvals.ts";
 import { registerApprovalRoutes } from "./ops/approvals.ts";
+import { registerAgentProposalRoutes } from "./ops/agent-proposals.ts";
 
 export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   const __ctx: RuntimeContext = ctx;
@@ -219,8 +223,16 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   registerModelRoutes(__ctx);
   registerModelRoutingRoutes(app, db, runAgentOneShot);
   registerBusinessRoutes(app, db);
+  registerBusinessMailboxRoutes(app, db);
+  registerBusinessEmailRoutes(app, db);
+  registerBusinessSocialRoutes(app, db);
   registerHomelabRoutes(app, db);
   registerSshApprovalRoutes(app, db);
+  registerAgentProposalRoutes(app, db, {
+    appendTaskLog,
+    broadcast,
+    recordTaskCreationAudit: (input) => __ctx.recordTaskCreationAudit(input as any),
+  });
   registerApprovalRoutes(app, db);
   registerAgentToolRoutes(app, db, runAgentOneShot);
 

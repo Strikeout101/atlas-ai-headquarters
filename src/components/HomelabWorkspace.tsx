@@ -85,6 +85,7 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
   const [testing, setTesting] = useState(false);
   const [grantDraft, setGrantDraft] = useState<string[]>([]);
   const [savingGrants, setSavingGrants] = useState(false);
+  const [savingAccess, setSavingAccess] = useState(false);
   const [approvals, setApprovals] = useState<HomelabSshApproval[]>([]);
   const [approvalsError, setApprovalsError] = useState<string | null>(null);
   const [loadingApprovals, setLoadingApprovals] = useState(false);
@@ -299,7 +300,7 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
       await refreshTargets(selected.id);
       setProbe(null);
       setTrustChecked(false);
-      setNotice("Fingerprint pinned. Test the SSH connection before granting agents access.");
+      setNotice("Fingerprint pinned. Test the SSH connection before running agent commands.");
     } catch (cause) {
       setError(errorText(cause));
     }
@@ -316,6 +317,25 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
       setError(errorText(cause));
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function changeHostAccess(restricted: boolean) {
+    if (!selected) return;
+    setSavingAccess(true);
+    setError(null);
+    try {
+      const { target } = await updateHomelabSshTarget(selected.id, { restrict_agents: restricted });
+      setTargets((current) => current.map((host) => (host.id === target.id ? target : host)));
+      setNotice(
+        restricted
+          ? "Only selected agents can access this host. Command approvals still apply."
+          : "All agents can access this host. Command approvals still apply.",
+      );
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setSavingAccess(false);
     }
   }
 
@@ -379,7 +399,8 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">ATLAS Settings</p>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">SSH Host Manager</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Store host credentials, verify fingerprints, grant agent access, and review each requested command.
+            Store host credentials, verify fingerprints, restrict sensitive hosts, and approve commands that need
+            review.
           </p>
         </div>
         <button type="button" className={primaryButton} onClick={openCreate}>
@@ -682,28 +703,52 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
                   <div>
                     <h3 className="text-lg font-semibold">Agent access</h3>
                     <p className="mt-1 text-sm text-slate-400">
-                      A grant allows an agent to request SSH.{" "}
+                      {selected.restrict_agents
+                        ? "Only selected agents can request SSH on this host. "
+                        : "All agents can request SSH on this host. "}
                       {autoApproveReadOnly === false
                         ? "Every command needs a separate owner approval."
                         : "Read-only checks run on their own; anything that could change the host needs your approval."}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className={secondaryButton}
-                    onClick={() => void saveGrants()}
-                    disabled={savingGrants || agents.length === 0}
-                  >
-                    {savingGrants ? "Saving..." : "Save grants"}
-                  </button>
+                  {selected.restrict_agents && (
+                    <button
+                      type="button"
+                      className={secondaryButton}
+                      onClick={() => void saveGrants()}
+                      disabled={savingGrants || savingAccess || agentsError !== null}
+                    >
+                      {savingGrants ? "Saving..." : "Save selected agents"}
+                    </button>
+                  )}
                 </div>
-                {agentsError && (
+                <label className="mt-4 flex items-start gap-2 text-sm text-slate-200">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={selected.restrict_agents}
+                    disabled={savingAccess || savingGrants}
+                    onChange={(event) => void changeHostAccess(event.target.checked)}
+                  />
+                  <span>
+                    Restrict to selected agents
+                    <span className="block text-xs text-slate-400">
+                      Use for sensitive hosts such as infrastructure nodes. Off allows all current and future agents.
+                      Saved selections are kept when this is turned off. Changes save immediately.
+                    </span>
+                  </span>
+                </label>
+                {selected.restrict_agents && agentsError && (
                   <p role="alert" className="mt-3 text-sm text-rose-300">
                     {agentsError}
                   </p>
                 )}
-                {agents.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-400">No agents available.</p>
+                {!selected.restrict_agents ? (
+                  <p className="mt-4 text-sm text-slate-400">Host access: all agents.</p>
+                ) : agents.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-400">
+                    No agents available. No agents can access a restricted host without a saved selection.
+                  </p>
                 ) : (
                   <div className="mt-4 grid max-h-48 gap-2 overflow-y-auto border-t border-slate-700 pt-4 sm:grid-cols-2">
                     {[...agents]
@@ -716,6 +761,7 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
                           <input
                             type="checkbox"
                             checked={grantDraft.includes(agent.id)}
+                            disabled={savingGrants || savingAccess}
                             onChange={() =>
                               setGrantDraft((current) =>
                                 current.includes(agent.id)

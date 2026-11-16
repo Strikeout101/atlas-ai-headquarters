@@ -22,6 +22,8 @@ export interface FormData {
   avatar_emoji: string;
   sprite_number: number | null;
   personality: string;
+  /** Suggests tasks on its own. Ignored for team leaders, who always do. */
+  autonomy_enabled: boolean;
 }
 
 export interface DeptForm {

@@ -113,6 +113,41 @@ function createDeps(db: DatabaseSync, logsDir = "/tmp") {
 }
 
 describe("run complete handler - video preprod review transition", () => {
+  it.each(["pending", "sending", "failed", "unknown"])(
+    "keeps an unsent email task pending with its work preserved (%s)",
+    (status) => {
+      const db = createDb();
+      try {
+        db.exec("CREATE TABLE business_email_approvals (id TEXT, task_id TEXT, status TEXT, created_at INTEGER)");
+        db.prepare("INSERT INTO tasks (id,title,status,assigned_agent_id,started_at) VALUES (?,?,?,?,?)").run(
+          "email-task",
+          "Send test email",
+          "in_progress",
+          "worker-1",
+          100,
+        );
+        db.prepare("INSERT INTO agents (id,name,status,current_task_id) VALUES (?,?,?,?)").run(
+          "worker-1",
+          "Worker",
+          "working",
+          "email-task",
+        );
+        db.prepare("INSERT INTO business_email_approvals VALUES (?,?,?,?)").run("approval-1", "email-task", status, 99);
+        const deps = createDeps(db);
+        deps.taskWorktrees.set("email-task", { worktreePath: "/work/email-task", projectPath: "/work" });
+        createRunCompleteHandler(deps).handleTaskRunComplete("email-task", 0);
+        expect(db.prepare("SELECT status FROM tasks WHERE id='email-task'").get()).toMatchObject({ status: "pending" });
+        expect(deps.cleanupWorktree).not.toHaveBeenCalled();
+        expect(deps.finishReview).not.toHaveBeenCalled();
+        expect(deps.notifyCeo).toHaveBeenCalledWith(
+          expect.stringContaining("Email approval/delivery requires attention"),
+          "email-task",
+        );
+      } finally {
+        db.close();
+      }
+    },
+  );
   it("checkpoints context exhaustion, ignores duplicate completion, and preserves the worktree", () => {
     const db = createDb();
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), "climpire-context-run-"));

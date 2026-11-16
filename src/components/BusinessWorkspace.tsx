@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import BusinessEmailHistory from "./BusinessEmailHistory";
 import {
   businessApi,
   type BusinessContact,
@@ -148,7 +149,7 @@ export default function BusinessWorkspace({
   sections = ["work", "contacts", "drafts"],
   eyebrow = "Operations",
   title = "Business workspace",
-  description = "Keep customer work and outreach drafts together. Drafts stay here until you choose how to send or publish them.",
+  description = "Keep customer work and outreach drafts together. Agents request email approval; review and send exact messages from Today.",
 }: BusinessWorkspaceProps = {}) {
   const [business, setBusiness] = useState<BusinessKind>(fixedBusiness ?? "tech");
   const [section, setSection] = useState<Section>(sections[0]);
@@ -939,6 +940,7 @@ export default function BusinessWorkspace({
           </div>
         </div>
       )}
+      {section === "drafts" && <BusinessEmailHistory business={business} />}
     </div>
   );
 }

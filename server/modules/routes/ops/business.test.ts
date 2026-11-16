@@ -23,6 +23,37 @@ afterEach(() => {
 });
 
 describe("business records", () => {
+  it("persists owner profiles without changing records or accepting unsafe fields", async () => {
+    const { app, db } = harness();
+    expect((await request(app).get("/api/business/profiles").expect(200)).body.items).toHaveLength(2);
+    await request(app)
+      .patch("/api/business/profiles/tech")
+      .send({
+        name: "Small Business Tech",
+        website: "https://smallbusinessestech.com/",
+        brand_voice: "Clear and practical",
+      })
+      .expect(200);
+    // Schema startup is idempotent and does not overwrite saved owner edits.
+    registerBusinessRoutes(express(), db);
+    const profiles = (await request(app).get("/api/business/profiles").expect(200)).body.items;
+    expect(profiles.find((item: { business: string }) => item.business === "tech")).toMatchObject({
+      name: "Small Business Tech",
+      brand_voice: "Clear and practical",
+    });
+    expect(profiles.find((item: { business: string }) => item.business === "rental").name).toBe("");
+    await request(app).patch("/api/business/profiles/tech").send({ website: "javascript:alert(1)" }).expect(400);
+    await request(app)
+      .patch("/api/business/profiles/tech")
+      .send({ website: "https://user:pass@example.com" })
+      .expect(400);
+    await request(app)
+      .patch("/api/business/profiles/tech")
+      .send({ brand_voice: "x".repeat(4001) })
+      .expect(400);
+    await request(app).patch("/api/business/profiles/tech").send({ send_without_approval: true }).expect(400);
+    await request(app).patch("/api/business/profiles/other").send({ name: "Other" }).expect(400);
+  });
   it("keeps tech tickets, rental quotes, and communication drafts within their business", async () => {
     const { app } = harness();
     const tech = await request(app)

@@ -8,10 +8,10 @@ import ApiSettingsTab from "./settings/ApiSettingsTab";
 import CliSettingsTab from "./settings/CliSettingsTab";
 import GatewaySettingsTab from "./settings/GatewaySettingsTab";
 import GeneralSettingsTab from "./settings/GeneralSettingsTab";
+import BusinessSettingsTab from "./settings/BusinessSettingsTab";
 import OAuthSettingsTab from "./settings/OAuthSettingsTab";
 import SecuritySettingsTab from "./settings/SecuritySettingsTab";
 import SettingsTabNav from "./settings/SettingsTabNav";
-import HomelabWorkspace from "./HomelabWorkspace";
 import type { AccountDraftMap, AccountDraftPatch, LocalSettings, SettingsTab } from "./settings/types";
 import { isSettingsTab, SETTINGS_TAB_EVENT, settingsTabFromUrl } from "./settings/types";
 import { useApiProvidersState } from "./settings/useApiProvidersState";
@@ -23,8 +23,6 @@ interface SettingsPanelProps {
   onRefreshCli: () => void;
   oauthResult?: OAuthCallbackResult | null;
   onOauthResultClear?: () => void;
-  /** SSH hosts live on the Homelab page; the SSH hosts tab links there. */
-  onOpenHomelab?: () => void;
 }
 
 export default function SettingsPanel({
@@ -34,7 +32,6 @@ export default function SettingsPanel({
   onRefreshCli,
   oauthResult,
   onOauthResultClear,
-  onOpenHomelab,
 }: SettingsPanelProps) {
   const [form, setForm] = useState<LocalSettings>(settings as LocalSettings);
   const { t, locale: localeTag } = useI18n(form.language);
@@ -47,6 +44,9 @@ export default function SettingsPanel({
     url.searchParams.set("tab", next);
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "ssh") setTab("general");
+  }, [setTab]);
   useEffect(() => {
     const onTab = (event: Event) => {
       const next = (event as CustomEvent<unknown>).detail;
@@ -414,13 +414,7 @@ export default function SettingsPanel({
   );
 
   return (
-    <div
-      className={
-        tab === "ssh" && !onOpenHomelab
-          ? "mx-auto max-w-7xl space-y-4 sm:space-y-6"
-          : "mx-auto max-w-2xl space-y-4 sm:space-y-6"
-      }
-    >
+    <div className="mx-auto w-full min-w-0 max-w-[1400px] space-y-4 sm:space-y-6" data-settings-layout>
       <h2 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
         {t({ ko: "설정", en: "Settings", ja: "設定", zh: "设置" })}
       </h2>
@@ -432,6 +426,7 @@ export default function SettingsPanel({
       )}
 
       {tab === "security" && <SecuritySettingsTab t={t} />}
+      {tab === "business" && <BusinessSettingsTab />}
 
       {tab === "cli" && (
         <CliSettingsTab
@@ -484,36 +479,6 @@ export default function SettingsPanel({
       {tab === "gateway" && (
         <GatewaySettingsTab t={t} form={form} setForm={setForm} persistSettings={persistSettings} />
       )}
-
-      {tab === "ssh" &&
-        (onOpenHomelab ? (
-          <div
-            className="rounded-xl p-5"
-            style={{ border: "1px solid var(--th-border)", background: "var(--th-card-bg)" }}
-          >
-            <h3 className="text-[15px] font-semibold" style={{ color: "var(--th-text-heading)" }}>
-              {t({
-                ko: "SSH 호스트는 홈랩으로 이동했습니다",
-                en: "SSH hosts moved to Homelab",
-                ja: "SSH ホストはホームラボに移動しました",
-                zh: "SSH 主机已移至家庭实验室",
-              })}
-            </h3>
-            <p className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
-              {t({
-                ko: "호스트, 지문, 에이전트 권한, 명령 승인과 실행 기록을 한곳에서 관리합니다.",
-                en: "Hosts, pinned fingerprints, agent access, command approvals and the run log are all managed there.",
-                ja: "ホスト、フィンガープリント、エージェント権限、コマンド承認、実行ログをまとめて管理します。",
-                zh: "主机、指纹、代理权限、命令审批和运行日志都在那里管理。",
-              })}
-            </p>
-            <button type="button" onClick={onOpenHomelab} className="ax-btn-primary mt-4 h-9 rounded-lg px-4 text-sm">
-              {t({ ko: "홈랩 열기", en: "Open Homelab", ja: "ホームラボを開く", zh: "打开家庭实验室" })}
-            </button>
-          </div>
-        ) : (
-          <HomelabWorkspace />
-        ))}
     </div>
   );
 }

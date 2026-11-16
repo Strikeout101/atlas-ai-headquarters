@@ -19,6 +19,7 @@ import {
   resolveVideoArtifactSpecForTask,
 } from "../packs/video-artifact.ts";
 import { evaluateRemotionOnlyGateFromLogFiles } from "../packs/video-render-engine-gate.ts";
+import { summarizeTaskRunFailure } from "../agents/run-failure-summary.ts";
 
 type CreateRunCompleteHandlerDeps = Record<string, any>;
 
@@ -197,6 +198,40 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
       notifyCeo(
         `SSH command approval needed for '${task.title}'. Review it on Today or in Homelab, then resume the task.`,
+        taskId,
+      );
+      return;
+    }
+    let emailApproval: { id: string; status: string } | undefined;
+    if (task.started_at) {
+      try {
+        emailApproval = db
+          .prepare(
+            `SELECT id,status FROM business_email_approvals
+          WHERE task_id = ? AND status IN ('pending','sending','failed','unknown')
+          ORDER BY created_at DESC LIMIT 1`,
+          )
+          .get(taskId) as typeof emailApproval;
+      } catch {
+        // Email tools are optional in isolated test databases.
+      }
+    }
+    if (emailApproval) {
+      db.prepare("UPDATE tasks SET status = 'pending', result = ?, updated_at = ? WHERE id = ?").run(result, t, taskId);
+      if (task.assigned_agent_id) {
+        db.prepare("UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ?").run(
+          task.assigned_agent_id,
+        );
+        broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id));
+      }
+      appendTaskLog(
+        taskId,
+        "system",
+        `Email approval/delivery ${emailApproval.id} is ${emailApproval.status}; task preserved for resume.`,
+      );
+      broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
+      notifyCeo(
+        `Email approval/delivery requires attention for '${task.title}'. Review Today or email history; work is preserved.`,
         taskId,
       );
       return;
@@ -460,6 +495,17 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
 
     const logKind = finalExitCode === 0 ? "completed" : "failed";
     appendTaskLog(taskId, "system", `RUN ${logKind} (exit code: ${finalExitCode})`);
+    if (finalExitCode !== 0) {
+      try {
+        const logFile = path.join(logsDir, `${taskId}.log`);
+        if (fs.existsSync(logFile)) {
+          const summary = summarizeTaskRunFailure(fs.readFileSync(logFile, "utf8"));
+          if (summary) appendTaskLog(taskId, "error", `Run failed: ${summary}`);
+        }
+      } catch {
+        // A missing or rotating terminal log must not block task completion handling.
+      }
+    }
 
     if (result) {
       db.prepare("UPDATE tasks SET result = ? WHERE id = ?").run(result, taskId);

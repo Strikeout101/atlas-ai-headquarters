@@ -21,13 +21,13 @@ function harness() {
   databases.push(db);
   db.exec(`CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT);
     CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT);
-    CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, name TEXT, host TEXT, enabled INTEGER);
+    CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, name TEXT, host TEXT, enabled INTEGER, restrict_agents INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE homelab_ssh_grants (target_id TEXT, agent_id TEXT);
     CREATE TABLE model_upgrade_requests (id TEXT PRIMARY KEY, task_id TEXT, agent_id TEXT, requested_model TEXT,
       requested_reasoning_level TEXT, reason TEXT, status TEXT, created_at INTEGER);
     INSERT INTO tasks VALUES ('task-1','Weekly health check'), ('task-2','Site refactor');
     INSERT INTO agents VALUES ('turbo','Turbo'), ('bolt','Bolt');
-    INSERT INTO homelab_ssh_targets VALUES ('host-1','pve-dns-01','10.0.0.5',1);
+    INSERT INTO homelab_ssh_targets VALUES ('host-1','pve-dns-01','10.0.0.5',1,0);
     INSERT INTO homelab_ssh_grants VALUES ('host-1','turbo');`);
   ensureSshApprovalSchema(db);
   const app = express();
@@ -37,6 +37,29 @@ function harness() {
 }
 
 describe("GET /api/approvals", () => {
+  it("includes exact pending emails in the shared owner approval list", async () => {
+    const { app, db } = harness();
+    db.exec(`CREATE TABLE business_email_approvals (id TEXT, created_at INTEGER, task_id TEXT, agent_id TEXT,
+      business TEXT, sender TEXT, recipient TEXT, subject TEXT, body TEXT, status TEXT, password_enc TEXT);
+      INSERT INTO business_email_approvals VALUES ('email-1',1000,'task-1','bolt','tech','info@example.com',
+        'owner@example.net','Test email','Exact body','pending','must-not-leak'),
+        ('email-2',2000,'task-1','bolt','tech','info@example.com','owner@example.net','Already sent','old','sent','must-not-leak');`);
+    const response = await request(app).get("/api/approvals").expect(200);
+    expect(response.body.items).toEqual([
+      expect.objectContaining({
+        kind: "business_email",
+        id: "email-1",
+        sender: "info@example.com",
+        recipient: "owner@example.net",
+        subject: "Test email",
+        body: "Exact body",
+        task_title: "Weekly health check",
+        agent_name: "Bolt",
+        decide_path: "/api/business/email-approvals/email-1/decide",
+      }),
+    ]);
+    expect(JSON.stringify(response.body)).not.toContain("must-not-leak");
+  });
   it("lists pending SSH commands and model upgrades with context, newest first, and skips decided ones", async () => {
     const { app, db } = harness();
     const ssh = createSshApprovalRequest(db, "host-1", "task-1", "turbo", "systemctl restart pihole-FTL");

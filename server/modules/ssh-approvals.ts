@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret, encryptSecret } from "../oauth/helpers.ts";
 import { classifySshCommand } from "./ssh-command-policy.ts";
+import { hasSshHostAccess } from "./ssh-access.ts";
 
 const digest = (command: string) => createHash("sha256").update(command).digest("hex");
 
@@ -59,10 +60,7 @@ export function createSshApprovalRequest(
     | { enabled: number }
     | undefined;
   if (!target?.enabled) throw new Error("ssh_target_unavailable");
-  const grant = db
-    .prepare("SELECT 1 FROM homelab_ssh_grants WHERE target_id = ? AND agent_id = ?")
-    .get(targetId, agentId);
-  if (!grant) throw new Error("ssh_agent_not_granted");
+  if (!hasSshHostAccess(db, targetId, agentId)) throw new Error("ssh_agent_not_granted");
   const id = randomUUID();
   const now = Date.now();
   // Read-only commands are approved on the spot; everything else waits for the owner.

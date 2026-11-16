@@ -18,9 +18,9 @@ function harness() {
   const db = new DatabaseSync(":memory:");
   databases.push(db);
   db.exec(`CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
-    CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, enabled INTEGER);
+    CREATE TABLE homelab_ssh_targets (id TEXT PRIMARY KEY, enabled INTEGER, restrict_agents INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE homelab_ssh_grants (target_id TEXT, agent_id TEXT);
-    INSERT INTO homelab_ssh_targets VALUES ('host-1',1);
+    INSERT INTO homelab_ssh_targets VALUES ('host-1',1,0);
     INSERT INTO homelab_ssh_grants VALUES ('host-1','worker');`);
   ensureSshApprovalSchema(db);
   const app = express();
@@ -71,8 +71,21 @@ describe("SSH command approvals", () => {
     expect(createSshApprovalRequest(db, "host-1", "task-1", "worker", "uptime")).toMatchObject({ status: "pending" });
   });
 
-  it("rejects a request without a host grant", () => {
+  it("allows ungranted agents by default and enforces opt-in restrictions", () => {
     const { db } = harness();
+    expect(createSshApprovalRequest(db, "host-1", "task-1", "other", "ping -c 4 127.0.0.1")).toMatchObject({
+      status: "approved",
+      auto_approved: true,
+    });
+    expect(createSshApprovalRequest(db, "host-1", "task-1", "other", "reboot")).toMatchObject({
+      status: "pending",
+      auto_approved: false,
+    });
+    db.exec("UPDATE homelab_ssh_targets SET restrict_agents = 1");
     expect(() => createSshApprovalRequest(db, "host-1", "task-1", "other", "uptime")).toThrow("ssh_agent_not_granted");
+    expect(createSshApprovalRequest(db, "host-1", "task-1", "worker", "uptime").status).toBe("approved");
+    db.exec("UPDATE homelab_ssh_targets SET restrict_agents = 0");
+    expect(createSshApprovalRequest(db, "host-1", "task-1", "other", "uptime").status).toBe("approved");
+    expect(db.prepare("SELECT COUNT(*) AS n FROM homelab_ssh_grants").get()).toMatchObject({ n: 1 });
   });
 });

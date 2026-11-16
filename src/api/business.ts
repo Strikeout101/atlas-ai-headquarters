@@ -19,6 +19,20 @@ export interface BusinessContact {
 
 type ContactFlag = { do_not_contact?: "0" | "1" };
 
+export interface BusinessProfile {
+  business: BusinessKind;
+  name: string;
+  website: string;
+  email: string;
+  service_area: string;
+  hours: string;
+  brand_voice: string;
+  social_profiles: string;
+  services: string;
+  workflow_notes: string;
+  updated_at: number;
+}
+
 export interface TechTicket {
   id: string;
   business: "tech";
@@ -61,6 +75,11 @@ type ListResponse<T> = { ok: true; items: T[] };
 type ItemResponse<T> = { ok: true; item: T };
 
 export const businessApi = {
+  profiles: {
+    list: async () => (await request<ListResponse<BusinessProfile>>("/api/business/profiles")).items,
+    update: async (business: BusinessKind, input: Partial<Omit<BusinessProfile, "business" | "updated_at">>) =>
+      (await patch<ItemResponse<BusinessProfile>>(`/api/business/profiles/${business}`, input)).item,
+  },
   contacts: {
     list: async (business: BusinessKind) =>
       (await request<ListResponse<BusinessContact>>(`/api/business/contacts?business=${business}`)).items,

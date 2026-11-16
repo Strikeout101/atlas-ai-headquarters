@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { Express } from "express";
+import { registerBusinessProfileRoutes } from "./business-profiles.ts";
 
 type Business = "tech" | "rental";
 type Body = Record<string, unknown>;
@@ -175,6 +176,7 @@ function contactBelongsToBusiness(db: DatabaseSync, contactId: unknown, business
 
 export function registerBusinessRoutes(app: Express, db: DatabaseSync): void {
   ensureBusinessSchema(db);
+  registerBusinessProfileRoutes(app, db);
 
   for (const entity of ENTITIES) {
     const base = `/api/business/${entity.path}`;

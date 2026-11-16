@@ -1,4 +1,4 @@
-import { Cable, KeyRound, Radio, Server, ShieldCheck, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
+import { Cable, KeyRound, Radio, ShieldCheck, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react";
 import type { SettingsTab, TFunction } from "./types";
 
 interface SettingsTabNavProps {
@@ -7,13 +7,19 @@ interface SettingsTabNavProps {
   t: TFunction;
 }
 
-/** Tabs in groups: the account, AI providers, messaging channels, and the pointer to Homelab. */
+/** Settings groups for the account, businesses, AI providers, and messaging channels. */
 const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunction) => string; group: number }> = [
   {
     key: "general",
     group: 0,
     icon: SlidersHorizontal,
     label: (t) => t({ ko: "일반 설정", en: "General", ja: "一般設定", zh: "常规设置" }),
+  },
+  {
+    key: "business",
+    group: 0,
+    icon: SlidersHorizontal,
+    label: (t) => t({ ko: "사업 프로필", en: "Businesses", ja: "事業", zh: "业务" }),
   },
   {
     key: "security",
@@ -39,12 +45,6 @@ const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunctio
     group: 2,
     icon: Radio,
     label: (t) => t({ ko: "채널 메시지", en: "Channels", ja: "チャネル", zh: "频道" }),
-  },
-  {
-    key: "ssh",
-    group: 3,
-    icon: Server,
-    label: (t) => t({ ko: "SSH 호스트", en: "SSH hosts", ja: "SSH ホスト", zh: "SSH 主机" }),
   },
 ];
 

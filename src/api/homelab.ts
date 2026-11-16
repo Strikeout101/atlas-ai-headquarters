@@ -7,6 +7,7 @@ export type HomelabSshTarget = {
   ssh_user: string;
   port: number;
   enabled: boolean;
+  restrict_agents: boolean;
   auth_method: "password" | "private_key" | "legacy_key_path";
   has_credential: boolean;
   has_passphrase: boolean;
@@ -22,6 +23,7 @@ export type HomelabSshTargetInput = {
   ssh_user: string;
   port: number;
   enabled: boolean;
+  restrict_agents?: boolean;
   auth_method: "password" | "private_key";
   credential?: string;
   passphrase?: string;

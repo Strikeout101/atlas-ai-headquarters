@@ -5,6 +5,10 @@ import { isDirectLocalRequest } from "../../../security/auth.ts";
 import { verifyAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { createModelUpgradeRequest, decideModelUpgrade } from "../../model-routing.ts";
 import { createSshApprovalRequest, getSshApprovalStatus } from "../../ssh-approvals.ts";
+import { SSH_AGENT_ACCESS_SQL } from "../../ssh-access.ts";
+import { requestEmailApproval, getEmailApprovalStatus } from "./business-email.ts";
+import { listAgentMailboxes } from "./business-mailboxes.ts";
+import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
 
 const BUSINESS_RESOURCES = new Set(["contacts", "tickets", "quotes", "drafts"]);
 const BUSINESS_ACTIONS = new Set(["list", "get", "create", "update", "delete"]);
@@ -42,6 +46,53 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
       req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
     const operation = body.operation;
     try {
+      if (operation === "business.social.accounts") {
+        return res.json({ ok: true, items: listSocialAccountsForAgent(db) });
+      }
+      if (operation === "business.social.media") {
+        const accountId = typeof body.account_id === "string" && body.account_id.length <= 128 ? body.account_id : "";
+        if (!accountId) return res.status(400).json({ error: "social_account_id_required" });
+        const result = await listInstagramMediaForAgent(db, accountId);
+        return res
+          .status(
+            result.ok
+              ? 200
+              : result.error === "social_account_not_found"
+                ? 404
+                : result.error === "social_account_not_verified"
+                  ? 400
+                  : 502,
+          )
+          .json(result);
+      }
+      if (operation === "business.email.mailboxes") return res.json({ ok: true, items: listAgentMailboxes(db) });
+      if (operation === "business.email.request") {
+        const draftId = typeof body.draft_id === "string" && body.draft_id.length <= 128 ? body.draft_id : "";
+        if (!draftId) return res.status(400).json({ error: "email_draft_id_required" });
+        if (
+          "mailbox_id" in body &&
+          (typeof body.mailbox_id !== "string" || !body.mailbox_id || body.mailbox_id.length > 128)
+        )
+          return res.status(400).json({ error: "invalid_mailbox_id" });
+        const request = requestEmailApproval(
+          db,
+          draftId,
+          claims.taskId,
+          claims.agentId,
+          body.mailbox_id as string | undefined,
+        );
+        return res.status(201).json({ ok: true, request });
+      }
+      if (operation === "business.email.status") {
+        const approvalId =
+          typeof body.approval_id === "string" && body.approval_id.length <= 128 ? body.approval_id : "";
+        const request = getEmailApprovalStatus(db, approvalId, claims.taskId, claims.agentId);
+        return request ? res.json({ ok: true, request }) : res.status(404).json({ error: "email_approval_not_found" });
+      }
+      if (operation === "business.profiles") {
+        const items = db.prepare("SELECT * FROM business_profiles ORDER BY business").all();
+        return res.json({ ok: true, items });
+      }
       if (operation === "business") {
         const resource = body.resource;
         const action = body.action;
@@ -74,7 +125,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
         const targets = db
           .prepare(
             `SELECT t.id, t.name, t.host, t.ssh_user, t.port FROM homelab_ssh_targets t
-          JOIN homelab_ssh_grants g ON g.target_id = t.id WHERE g.agent_id = ? AND t.enabled = 1 ORDER BY t.name`,
+          WHERE ${SSH_AGENT_ACCESS_SQL} AND t.enabled = 1 ORDER BY t.name`,
           )
           .all(claims.agentId);
         return res.json({ ok: true, targets });
@@ -114,6 +165,16 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
     } catch (error) {
       const message = error instanceof Error ? error.message : "agent_tool_failed";
       const expected = new Set([
+        "agent_task_not_active",
+        "email_draft_not_found",
+        "email_draft_not_sendable",
+        "email_snapshot_already_requested",
+        "email_contact_business_mismatch",
+        "invalid_recipient_email",
+        "invalid_sender_email",
+        "invalid_email_content",
+        "contact_do_not_contact",
+        "mailbox_not_configured",
         "invalid_reason",
         "no_model_upgrade_available",
         "requested_model_not_available",

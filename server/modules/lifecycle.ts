@@ -8,6 +8,7 @@ import { notifyTaskStatus } from "../gateway/client.ts";
 import { startDiscordReceiver } from "../messenger/discord-receiver.ts";
 import { startTelegramReceiver } from "../messenger/telegram-receiver.ts";
 import { registerGracefulShutdownHandlers } from "./lifecycle/register-graceful-shutdown.ts";
+import { AUTONOMY_TICK_MS, runAutonomyTick } from "./agent-proposals.ts";
 import {
   getContextRollover,
   releaseStaleContextRolloverClaims,
@@ -50,6 +51,8 @@ export function startLifecycle(ctx: RuntimeContext): void {
     rollbackTaskWorktree,
     runInTransaction,
     resumePendingContextRollovers,
+    runAgentOneShot,
+    getPreferredLanguage,
     stopProgressTimer,
     stopRequestedTasks,
     wsClients,
@@ -491,6 +494,28 @@ export function startLifecycle(ctx: RuntimeContext): void {
   setTimeout(sweepPendingSubtaskDelegations, 4_000);
   setInterval(sweepPendingSubtaskDelegations, SUBTASK_DELEGATION_SWEEP_MS);
   setTimeout(autoAssignAgentProviders, 4_000);
+
+  // Agent autonomy (level 1): one eligible idle agent per tick thinks and may suggest tasks for the owner to approve.
+  let autonomyTickRunning = false;
+  const autonomyTick = async () => {
+    if (autonomyTickRunning) return;
+    autonomyTickRunning = true;
+    try {
+      await runAutonomyTick({
+        db,
+        runAgentOneShot,
+        isAgentInMeeting: (agentId) => Boolean(isAgentInMeeting(agentId)),
+        getPreferredLanguage: () => String(getPreferredLanguage?.() ?? "en"),
+        log: (message) => console.log(message),
+      });
+    } catch (err) {
+      console.error("[autonomy] tick failed:", err);
+    } finally {
+      autonomyTickRunning = false;
+    }
+  };
+  setTimeout(autonomyTick, 2 * 60_000);
+  setInterval(autonomyTick, AUTONOMY_TICK_MS);
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 

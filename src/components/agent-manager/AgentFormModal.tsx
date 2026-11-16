@@ -17,6 +17,65 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/** Whether the agent thinks on its own and suggests tasks. Locked on for team leaders. */
+export function AutonomyToggle({
+  isLeader,
+  checked,
+  onChange,
+}: {
+  isLeader: boolean;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const label = t({ ko: "업무 제안", en: "Suggests tasks", ja: "タスクを提案", zh: "主动提议任务" });
+  const help = isLeader
+    ? t({
+        ko: "팀장은 항상 여유 시간에 업무를 제안합니다. 승인한 제안만 작업이 됩니다.",
+        en: "Team leaders always suggest tasks in their free time. Only the ones you approve become tasks.",
+        ja: "チームリーダーは空き時間に常にタスクを提案します。承認したものだけがタスクになります。",
+        zh: "组长总会在空闲时提议任务。只有你批准的提议才会成为任务。",
+      })
+    : t({
+        ko: "여유 시간에 스스로 생각해 업무를 제안합니다. 오늘 화면에서 승인한 제안만 작업이 됩니다.",
+        en: "Thinks on its own in free time and suggests tasks. Only the ones you approve on Today become tasks.",
+        ja: "空き時間に自分で考えてタスクを提案します。Today で承認したものだけがタスクになります。",
+        zh: "空闲时自主思考并提议任务。只有你在今日页批准的提议才会成为任务。",
+      });
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div id="agent-autonomy-label" className="text-xs font-medium" style={{ color: "var(--th-text-secondary)" }}>
+          {label}
+        </div>
+        <p
+          id="agent-autonomy-help"
+          className="mt-0.5 text-[11px] leading-snug"
+          style={{ color: "var(--th-text-muted)" }}
+        >
+          {help}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby="agent-autonomy-label"
+        aria-describedby="agent-autonomy-help"
+        disabled={isLeader}
+        onClick={() => onChange(!checked)}
+        className="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ background: checked ? "var(--ax-signal, #3b82f6)" : "var(--th-input-border)" }}
+      >
+        <span
+          className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+          style={{ transform: checked ? "translateX(18px)" : "translateX(2px)" }}
+        />
+      </button>
+    </div>
+  );
+}
+
 export default function AgentFormModal({
   isKo,
   locale,
@@ -325,6 +384,11 @@ export default function AgentFormModal({
                 style={inputStyle}
               />
             </div>
+            <AutonomyToggle
+              isLeader={form.role === "team_leader"}
+              checked={form.role === "team_leader" || form.autonomy_enabled}
+              onChange={(next) => setForm({ ...form, autonomy_enabled: next })}
+            />
           </div>
         </div>
 

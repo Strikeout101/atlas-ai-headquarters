@@ -9,6 +9,7 @@ import {
   type AuthMethod,
 } from "../../api";
 import type { TFunction } from "./types";
+import SettingsSection from "./SettingsSection";
 
 interface SecuritySettingsTabProps {
   t: TFunction;
@@ -186,10 +187,10 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
 
   return (
     <>
-      <section className="space-y-4 rounded-xl p-5 sm:p-6" style={sectionStyle}>
-        <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
-          {t({ ko: "이 브라우저", en: "This browser", ja: "このブラウザ", zh: "此浏览器" })}
-        </h3>
+      <SettingsSection
+        title={t({ ko: "이 브라우저", en: "This browser", ja: "このブラウザ", zh: "此浏览器" })}
+        defaultOpen
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <span className="text-xs" style={{ color: "var(--th-text-muted)" }}>
@@ -225,13 +226,12 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
             )}
           </div>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="space-y-4 rounded-xl p-5 sm:p-6" style={sectionStyle}>
+      <SettingsSection
+        title={t({ ko: "로그인 비밀번호", en: "Sign-in password", ja: "サインインパスワード", zh: "登录密码" })}
+      >
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
-            {t({ ko: "로그인 비밀번호", en: "Sign-in password", ja: "サインインパスワード", zh: "登录密码" })}
-          </h3>
           <p className="text-sm leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
             {auth.password_configured
               ? t({
@@ -337,13 +337,12 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
             )}
           </div>
         </form>
-      </section>
+      </SettingsSection>
 
-      <section className="space-y-4 rounded-xl p-5 sm:p-6" style={sectionStyle}>
+      <SettingsSection
+        title={t({ ko: "신뢰된 네트워크", en: "Trusted networks", ja: "信頼済みネットワーク", zh: "受信任网络" })}
+      >
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
-            {t({ ko: "신뢰된 네트워크", en: "Trusted networks", ja: "信頼済みネットワーク", zh: "受信任网络" })}
-          </h3>
           <p className="text-sm leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
             {t({
               ko: "이 네트워크의 브라우저는 자동으로 로그인합니다. 서버의 .env 파일에서 TRUSTED_NETWORKS를 수정하고 ATLAS를 재시작하세요. 게스트나 IoT VLAN은 넣지 마세요.",
@@ -386,7 +385,7 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
             <span style={{ fontFamily: "var(--th-font-mono)" }}>{auth.allowed_hosts.join(", ")}</span>
           </p>
         )}
-      </section>
+      </SettingsSection>
     </>
   );
 }

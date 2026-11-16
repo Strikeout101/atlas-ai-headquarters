@@ -55,14 +55,14 @@ test.describe("ATLAS shell", () => {
   test("command bar jumps to pages and settings tabs", async ({ page }) => {
     await openApp(page);
     await page.keyboard.press("Control+k");
-    const search = page.getByRole("combobox");
+    const search = page.getByPlaceholder("Search pages, actions, agents and tasks…");
     await expect(search).toBeFocused();
     await search.fill("outreach");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/outreach$/);
 
     await page.keyboard.press("Control+k");
-    await page.getByRole("combobox").fill("ollama");
+    await page.getByPlaceholder("Search pages, actions, agents and tasks…").fill("ollama");
     await expect(page.getByRole("option", { name: /Settings › API/ })).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/settings\?tab=api$/);
@@ -79,10 +79,12 @@ test.describe("ATLAS shell", () => {
     await expect(sidebar(page).locator('[aria-current="page"]')).toContainText("Team");
   });
 
-  test("Settings points SSH hosts to Homelab", async ({ page }) => {
+  test("Settings removes the obsolete SSH tab while Homelab remains available", async ({ page }) => {
     await openApp(page, "/settings?tab=ssh");
-    await expect(page.getByText("SSH hosts moved to Homelab")).toBeVisible();
-    await page.getByRole("button", { name: "Open Homelab" }).click();
+    await expect(page.getByRole("tab", { name: "General", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page).toHaveURL(/tab=general/);
+    await expect(page.getByRole("tab", { name: "SSH hosts" })).toHaveCount(0);
+    await sidebar(page).getByRole("button", { name: "Homelab", exact: false }).click();
     await expect(page).toHaveURL(/\/homelab$/);
   });
 

@@ -1,5 +1,6 @@
 import { CLI_INFO } from "./constants";
 import type { CliSettingsTabProps } from "./types";
+import SettingsSection from "./SettingsSection";
 
 export default function CliSettingsTab({
   t,
@@ -12,21 +13,17 @@ export default function CliSettingsTab({
   onRefresh,
 }: CliSettingsTabProps) {
   return (
-    <section
-      className="rounded-xl p-5 sm:p-6 space-y-5"
-      style={{ background: "var(--th-card-bg)", border: "1px solid var(--th-card-border)" }}
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold" style={{ color: "var(--th-text-primary)" }}>
-          {t({ ko: "CLI 도구 상태", en: "CLI Tool Status", ja: "CLI ツール状態", zh: "CLI 工具状态" })}
-        </h3>
+    <SettingsSection
+      title={t({ ko: "CLI 도구 상태", en: "CLI tools and models", ja: "CLI ツールとモデル", zh: "CLI 工具与模型" })}
+      defaultOpen
+      actions={
         <button onClick={onRefresh} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-          🔄 {t({ ko: "새로고침", en: "Refresh", ja: "更新", zh: "刷新" })}
+          {t({ ko: "새로고침", en: "Refresh", ja: "更新", zh: "刷新" })}
         </button>
-      </div>
-
+      }
+    >
       {cliStatus ? (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
           {Object.entries(cliStatus)
             .filter(([provider]) => !["copilot", "antigravity"].includes(provider))
             .map(([provider, status]) => {
@@ -267,6 +264,6 @@ export default function CliSettingsTab({
           zh: "每个代理的 CLI 工具可在 Office 中点击代理后修改。Copilot/Antigravity 模型请在 OAuth 页签配置。",
         })}
       </p>
-    </section>
+    </SettingsSection>
   );
 }

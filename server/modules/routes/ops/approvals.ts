@@ -3,10 +3,25 @@ import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret } from "../../../oauth/helpers.ts";
 
 /**
- * One list of everything waiting on the owner's approval, for the Today page.
+ * One list of everything waiting on the owner's approval (including tasks agents suggested), for the Today page.
  * Each item is still decided through its own endpoint (listed in `decide_path`), so approval rules stay in one place.
  */
 export type PendingApproval =
+  | {
+      kind: "business_email";
+      id: string;
+      created_at: number;
+      task_id: string;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: "tech" | "rental";
+      sender: string;
+      recipient: string;
+      subject: string;
+      body: string;
+      decide_path: string;
+    }
   | {
       kind: "ssh_command";
       id: string;
@@ -34,6 +49,22 @@ export type PendingApproval =
       requested_reasoning_level: string | null;
       reason: string;
       decide_path: string;
+    }
+  | {
+      /** A task an agent suggested on its own. There is no task yet; approving creates one. */
+      kind: "task_proposal";
+      id: string;
+      created_at: number;
+      task_id: null;
+      task_title: null;
+      agent_id: string;
+      agent_name: string | null;
+      title: string;
+      description: string;
+      reason: string;
+      project_id: string | null;
+      project_name: string | null;
+      decide_path: string;
     };
 
 function tableExists(db: DatabaseSync, name: string): boolean {
@@ -52,6 +83,34 @@ export function listPendingApprovals(db: DatabaseSync, limit = 100): PendingAppr
   const agentJoin = hasAgents ? "LEFT JOIN agents a ON a.id = r.agent_id" : "";
   const taskTitle = hasTasks ? "t.title" : "NULL";
   const agentName = hasAgents ? "a.name" : "NULL";
+
+  if (tableExists(db, "business_email_approvals")) {
+    const rows = db
+      .prepare(
+        `SELECT r.id,r.created_at,r.task_id,r.agent_id,r.business,r.sender,r.recipient,r.subject,r.body,
+      ${taskTitle} AS task_title, ${agentName} AS agent_name FROM business_email_approvals r ${taskJoin} ${agentJoin}
+      WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows) {
+      const id = String(row.id);
+      items.push({
+        kind: "business_email",
+        id,
+        created_at: Number(row.created_at),
+        task_id: String(row.task_id),
+        task_title: (row.task_title as string | null) ?? null,
+        agent_id: String(row.agent_id),
+        agent_name: (row.agent_name as string | null) ?? null,
+        business: row.business as "tech" | "rental",
+        sender: String(row.sender),
+        recipient: String(row.recipient),
+        subject: String(row.subject),
+        body: String(row.body),
+        decide_path: `/api/business/email-approvals/${encodeURIComponent(id)}/decide`,
+      });
+    }
+  }
 
   if (tableExists(db, "homelab_ssh_approvals")) {
     const hasTargets = tableExists(db, "homelab_ssh_targets");
@@ -114,6 +173,37 @@ export function listPendingApprovals(db: DatabaseSync, limit = 100): PendingAppr
         requested_reasoning_level: (row.requested_reasoning_level as string | null) ?? null,
         reason: String(row.reason ?? ""),
         decide_path: `/api/model-upgrades/${encodeURIComponent(id)}/decide`,
+      });
+    }
+  }
+
+  if (tableExists(db, "agent_task_proposals")) {
+    const hasProjects = tableExists(db, "projects");
+    const rows = db
+      .prepare(
+        `SELECT r.id, r.agent_id, r.project_id, r.title, r.description, r.reason, r.created_at,
+          ${agentName} AS agent_name, ${hasProjects ? "p.name" : "NULL"} AS project_name
+        FROM agent_task_proposals r ${agentJoin}
+        ${hasProjects ? "LEFT JOIN projects p ON p.id = r.project_id" : ""}
+        WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows) {
+      const id = String(row.id);
+      items.push({
+        kind: "task_proposal",
+        id,
+        created_at: Number(row.created_at),
+        task_id: null,
+        task_title: null,
+        agent_id: String(row.agent_id),
+        agent_name: (row.agent_name as string | null) ?? null,
+        title: String(row.title),
+        description: String(row.description ?? ""),
+        reason: String(row.reason ?? ""),
+        project_id: (row.project_id as string | null) ?? null,
+        project_name: (row.project_name as string | null) ?? null,
+        decide_path: `/api/agent-proposals/${encodeURIComponent(id)}/decide`,
       });
     }
   }

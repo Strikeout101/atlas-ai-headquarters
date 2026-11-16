@@ -1,17 +1,27 @@
-import { request } from "./core";
+import { businessEmailApi } from "./business-email";
+import { isApiRequestError, post, request } from "./core";
 import { decideHomelabSshApproval } from "./homelab";
 import { decideModelUpgrade } from "./model-routing";
 
 interface PendingApprovalBase {
   id: string;
   created_at: number;
-  task_id: string;
+  /** Null only for agent task suggestions, which have no task until approved. */
+  task_id: string | null;
   task_title: string | null;
   agent_id: string;
   agent_name: string | null;
 }
 
 export type PendingApproval =
+  | (PendingApprovalBase & {
+      kind: "business_email";
+      business: "tech" | "rental";
+      sender: string;
+      recipient: string;
+      subject: string;
+      body: string;
+    })
   | (PendingApprovalBase & {
       kind: "ssh_command";
       target_id: string;
@@ -25,9 +35,23 @@ export type PendingApproval =
       requested_model: string | null;
       requested_reasoning_level: string | null;
       reason: string;
+    })
+  | (PendingApprovalBase & {
+      kind: "task_proposal";
+      task_id: null;
+      title: string;
+      description: string;
+      reason: string;
+      project_id: string | null;
+      project_name: string | null;
     });
 
-/** Everything waiting on the owner's approval: SSH commands that could change a host, and model upgrades. */
+/** Approve creates a planned task assigned to the agent who suggested it; dismiss is remembered so it is not suggested again. */
+export function decideAgentProposal(id: string, approve: boolean): Promise<{ ok: boolean; task_id?: string }> {
+  return post(`/api/agent-proposals/${encodeURIComponent(id)}/decide`, { approve });
+}
+
+/** Everything waiting on the owner's approval: emails, SSH commands that could change a host, model upgrades and tasks agents suggested. */
 export async function getPendingApprovals(): Promise<PendingApproval[]> {
   const result = await request<{ items?: PendingApproval[] }>("/api/approvals");
   return Array.isArray(result.items) ? result.items : [];
@@ -35,7 +59,25 @@ export async function getPendingApprovals(): Promise<PendingApproval[]> {
 
 /** Decides one approval through the same endpoint its own page uses. */
 export async function decidePendingApproval(item: PendingApproval, approve: boolean): Promise<void> {
-  if (item.kind === "ssh_command") {
+  if (item.kind === "business_email") {
+    const result = await businessEmailApi.decide(item.id, approve).catch((cause: unknown) => {
+      if (approve && !isApiRequestError(cause)) {
+        throw new Error(
+          "The connection ended before delivery could be confirmed. Do not create another message; check Email delivery history first.",
+        );
+      }
+      throw cause;
+    });
+    if (!result.ok || (approve && result.item.status !== "sent")) {
+      throw new Error(
+        result.item.status === "unknown"
+          ? "Email delivery is uncertain. Do not resend; check Email delivery history first."
+          : `Email was not sent (${result.item.error_code ?? result.error ?? result.item.status}). Check Email delivery history.`,
+      );
+    }
+  } else if (item.kind === "task_proposal") {
+    await decideAgentProposal(item.id, approve);
+  } else if (item.kind === "ssh_command") {
     await decideHomelabSshApproval(item.id, approve);
   } else {
     await decideModelUpgrade(item.id, approve, approve ? "Approved by owner from Today" : "Denied by owner from Today");

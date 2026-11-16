@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SettingsSection from "./SettingsSection";
 import { API_TYPE_PRESETS } from "./constants";
 import ApiAssignModal from "./ApiAssignModal";
 import type { ApiStateBundle, TFunction } from "./types";
@@ -59,11 +60,11 @@ export default function ApiSettingsTab({ t, localeTag, apiState }: ApiSettingsTa
 
   return (
     <>
-      <section className="space-y-4 rounded-xl border border-slate-700/50 bg-slate-800/60 p-4 sm:p-5">
+      <SettingsSection
+        title={t({ ko: "API 프로바이더", en: "API providers", ja: "API プロバイダー", zh: "API 提供方" })}
+        defaultOpen
+      >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-300">
-            {t({ ko: "API 프로바이더", en: "API Providers", ja: "API プロバイダー", zh: "API 提供方" })}
-          </h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -548,7 +549,7 @@ export default function ApiSettingsTab({ t, localeTag, apiState }: ApiSettingsTa
             })}
           </div>
         )}
-      </section>
+      </SettingsSection>
 
       <ApiAssignModal t={t} localeTag={localeTag} apiState={apiState} />
     </>
