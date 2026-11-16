@@ -213,26 +213,6 @@ test.describe("CI public API surface", () => {
       expect(Array.isArray(projectDetailJson.tasks)).toBe(true);
       expect(Array.isArray(projectDetailJson.reports)).toBe(true);
 
-      const workflowPacksRes = await request.get("/api/workflow-packs");
-      const workflowPacksJson = await expectOkJson<{ packs: Array<{ key: string }> }>(
-        workflowPacksRes,
-        "GET /api/workflow-packs",
-      );
-      expect(workflowPacksJson.packs.length).toBeGreaterThan(0);
-
-      const workflowRouteRes = await request.post("/api/workflow/route", {
-        data: {
-          text: "CI build fix and API surface verification",
-          project_id: projectId,
-        },
-      });
-      const workflowRouteJson = await expectOkJson<{ packKey: string; confidence: number }>(
-        workflowRouteRes,
-        "POST /api/workflow/route",
-      );
-      expect(typeof workflowRouteJson.packKey).toBe("string");
-      expect(typeof workflowRouteJson.confidence).toBe("number");
-
       const createTaskRes = await request.post("/api/tasks", {
         data: {
           title: `ci-public-task-${seed}`,

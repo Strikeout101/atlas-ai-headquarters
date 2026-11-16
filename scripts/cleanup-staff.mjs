@@ -31,10 +31,6 @@ function printUsage() {
   console.log("  --all              Run every report and reset break agents");
 }
 
-function isPackSeed(agentId) {
-  return /^[a-z_]+-seed-\d+$/i.test(agentId);
-}
-
 function countByRole(rows, role) {
   return rows.filter((row) => row.role === role).length;
 }
@@ -51,8 +47,7 @@ function reportBreakAgents(db) {
 
   console.log(`Agents in break status (${rows.length})`);
   for (const row of rows) {
-    const seedLabel = isPackSeed(row.id) ? " [pack-seed]" : "";
-    console.log(`- ${row.name} (${row.role}${row.cli_provider ? `, ${row.cli_provider}` : ""})${seedLabel}`);
+    console.log(`- ${row.name} (${row.role}${row.cli_provider ? `, ${row.cli_provider}` : ""})`);
   }
   return rows;
 }
@@ -72,20 +67,14 @@ function resetBreakAgents(db) {
 
 function reportRoles(db) {
   const rows = db.prepare("SELECT id, name, role, cli_provider, stats_tasks_done FROM agents ORDER BY name ASC").all();
-  const coreAgents = rows.filter((row) => !isPackSeed(row.id));
-  const seedAgents = rows.filter((row) => isPackSeed(row.id));
   const topAgents = [...rows].sort((a, b) => (b.stats_tasks_done ?? 0) - (a.stats_tasks_done ?? 0)).slice(0, 5);
 
   console.log("Role composition");
-  console.log(`- core team_leader: ${countByRole(coreAgents, "team_leader")}`);
-  console.log(`- core senior: ${countByRole(coreAgents, "senior")}`);
-  console.log(`- core junior: ${countByRole(coreAgents, "junior")}`);
-  console.log(`- core intern: ${countByRole(coreAgents, "intern")}`);
-  console.log(`- core total: ${coreAgents.length}`);
-  console.log(`- seed team_leader: ${countByRole(seedAgents, "team_leader")}`);
-  console.log(`- seed senior: ${countByRole(seedAgents, "senior")}`);
-  console.log(`- seed junior: ${countByRole(seedAgents, "junior")}`);
-  console.log(`- seed total: ${seedAgents.length}`);
+  console.log(`- team_leader: ${countByRole(rows, "team_leader")}`);
+  console.log(`- senior: ${countByRole(rows, "senior")}`);
+  console.log(`- junior: ${countByRole(rows, "junior")}`);
+  console.log(`- intern: ${countByRole(rows, "intern")}`);
+  console.log(`- total: ${rows.length}`);
 
   if (topAgents.length > 0) {
     console.log("Top completed-task agents");
@@ -114,7 +103,7 @@ function reportDuplicates(db) {
   for (const [name, bucket] of duplicates) {
     console.log(`- ${name}`);
     for (const row of bucket) {
-      const scope = isPackSeed(row.id) ? `pack-seed:${row.id}` : `core:${row.id.slice(0, 8)}`;
+      const scope = row.id.slice(0, 8);
       console.log(`  ${row.role}${row.cli_provider ? ` / ${row.cli_provider}` : ""} / ${scope}`);
     }
   }

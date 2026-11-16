@@ -4,10 +4,9 @@ import {
   type MessengerChannelType,
   type MessengerChannelsConfig,
   type MessengerSessionConfig,
-  type WorkflowPackKey,
 } from "../../../types";
 import type { ChannelSettingsTabProps } from "../types";
-import { CHANNEL_META, isWorkflowPackKey } from "./constants";
+import { CHANNEL_META } from "./constants";
 
 export type ChatRow = {
   key: string;
@@ -29,7 +28,6 @@ export type ChatEditorState = {
   targetId: string;
   enabled: boolean;
   agentId: string;
-  workflowPackKey: WorkflowPackKey;
   receiveEnabled: boolean;
 };
 
@@ -63,7 +61,6 @@ function normalizeSession(
   const id = (session.id || "").trim() || `${channel}-${index + 1}`;
   const agentId = session.agentId?.trim() || "";
   const token = session.token?.trim() || "";
-  const workflowPackKey = isWorkflowPackKey(session.workflowPackKey) ? session.workflowPackKey : "development";
   return {
     id,
     name: session.name?.trim() || `${CHANNEL_META[channel].label} Session ${index + 1}`,
@@ -71,7 +68,6 @@ function normalizeSession(
     enabled: session.enabled !== false,
     token: token || undefined,
     agentId: agentId || undefined,
-    workflowPackKey,
   };
 }
 
@@ -113,26 +109,6 @@ export function createEditorState(channelsConfig: MessengerChannelsConfig): Chat
     targetId: "",
     enabled: true,
     agentId: "",
-    workflowPackKey: "development",
     receiveEnabled: channelsConfig.telegram.receiveEnabled !== false,
   };
-}
-
-export function defaultWorkflowPackLabel(t: ChannelSettingsTabProps["t"], key: WorkflowPackKey): string {
-  switch (key) {
-    case "development":
-      return t({ ko: "개발", en: "Development", ja: "開発", zh: "开发" });
-    case "novel":
-      return t({ ko: "소설", en: "Novel", ja: "小説", zh: "小说" });
-    case "report":
-      return t({ ko: "보고서", en: "Report", ja: "レポート", zh: "报告" });
-    case "video_preprod":
-      return t({ ko: "영상기획", en: "Video Preprod", ja: "映像企画", zh: "视频策划" });
-    case "web_research_report":
-      return t({ ko: "웹서치+리포트", en: "Web Research", ja: "Web調査", zh: "网页调研" });
-    case "roleplay":
-      return t({ ko: "롤플레이", en: "Roleplay", ja: "ロールプレイ", zh: "角色扮演" });
-    default:
-      return key;
-  }
 }

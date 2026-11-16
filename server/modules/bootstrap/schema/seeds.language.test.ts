@@ -61,10 +61,31 @@ describe("default agent names", () => {
     insert.run("a3", "Sage", "세이지", "planning", "team_leader");
     insert.run("a4", "Bolt", "볼트", "qa", "senior"); // moved to QA by the owner: not a default any more
     insert.run("a5", "My Lead", "", "operations", "team_leader"); // renamed by the owner
-    insert.run("pack-1", "Sage", "세이지", "planning", "team_leader");
-    db.prepare("UPDATE agents SET workflow_pack_key = 'report' WHERE id = 'pack-1'").run();
     return db;
   }
+
+  it("does not bring back default agents the owner deleted when the server restarts", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const db = freshDb();
+    applyDefaultSeeds(db);
+    db.prepare("DELETE FROM agents WHERE name IN ('Claire', 'Felix', 'Priya')").run();
+    applyDefaultSeeds(db);
+    const names = (db.prepare("SELECT name FROM agents").all() as Array<{ name: string }>).map((r) => r.name);
+    expect(names).not.toContain("Claire");
+    expect(names).not.toContain("Felix");
+    expect(names).not.toContain("Priya");
+  });
+
+  it("leaves an existing install alone even before the one-time top-up was recorded", () => {
+    const db = legacyInstall();
+    db.prepare("DELETE FROM settings WHERE key = 'laterDefaultAgentsAdded'").run();
+    db.prepare(
+      "INSERT INTO agents (id, name, name_ko, department_id, role, cli_provider, personality, workflow_pack_key) VALUES ('v', 'Victor', '', 'qa', 'team_leader', 'codex', 'x', 'development')",
+    ).run();
+    const before = (db.prepare("SELECT COUNT(*) AS n FROM agents").get() as { n: number }).n;
+    applyDefaultSeeds(db);
+    expect((db.prepare("SELECT COUNT(*) AS n FROM agents").get() as { n: number }).n).toBe(before);
+  });
 
   it("seeds a new install with names and matched, pinned headshots", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -82,7 +103,7 @@ describe("default agent names", () => {
     expect(new Set(rows.map((r) => r.sprite_number)).size).toBe(DEFAULT_AGENTS.length);
   });
 
-  it("renames untouched default agents, keeps DORO's face, and leaves owner changes and pack agents alone", () => {
+  it("renames untouched default agents, keeps DORO's face, and leaves owner changes alone", () => {
     const db = legacyInstall();
     applyDefaultSeeds(db);
     const byId = (id: string) =>
@@ -96,7 +117,6 @@ describe("default agent names", () => {
     expect(byId("a3").name).toBe("Adrian");
     expect(byId("a4").name).toBe("Bolt");
     expect(byId("a5").name).toBe("My Lead");
-    expect(byId("pack-1").name).toBe("Sage");
     // Running again changes nothing.
     applyDefaultSeeds(db);
     expect(byId("a1").name).toBe("Marcus");

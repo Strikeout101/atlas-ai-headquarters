@@ -10,31 +10,16 @@ import type {
   TaskLog,
   TaskStatus,
   TaskType,
-  WorkflowPackKey,
 } from "../types";
 
 // Departments
-export async function getDepartments(options?: {
-  workflowPackKey?: WorkflowPackKey;
-  includeSeed?: boolean;
-}): Promise<Department[]> {
-  const params = new URLSearchParams();
-  if (options?.workflowPackKey) params.set("workflow_pack_key", options.workflowPackKey);
-  if (options?.includeSeed) params.set("include_seed", "1");
-  const query = params.toString();
-  const j = await request<{ departments: Department[] }>(`/api/departments${query ? `?${query}` : ""}`);
+export async function getDepartments(): Promise<Department[]> {
+  const j = await request<{ departments: Department[] }>("/api/departments");
   return j.departments;
 }
 
-export async function getDepartment(
-  id: string,
-  options?: { workflowPackKey?: WorkflowPackKey; includeSeed?: boolean },
-): Promise<{ department: Department; agents: Agent[] }> {
-  const params = new URLSearchParams();
-  if (options?.workflowPackKey) params.set("workflow_pack_key", options.workflowPackKey);
-  if (options?.includeSeed) params.set("include_seed", "1");
-  const query = params.toString();
-  return request(`/api/departments/${id}${query ? `?${query}` : ""}`);
+export async function getDepartment(id: string): Promise<{ department: Department; agents: Agent[] }> {
+  return request(`/api/departments/${id}`);
 }
 
 export async function createDepartment(data: {
@@ -47,7 +32,6 @@ export async function createDepartment(data: {
   color?: string;
   description?: string;
   prompt?: string;
-  workflow_pack_key?: WorkflowPackKey;
 }): Promise<Department> {
   const j = await request<{ department: Department }>("/api/departments", {
     method: "POST",
@@ -64,40 +48,22 @@ export async function updateDepartment(
       Department,
       "name" | "name_ko" | "name_ja" | "name_zh" | "icon" | "color" | "description" | "prompt" | "sort_order"
     >
-  > & { workflow_pack_key?: WorkflowPackKey },
+  >,
 ): Promise<void> {
-  const params = new URLSearchParams();
-  if (data.workflow_pack_key) params.set("workflow_pack_key", data.workflow_pack_key);
-  const query = params.toString();
-  await patch(`/api/departments/${id}${query ? `?${query}` : ""}`, data);
+  await patch(`/api/departments/${id}`, data);
 }
 
-export async function deleteDepartment(id: string, options?: { workflowPackKey?: WorkflowPackKey }): Promise<void> {
-  const params = new URLSearchParams();
-  if (options?.workflowPackKey) params.set("workflow_pack_key", options.workflowPackKey);
-  const query = params.toString();
-  await del(`/api/departments/${id}${query ? `?${query}` : ""}`);
+export async function deleteDepartment(id: string): Promise<void> {
+  await del(`/api/departments/${id}`);
 }
 
-export async function reorderDepartments(
-  orders: { id: string; sort_order: number }[],
-  options?: { workflowPackKey?: WorkflowPackKey },
-): Promise<void> {
-  const params = new URLSearchParams();
-  if (options?.workflowPackKey) params.set("workflow_pack_key", options.workflowPackKey);
-  const query = params.toString();
-  await patch(`/api/departments/reorder${query ? `?${query}` : ""}`, {
-    orders,
-    ...(options?.workflowPackKey ? { workflow_pack_key: options.workflowPackKey } : {}),
-  });
+export async function reorderDepartments(orders: { id: string; sort_order: number }[]): Promise<void> {
+  await patch("/api/departments/reorder", { orders });
 }
 
 // Agents
-export async function getAgents(options?: { includeSeed?: boolean }): Promise<Agent[]> {
-  const params = new URLSearchParams();
-  if (options?.includeSeed) params.set("include_seed", "1");
-  const q = params.toString();
-  const j = await request<{ agents: Agent[] }>(`/api/agents${q ? "?" + q : ""}`);
+export async function getAgents(): Promise<Agent[]> {
+  const j = await request<{ agents: Agent[] }>("/api/agents");
   return j.agents;
 }
 
@@ -138,7 +104,6 @@ export async function updateAgent(
       | "personality"
     >
   > & {
-    workflow_pack_key?: WorkflowPackKey;
     force_planning_leader_override?: boolean;
   },
 ): Promise<void> {
@@ -157,7 +122,6 @@ export async function createAgent(data: {
   sprite_number?: number | null;
   personality: string | null;
   autonomy_enabled?: number;
-  workflow_pack_key?: WorkflowPackKey;
 }): Promise<Agent> {
   const j = (await post("/api/agents", data)) as { ok: boolean; agent: Agent };
   return j.agent;
@@ -200,14 +164,12 @@ export async function getTasks(filters?: {
   department_id?: string;
   agent_id?: string;
   project_id?: string;
-  workflow_pack_key?: WorkflowPackKey;
 }): Promise<Task[]> {
   const params = new URLSearchParams();
   if (filters?.status) params.set("status", filters.status);
   if (filters?.department_id) params.set("department_id", filters.department_id);
   if (filters?.agent_id) params.set("agent_id", filters.agent_id);
   if (filters?.project_id) params.set("project_id", filters.project_id);
-  if (filters?.workflow_pack_key) params.set("workflow_pack_key", filters.workflow_pack_key);
   const q = params.toString();
   const j = await request<{ tasks: Task[] }>(`/api/tasks${q ? "?" + q : ""}`);
   return j.tasks;
@@ -226,7 +188,6 @@ export async function createTask(input: {
   project_id?: string;
   project_path?: string;
   assigned_agent_id?: string;
-  workflow_pack_key?: WorkflowPackKey;
   workflow_meta_json?: Record<string, unknown> | string;
   output_format?: string;
 }): Promise<string> {
@@ -247,7 +208,6 @@ export async function updateTask(
       | "department_id"
       | "project_id"
       | "project_path"
-      | "workflow_pack_key"
       | "workflow_meta_json"
       | "output_format"
       | "hidden"
@@ -383,7 +343,6 @@ export async function createProject(input: {
   name: string;
   project_path: string;
   core_goal: string;
-  default_pack_key?: WorkflowPackKey;
   create_path_if_missing?: boolean;
   github_repo?: string;
   assignment_mode?: "auto" | "manual";
@@ -395,7 +354,7 @@ export async function createProject(input: {
 
 export async function updateProject(
   id: string,
-  patchData: Partial<Pick<Project, "name" | "project_path" | "core_goal" | "default_pack_key">> & {
+  patchData: Partial<Pick<Project, "name" | "project_path" | "core_goal">> & {
     create_path_if_missing?: boolean;
     github_repo?: string | null;
     assignment_mode?: "auto" | "manual";

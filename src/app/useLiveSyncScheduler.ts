@@ -12,7 +12,6 @@ type UseLiveSyncSchedulerParams = {
   setAgents: Dispatch<SetStateAction<Agent[]>>;
   setStats: Dispatch<SetStateAction<CompanyStats | null>>;
   setDecisionInboxItems: Dispatch<SetStateAction<DecisionInboxItem[]>>;
-  shouldIncludeSeedAgents?: () => boolean;
 };
 
 export function useLiveSyncScheduler({
@@ -20,7 +19,6 @@ export function useLiveSyncScheduler({
   setAgents,
   setStats,
   setDecisionInboxItems,
-  shouldIncludeSeedAgents,
 }: UseLiveSyncSchedulerParams): (delayMs?: number) => void {
   const liveSyncInFlightRef = useRef(false);
   const liveSyncQueuedRef = useRef(false);
@@ -32,13 +30,7 @@ export function useLiveSyncScheduler({
       return;
     }
     liveSyncInFlightRef.current = true;
-    const includeSeedAgents = shouldIncludeSeedAgents?.() === true;
-    Promise.all([
-      api.getTasks(),
-      api.getAgents({ includeSeed: includeSeedAgents }),
-      api.getStats(),
-      api.getDecisionInbox(),
-    ])
+    Promise.all([api.getTasks(), api.getAgents(), api.getStats(), api.getDecisionInbox()])
       .then(([nextTasks, nextAgents, nextStats, nextDecisionItems]) => {
         setTasks((prev) => (areTaskListsEquivalent(prev, nextTasks) ? prev : nextTasks));
         setAgents((prev) => (areAgentListsEquivalent(prev, nextAgents) ? prev : nextAgents));
@@ -59,7 +51,7 @@ export function useLiveSyncScheduler({
         liveSyncQueuedRef.current = false;
         setTimeout(() => runLiveSync(), 120);
       });
-  }, [setAgents, setDecisionInboxItems, setStats, setTasks, shouldIncludeSeedAgents]);
+  }, [setAgents, setDecisionInboxItems, setStats, setTasks]);
 
   const scheduleLiveSync = useCallback(
     (delayMs = 120) => {

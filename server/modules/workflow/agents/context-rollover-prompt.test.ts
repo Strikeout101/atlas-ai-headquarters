@@ -9,7 +9,6 @@ describe("context rollover prompt", () => {
         title: "Finish the feature",
         checkpointText: `Goal: implement feature\n${"prior detail ".repeat(1500)}\nRemaining: run tests`,
         contextWindowTokens: 4096,
-        workflowGuidance: "Follow the coding workflow",
         departmentSharedPrompt: "Follow department rules",
         taskToolsPath: "C:/claw-empire/scripts/claw-agent-tool.mjs",
         worktreeBranch: "climpire/task-1",

@@ -1,5 +1,5 @@
 import type { Lang } from "../../../types/lang.ts";
-import { getDepartmentPromptForPack } from "../../workflow/packs/department-scope.ts";
+import { getDepartmentPrompt } from "../../workflow/department-lookup.ts";
 import type { AgentRow } from "./direct-chat.ts";
 import type { L10n } from "./language-policy.ts";
 import type { SubtaskRow } from "./subtask-summary.ts";
@@ -17,7 +17,7 @@ interface PromptDeps {
   l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   resolveLang: (text?: string, fallback?: Lang) => Lang;
-  getDeptName: (deptId: string, workflowPackKey?: string | null) => string;
+  getDeptName: (deptId: string) => string;
   getDeptRoleConstraint: (deptId: string, deptName: string) => string;
   getRecentConversationContext: (agentId: string, limit?: number) => string;
   getAgentDisplayName: (agent: AgentRow, lang: string) => string;
@@ -74,16 +74,16 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
       blocked: "🔒",
     };
 
-    const parentDept = db
-      .prepare("SELECT department_id, workflow_pack_key FROM tasks WHERE id = ?")
-      .get(parentTask.id) as { department_id: string | null; workflow_pack_key: string | null } | undefined;
+    const parentDept = db.prepare("SELECT department_id FROM tasks WHERE id = ?").get(parentTask.id) as
+      | { department_id: string | null }
+      | undefined;
 
     const subtaskLines = allSubtasks
       .map((st) => {
         const icon = statusIcon[st.status] || "⏳";
         const dept = st.target_department_id
-          ? getDeptName(st.target_department_id, parentDept?.workflow_pack_key ?? null)
-          : getDeptName(parentDept?.department_id ?? "", parentDept?.workflow_pack_key ?? null);
+          ? getDeptName(st.target_department_id)
+          : getDeptName(parentDept?.department_id ?? "");
         const marker = assignedIds.has(st.id)
           ? pickL(l([" ← 당신의 담당"], [" <- assigned to you"], [" ← あなたの担당"], [" <- 你的负责项"]), lang)
           : "";
@@ -98,8 +98,8 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
       const artifactSections: string[] = [];
       for (const sibling of completedSiblings) {
         const deptName = sibling.target_department_id
-          ? getDeptName(sibling.target_department_id, parentDept?.workflow_pack_key ?? null)
-          : getDeptName(parentDept?.department_id ?? "", parentDept?.workflow_pack_key ?? null);
+          ? getDeptName(sibling.target_department_id)
+          : getDeptName(parentDept?.department_id ?? "");
 
         if (sibling.delegated_task_id) {
           // Delegated subtask — collect logs from delegated task
@@ -152,7 +152,7 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
         .reverse()
         .join("\n  ");
       if (parentLogSummary) {
-        const originDeptName = getDeptName(parentDept?.department_id ?? "", parentDept?.workflow_pack_key ?? null);
+        const originDeptName = getDeptName(parentDept?.department_id ?? "");
         artifactSections.unshift(
           `[${originDeptName}] ${parentTask.title} (origin task summary)\n  ${parentLogSummary}`,
         );
@@ -174,53 +174,9 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
       { team_leader: "Team Leader", senior: "Senior", junior: "Junior", intern: "Intern" }[execAgent.role] ||
       execAgent.role;
     const deptConstraint = getDeptRoleConstraint(targetDeptId, targetDeptName);
-    const deptPromptRaw = getDepartmentPromptForPack(
-      db as any,
-      parentDept?.workflow_pack_key ?? "development",
-      targetDeptId,
-    );
+    const deptPromptRaw = getDepartmentPrompt(db as any, targetDeptId);
     const deptPrompt = typeof deptPromptRaw === "string" ? deptPromptRaw.trim() : "";
     const deptPromptBlock = deptPrompt ? `[Department Shared Prompt]\n${deptPrompt}` : "";
-    const videoRuntimeRuleBlock =
-      parentDept?.workflow_pack_key === "video_preprod"
-        ? pickL(
-            l(
-              [
-                "[Video Runtime Rules]",
-                "- 렌더링 엔진은 반드시 Remotion을 사용하세요. ffmpeg 단독 합성/다른 생성기로 대체 금지.",
-                "- Python(moviepy/Pillow) 기반 렌더링은 금지됩니다.",
-                "- `remotion-dev/skills#remotion-best-practices` 스킬은 시스템이 자동 설치/학습 처리합니다.",
-                "- 산출물은 mp4 파일로 렌더링하고 파일 경로/용량 검증을 결과에 포함하세요.",
-                "- 화면 텍스트는 반드시 정제하세요: `\\n`/`\\t`/백틱/마크다운 기호를 문자 그대로 노출 금지.",
-              ],
-              [
-                "[Video Runtime Rules]",
-                "- Rendering engine must be Remotion. Do not replace it with ffmpeg-only stitching or other generators.",
-                "- Python renderers (moviepy/Pillow) are forbidden.",
-                "- `remotion-dev/skills#remotion-best-practices` is auto-installed/recorded by the system when missing.",
-                "- Render a real mp4 artifact and include path/size verification in the result.",
-                "- Sanitize all on-screen copy: never render raw `\\n`/`\\t`, backticks, or markdown symbols literally.",
-              ],
-              [
-                "[Video Runtime Rules]",
-                "- レンダリングエンジンは必ず Remotion を使用し、ffmpeg単体合成や他生成器へ置換しないでください。",
-                "- Python（moviepy/Pillow）系レンダリングは使用禁止です。",
-                "- `remotion-dev/skills#remotion-best-practices` が未導入ならシステムが自動インストール/学習記録します。",
-                "- 実際の mp4 成果物を生成し、パス/サイズ検証を結果に含めてください。",
-                "- 画面テキストは正規化し、`\\n`/`\\t`/バッククォート/Markdown記号の生表示を禁止します。",
-              ],
-              [
-                "[Video Runtime Rules]",
-                "- 渲染引擎必须使用 Remotion，不得替换为仅 ffmpeg 拼接或其他生成器。",
-                "- 禁止使用 Python（moviepy/Pillow）渲染方案。",
-                "- 若缺少 `remotion-dev/skills#remotion-best-practices`，系统会自动安装并记录学习。",
-                "- 必须输出真实 mp4 文件，并在结果中附上路径/大小校验。",
-                "- 屏幕文案必须净化：禁止把 `\\n`/`\\t`/反引号/Markdown 符号按原样显示出来。",
-              ],
-            ),
-            lang,
-          )
-        : "";
     const conversationCtx = getRecentConversationContext(execAgent.id);
     const agentDisplayName = getAgentDisplayName(execAgent, lang);
     const header = pickL(
@@ -286,7 +242,6 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
         execAgent.personality ? `Personality: ${execAgent.personality}` : "",
         deptConstraint,
         deptPromptBlock,
-        videoRuntimeRuleBlock,
         ``,
         finalInstruction,
       ],

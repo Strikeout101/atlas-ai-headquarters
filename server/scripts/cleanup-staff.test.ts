@@ -80,7 +80,7 @@ describe("cleanup-staff script", () => {
       );
       insert.run("core-1", "Nova", "team_leader", "codex", "break", 7);
       insert.run("core-2", "Nova", "senior", "claude", "idle", 4);
-      insert.run("video_preprod-seed-1", "Nova", "junior", "gemini", "idle", 2);
+      insert.run("core-3", "Nova", "junior", "gemini", "idle", 2);
       db.close();
 
       const output = runScript(["--all"], { DB_PATH: dbPath });

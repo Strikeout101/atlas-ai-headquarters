@@ -22,7 +22,6 @@ import { sendProjectProgressReply } from "./direct-chat-progress-summary.ts";
 import { createDirectReplyRuntime } from "./direct-chat-runtime-reply.ts";
 import { createDirectTaskFlow } from "./direct-chat-task-flow.ts";
 import type { AgentRow, DirectChatDeps, PendingProjectBinding } from "./direct-chat-types.ts";
-import { hydrateOfficePackAgentFromSettings } from "./office-pack-agent-hydration.ts";
 
 export function createDirectChatHandlers(deps: DirectChatDeps) {
   const {
@@ -61,9 +60,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
     messageType: string,
     options: DelegationOptions = {},
   ): void {
-    const agent =
-      (db.prepare("SELECT * FROM agents WHERE id = ?").get(agentId) as AgentRow | undefined) ??
-      hydrateOfficePackAgentFromSettings(db, agentId, nowMs);
+    const agent = db.prepare("SELECT * FROM agents WHERE id = ?").get(agentId) as AgentRow | undefined;
     if (!agent) return;
 
     if (agent.status === "offline") {

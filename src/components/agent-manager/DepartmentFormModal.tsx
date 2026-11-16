@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Department, WorkflowPackKey } from "../../types";
+import type { Department } from "../../types";
 import { useI18n } from "../../i18n";
 import * as api from "../../api";
 import { DEPT_BLANK, DEPT_COLORS } from "./constants";
@@ -13,9 +13,6 @@ export default function DepartmentFormModal({
   departments,
   onSave,
   onClose,
-  onSaveDepartment,
-  onDeleteDepartment,
-  workflowPackKey,
 }: {
   locale: string;
   tr: Translator;
@@ -23,23 +20,6 @@ export default function DepartmentFormModal({
   departments: Department[];
   onSave: () => void;
   onClose: () => void;
-  onSaveDepartment?: (input: {
-    mode: "create" | "update";
-    id: string;
-    payload: {
-      name: string;
-      name_ko: string;
-      name_ja: string | null;
-      name_zh: string | null;
-      icon: string;
-      color: string;
-      description: string | null;
-      prompt: string | null;
-      sort_order: number;
-    };
-  }) => Promise<void>;
-  onDeleteDepartment?: (departmentId: string) => Promise<void>;
-  workflowPackKey?: WorkflowPackKey;
 }) {
   const { t } = useI18n();
   const isEdit = !!department;
@@ -93,25 +73,16 @@ export default function DepartmentFormModal({
         sort_order: department?.sort_order ?? nextSortOrder,
       };
       if (isEdit) {
-        if (onSaveDepartment) {
-          await onSaveDepartment({
-            mode: "update",
-            id: department!.id,
-            payload: { ...payload, sort_order: department!.sort_order },
-          });
-        } else {
-          await api.updateDepartment(department!.id, {
-            name: payload.name,
-            name_ko: payload.name_ko,
-            name_ja: payload.name_ja,
-            name_zh: payload.name_zh,
-            icon: payload.icon,
-            color: payload.color,
-            description: payload.description,
-            prompt: payload.prompt,
-            workflow_pack_key: workflowPackKey,
-          });
-        }
+        await api.updateDepartment(department!.id, {
+          name: payload.name,
+          name_ko: payload.name_ko,
+          name_ja: payload.name_ja,
+          name_zh: payload.name_zh,
+          icon: payload.icon,
+          color: payload.color,
+          description: payload.description,
+          prompt: payload.prompt,
+        });
       } else {
         // name 기반 slug 생성, 비라틴 문자만인 경우 dept-N fallback
         const slug = form.name
@@ -126,26 +97,17 @@ export default function DepartmentFormModal({
         while (existingIds.has(deptId)) {
           deptId = `${slug || "dept"}-${suffix++}`;
         }
-        if (onSaveDepartment) {
-          await onSaveDepartment({
-            mode: "create",
-            id: deptId,
-            payload: { ...payload, sort_order: nextSortOrder },
-          });
-        } else {
-          await api.createDepartment({
-            id: deptId,
-            name: payload.name,
-            name_ko: payload.name_ko,
-            name_ja: payload.name_ja ?? "",
-            name_zh: payload.name_zh ?? "",
-            icon: payload.icon,
-            color: payload.color,
-            description: payload.description ?? undefined,
-            prompt: payload.prompt ?? undefined,
-            workflow_pack_key: workflowPackKey,
-          });
-        }
+        await api.createDepartment({
+          id: deptId,
+          name: payload.name,
+          name_ko: payload.name_ko,
+          name_ja: payload.name_ja ?? "",
+          name_zh: payload.name_zh ?? "",
+          icon: payload.icon,
+          color: payload.color,
+          description: payload.description ?? undefined,
+          prompt: payload.prompt ?? undefined,
+        });
       }
       onSave();
       onClose();
@@ -169,11 +131,7 @@ export default function DepartmentFormModal({
   const handleDelete = async () => {
     setSaving(true);
     try {
-      if (onDeleteDepartment) {
-        await onDeleteDepartment(department!.id);
-      } else {
-        await api.deleteDepartment(department!.id, { workflowPackKey });
-      }
+      await api.deleteDepartment(department!.id);
       onSave();
       onClose();
     } catch (e: any) {

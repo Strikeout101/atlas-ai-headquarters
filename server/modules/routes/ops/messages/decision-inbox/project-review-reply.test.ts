@@ -125,7 +125,7 @@ describe("project review reply", () => {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '영상 최종 검토', 'proj-1', 'review', 'video_preprod', NULL, 1, 1)
+          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
 
@@ -134,7 +134,7 @@ describe("project review reply", () => {
       deps.finishReview = vi.fn((taskId: string) => {
         db.prepare("INSERT INTO task_logs (task_id, kind, message, created_at) VALUES (?, 'system', ?, 3000)").run(
           taskId,
-          "Review hold: video artifact gate blocked approval (missing/empty video file). checked=/tmp/video_output/final.mp4",
+          "Review hold: waiting for 2 unfinished subtasks",
         );
       });
 
@@ -156,16 +156,8 @@ describe("project review reply", () => {
       });
       const blockedTasks = (resPayload.body?.blocked_tasks as Array<{ reason?: string }> | undefined) ?? [];
       expect(blockedTasks).toHaveLength(1);
-      expect(blockedTasks[0]?.reason).toBe("video_artifact_missing");
-      const renderSubtasks = db
-        .prepare("SELECT title, target_department_id, status FROM subtasks WHERE task_id = 'task-1'")
-        .all() as Array<{ title: string; target_department_id: string | null; status: string }>;
-      expect(renderSubtasks).toHaveLength(1);
-      expect(renderSubtasks[0]).toMatchObject({
-        title: "[VIDEO_FINAL_RENDER] 최종 영상 렌더링",
-        target_department_id: "dev",
-        status: "pending",
-      });
+      expect(blockedTasks[0]?.reason).toBe("unfinished_subtasks");
+      expect(db.prepare("SELECT COUNT(*) AS n FROM subtasks WHERE task_id = 'task-1'").get()).toEqual({ n: 0 });
       expect((deps.recordProjectReviewDecisionEvent as any).mock.calls[0]?.[0]?.event_type).toBe(
         "start_review_meeting_blocked",
       );
@@ -180,7 +172,7 @@ describe("project review reply", () => {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '영상 최종 검토', 'proj-1', 'review', 'video_preprod', NULL, 1, 1)
+          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
 
@@ -215,72 +207,13 @@ describe("project review reply", () => {
     }
   });
 
-  it("VIDEO_FINAL_RENDER done 서브태스크가 이미 있으면 blocked 시 신규 생성하지 않는다", () => {
-    const db = createDb();
-    try {
-      db.prepare(
-        `
-          INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '영상 최종 검토', 'proj-1', 'review', 'video_preprod', NULL, 1, 1)
-        `,
-      ).run();
-      db.prepare(
-        `
-          INSERT INTO subtasks (id, task_id, title, description, status, target_department_id, created_at)
-          VALUES ('st-render-done', 'task-1', '[VIDEO_FINAL_RENDER] 최종 영상 렌더링', 'done render', 'done', 'dev', 2000)
-        `,
-      ).run();
-
-      const input = createBaseInput(db);
-      const { deps, req, res, resPayload, currentItem, selectedOption } = input;
-      deps.finishReview = vi.fn((taskId: string) => {
-        db.prepare("INSERT INTO task_logs (task_id, kind, message, created_at) VALUES (?, 'system', ?, 3000)").run(
-          taskId,
-          "Review hold: video artifact gate blocked approval (missing/empty video file). checked=/tmp/video_output/final.mp4",
-        );
-      });
-
-      const handled = handleProjectReviewDecisionReply({
-        req,
-        res,
-        currentItem,
-        selectedOption,
-        optionNumber: 1,
-        deps,
-      });
-
-      expect(handled).toBe(true);
-      expect(resPayload.status).toBe(200);
-      expect(resPayload.body).toMatchObject({
-        ok: true,
-        resolved: false,
-        action: "start_project_review_blocked",
-      });
-      const renderSubtasks = db
-        .prepare(
-          "SELECT id, title, target_department_id, status FROM subtasks WHERE task_id = 'task-1' ORDER BY created_at ASC",
-        )
-        .all() as Array<{ id: string; title: string; target_department_id: string | null; status: string }>;
-      expect(renderSubtasks).toHaveLength(1);
-      expect(renderSubtasks[0]).toMatchObject({
-        id: "st-render-done",
-        title: "[VIDEO_FINAL_RENDER] 최종 영상 렌더링",
-        target_department_id: "dev",
-        status: "done",
-      });
-      expect(deps.processSubtaskDelegations).not.toHaveBeenCalled();
-    } finally {
-      db.close();
-    }
-  });
-
   it("위임 prefix가 붙은 VIDEO_FINAL_RENDER 서브태스크가 있으면 신규 생성하지 않는다", () => {
     const db = createDb();
     try {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '영상 최종 검토', 'proj-1', 'review', 'video_preprod', NULL, 1, 1)
+          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
       db.prepare(

@@ -3,9 +3,6 @@ import { notifyTaskStatus } from "../../../../gateway/client.ts";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
 import type { AgentRow } from "../../shared/types.ts";
 import { resolveConstrainedAgentScopeForTask, selectAutoAssignableAgentForTask } from "./execution-run-auto-assign.ts";
-import { buildWorkflowPackExecutionGuidance } from "../../../workflow/packs/execution-guidance.ts";
-import { resolveVideoArtifactSpecForTask } from "../../../workflow/packs/video-artifact.ts";
-import { ensureVideoPreprodRemotionBestPracticesSkill } from "../../../workflow/core/video-skill-bootstrap.ts";
 import { routeTaskModel } from "../../../model-routing.ts";
 import { getContextRollover } from "../../../workflow/agents/context-rollover-store.ts";
 import { buildCompactContextRolloverPrompt } from "../../../workflow/agents/context-rollover-prompt.ts";
@@ -99,7 +96,6 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
           assigned_agent_id: string | null;
           department_id: string | null;
           project_id: string | null;
-          workflow_pack_key: string | null;
           project_path: string | null;
           status: string;
         }
@@ -145,7 +141,6 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     let agentId = task.assigned_agent_id || (req.body?.agent_id as string | undefined);
     if (agentId) {
       const constrainedAgentIds = resolveConstrainedAgentScopeForTask(db as any, {
-        workflow_pack_key: task.workflow_pack_key,
         department_id: task.department_id,
         project_id: task.project_id,
       });
@@ -157,14 +152,13 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
         appendTaskLog(
           id,
           "system",
-          `Assigned agent (${agentId}) is out of scope for workflow pack. Re-selecting by pack rules.`,
+          `Assigned agent (${agentId}) is not assigned to this project. Re-selecting an agent.`,
         );
         agentId = undefined;
       }
     }
     if (!agentId) {
       const autoSelected = selectAutoAssignableAgentForTask(db as any, {
-        workflow_pack_key: task.workflow_pack_key,
         department_id: task.department_id,
         project_id: task.project_id,
       });
@@ -175,11 +169,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
           "UPDATE tasks SET assigned_agent_id = ?, department_id = COALESCE(department_id, ?), status = CASE WHEN status = 'inbox' THEN 'planned' ELSE status END, updated_at = ? WHERE id = ?",
         ).run(agentId, autoSelected.agent.department_id, assignedAt, id);
         db.prepare("UPDATE agents SET current_task_id = ? WHERE id = ?").run(id, agentId);
-        appendTaskLog(
-          id,
-          "system",
-          `Auto-assigned by workflow pack (${autoSelected.packKey}): ${autoSelected.agent.name}`,
-        );
+        appendTaskLog(id, "system", `Auto-assigned: ${autoSelected.agent.name}`);
       }
     }
     if (!agentId) {
@@ -215,18 +205,15 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
           `
       SELECT
         a.*,
-        COALESCE(opd.name, d.name) AS department_name,
-        COALESCE(opd.name_ko, d.name_ko) AS department_name_ko,
-        COALESCE(opd.prompt, d.prompt) AS department_prompt
+        d.name AS department_name,
+        d.name_ko AS department_name_ko,
+        d.prompt AS department_prompt
       FROM agents a
-      LEFT JOIN office_pack_departments opd
-        ON opd.workflow_pack_key = COALESCE(?, 'development')
-       AND opd.department_id = a.department_id
       LEFT JOIN departments d ON a.department_id = d.id
       WHERE a.id = ?
     `,
         )
-        .get(task.workflow_pack_key, agentId) as
+        .get(agentId) as
         | {
             id: string;
             name: string;
@@ -321,14 +308,6 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     if (!["claude", "codex", "gemini", "opencode", "kimi", "copilot", "antigravity", "api"].includes(provider)) {
       return res.status(400).json({ error: "unsupported_provider", provider });
     }
-    ensureVideoPreprodRemotionBestPracticesSkill({
-      db: db as any,
-      nowMs,
-      workflowPackKey: task.workflow_pack_key,
-      provider,
-      taskId: id,
-      appendTaskLog,
-    });
     const executionSession = ensureTaskExecutionSession(id, agentId, provider);
     const pendingInterruptPrompts = loadPendingInterruptPrompts(db as any, id, executionSession.sessionId);
     const interruptPromptBlock = buildInterruptPromptBlock(pendingInterruptPrompts);
@@ -483,18 +462,6 @@ Whenever you complete a subtask, report it in this format:
       ),
       taskLang,
     );
-    const videoArtifactSpec =
-      task.workflow_pack_key === "video_preprod"
-        ? resolveVideoArtifactSpecForTask(db as any, {
-            project_id: task.project_id,
-            project_path: task.project_path,
-            department_id: task.department_id,
-            workflow_pack_key: task.workflow_pack_key,
-          })
-        : null;
-    const workflowPackGuidance = buildWorkflowPackExecutionGuidance(task.workflow_pack_key, taskLang, {
-      videoArtifactRelativePath: videoArtifactSpec?.relativePath,
-    });
 
     const promptOptions = { allowWarningFix: hasExplicitWarningFixRequest(task.title, task.description) };
     const prompt = compactRollover
@@ -504,7 +471,6 @@ Whenever you complete a subtask, report it in this format:
             title: task.title,
             checkpointText: rollover!.checkpointText,
             contextWindowTokens: agent.context_window_tokens,
-            workflowGuidance: workflowPackGuidance,
             departmentConstraint: deptConstraint,
             departmentSharedPrompt: departmentPromptBlock,
             interruptPrompt: interruptPromptBlock,
@@ -525,7 +491,6 @@ Whenever you complete a subtask, report it in this format:
             recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
             `[Task] ${task.title}`,
             task.description ? `\n${task.description}` : "",
-            workflowPackGuidance ? `\n[Workflow Pack Execution Rules]\n${workflowPackGuidance}` : "",
             continuationCtx,
             conversationCtx,
             `\n---`,

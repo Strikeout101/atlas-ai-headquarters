@@ -117,7 +117,7 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/tasks/task-verify/verify-commit");
   });
 
-  it("getTasks는 workflow_pack_key를 포함한 필터 쿼리를 전달한다", async () => {
+  it("passes task filters as query parameters", async () => {
     const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -135,13 +135,12 @@ describe("api client", () => {
       department_id: "planning",
       agent_id: "agent-1",
       project_id: "project-1",
-      workflow_pack_key: "report",
     });
 
     expect(tasks).toEqual([{ id: "task-1", title: "Task 1", status: "inbox" }]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/api/tasks?status=inbox&department_id=planning&agent_id=agent-1&project_id=project-1&workflow_pack_key=report",
+      "/api/tasks?status=inbox&department_id=planning&agent_id=agent-1&project_id=project-1",
     );
   });
 

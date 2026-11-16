@@ -5,8 +5,6 @@ import type { DelegationOptions } from "./project-resolution.ts";
 import type { Lang } from "../../../types/lang.ts";
 import type { L10n } from "./language-policy.ts";
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
-import { resolveWorkflowPackKeyForTask } from "../../workflow/packs/task-pack-resolver.ts";
-import { isWorkflowPackKey } from "../../workflow/packs/definitions.ts";
 import { resolveConstrainedAgentScopeForTask } from "../core/tasks/execution-run-auto-assign.ts";
 import {
   buildDelegateMessage,
@@ -47,7 +45,7 @@ interface TaskDelegationDeps {
   notifyCeo: (content: string, taskId?: string | null, messageType?: string) => void;
   isTaskWorkflowInterrupted: (taskId: string) => boolean;
   hasOpenForeignSubtasks: (taskId: string, targetDeptIds?: string[]) => boolean;
-  processSubtaskDelegations: (taskId: string, opts?: { includeRender?: boolean }) => void;
+  processSubtaskDelegations: (taskId: string) => void;
   startCrossDeptCooperation: (
     mentionedDepts: string[],
     index: number,
@@ -85,15 +83,6 @@ interface TaskDelegationDeps {
 }
 
 export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
-  function inferPackKeyFromAgentId(agentId: string | null | undefined): string | null {
-    const normalized = String(agentId ?? "").trim();
-    if (!normalized) return null;
-    const matched = normalized.match(/^([a-z0-9_]+)-seed-\d+$/i);
-    if (!matched?.[1]) return null;
-    const candidate = matched[1].toLowerCase();
-    return isWorkflowPackKey(candidate) ? candidate : null;
-  }
-
   const {
     db,
     nowMs,
@@ -139,14 +128,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
     const ackDelay = 1000 + Math.random() * 1000;
     setTimeout(() => {
       const selectedProject = resolveProjectFromOptions(options);
-      const explicitPackKey = inferPackKeyFromAgentId(teamLeader.id);
-      const workflowPackKey = resolveWorkflowPackKeyForTask({
-        db: db as any,
-        explicitPackKey,
-        projectId: selectedProject.id,
-      });
       const projectCandidateAgentIds = resolveConstrainedAgentScopeForTask(db as any, {
-        workflow_pack_key: workflowPackKey,
         department_id: leaderDeptId,
         project_id: selectedProject.id,
       });
@@ -173,8 +155,8 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
       }
       db.prepare(
         `
-      INSERT INTO tasks (id, title, description, department_id, assigned_agent_id, project_id, status, priority, task_type, workflow_pack_key, project_path, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'planned', 1, 'general', ?, ?, ?, ?)
+      INSERT INTO tasks (id, title, description, department_id, assigned_agent_id, project_id, status, priority, task_type, project_path, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'planned', 1, 'general', ?, ?, ?)
     `,
       ).run(
         taskId,
@@ -183,7 +165,6 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
         leaderDeptId,
         teamLeader.id,
         selectedProject.id,
-        workflowPackKey,
         detectedPath,
         t,
         t,

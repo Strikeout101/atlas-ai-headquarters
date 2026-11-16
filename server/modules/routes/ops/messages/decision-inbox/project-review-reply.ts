@@ -9,28 +9,9 @@ type ReviewStartBlockedTask = {
 };
 
 function classifyReviewHoldReason(message: string): string {
-  if (message.includes("video artifact gate blocked approval")) return "video_artifact_missing";
-  if (message.includes("VIDEO_FINAL_RENDER")) return "unfinished_subtasks";
   if (message.includes("unfinished subtasks")) return "unfinished_subtasks";
   if (message.includes("collaboration children")) return "collaboration_children_pending";
   return "review_gate_hold";
-}
-
-function buildVideoFinalRenderRequestDescription(taskTitle: string): string {
-  return [
-    "[VIDEO_FINAL_RENDER]",
-    `상위 업무: ${taskTitle}`,
-    "모든 문서/협업 산출물을 취합해 최종 소개 영상을 1회 렌더링하세요.",
-    "최종 렌더링 엔진은 반드시 Remotion만 사용하세요. Python(moviepy/Pillow) 기반 렌더링은 금지됩니다.",
-    "산출물 경로 규칙(project_department_final.mp4)을 지키고, 결과 파일 경로/용량 검증을 보고하세요.",
-    "",
-    "[QUALITY]",
-    "- 목표 길이 55~65초, 8~12 샷 이상 구성",
-    "- 시작 2~4초는 브랜드/마스코트 키비주얼 인트로",
-    "- 정적인 장면 3초 초과 금지, 샷별 모션(카메라/텍스트/레이아웃) 분리",
-    "- 자막/텍스트 safe area(좌우 8%, 상하 10%) 준수",
-    "- 결과 보고에 초 단위 씬 타임라인과 품질 체크리스트 포함",
-  ].join("\n");
 }
 
 export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput): boolean {
@@ -285,7 +266,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
     const reviewTasks = db
       .prepare(
         `
-        SELECT id, title, workflow_pack_key, assigned_agent_id, department_id
+        SELECT id, title, assigned_agent_id, department_id
         FROM tasks
         WHERE project_id = ?
           AND status = 'review'
@@ -296,7 +277,6 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
       .all(projectId) as Array<{
       id: string;
       title: string;
-      workflow_pack_key: string | null;
       assigned_agent_id: string | null;
       department_id: string | null;
     }>;
@@ -350,48 +330,6 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
     }
 
     if (blockedTasks.length > 0) {
-      for (const blocked of blockedTasks) {
-        if (blocked.reason !== "video_artifact_missing" && blocked.reason !== "unfinished_subtasks") continue;
-        const taskRow = reviewTasks.find((task) => task.id === blocked.id);
-        if (!taskRow || taskRow.workflow_pack_key !== "video_preprod") continue;
-        const existingRenderSubtask = db
-          .prepare(
-            `
-            SELECT id
-                 , status
-            FROM subtasks
-            WHERE task_id = ?
-              AND title LIKE '%[VIDEO_FINAL_RENDER]%'
-            ORDER BY created_at DESC
-            LIMIT 1
-          `,
-          )
-          .get(taskRow.id) as { id?: string; status?: string } | undefined;
-        if (existingRenderSubtask?.id) {
-          appendTaskLog(
-            taskRow.id,
-            "system",
-            `Decision inbox: skipped final render subtask auto-create (existing id=${existingRenderSubtask.id}, status=${existingRenderSubtask.status ?? "unknown"})`,
-          );
-          continue;
-        }
-
-        const subtaskId = randomUUID();
-        const createdAt = nowMs();
-        const renderTitle = "[VIDEO_FINAL_RENDER] 최종 영상 렌더링";
-        const renderDescription = buildVideoFinalRenderRequestDescription(taskRow.title);
-        db.prepare(
-          `
-            INSERT INTO subtasks (id, task_id, title, description, status, target_department_id, created_at)
-            VALUES (?, ?, ?, ?, 'pending', 'dev', ?)
-          `,
-        ).run(subtaskId, taskRow.id, renderTitle, renderDescription, createdAt);
-        appendTaskLog(taskRow.id, "system", "Decision inbox: auto-created final render subtask (target=dev)");
-        const insertedSubtask = db.prepare("SELECT * FROM subtasks WHERE id = ?").get(subtaskId);
-        broadcast("subtask_update", insertedSubtask);
-        processSubtaskDelegations?.(taskRow.id, { includeRender: true });
-      }
-
       const blockedSummary = `팀장 회의 시작 보류 (${blockedTasks.length}건): ${blockedTasks.map((task) => task.title).join(", ")}`;
       recordProjectReviewDecisionEvent({
         project_id: projectId,

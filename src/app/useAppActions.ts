@@ -4,17 +4,7 @@ import * as api from "../api";
 import { buildDecisionInboxItems } from "../components/chat/decision-inbox";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { LANGUAGE_USER_SET_STORAGE_KEY, normalizeLanguage, pickLang } from "../i18n";
-import { normalizeOfficeWorkflowPack } from "./office-workflow-pack";
-import type {
-  Agent,
-  CliStatusMap,
-  CompanySettings,
-  CompanyStats,
-  Department,
-  Message,
-  Task,
-  WorkflowPackKey,
-} from "../types";
+import type { Agent, CliStatusMap, CompanySettings, CompanyStats, Department, Message, Task } from "../types";
 import { mapWorkflowDecisionItemsLocalized } from "./decision-inbox";
 import { mergeSettingsWithDefaults, syncClientLanguage } from "./utils";
 import type { ProjectMetaPayload } from "./types";
@@ -124,7 +114,6 @@ export function useAppActions({
       project_id?: string;
       project_path?: string;
       assigned_agent_id?: string;
-      workflow_pack_key?: WorkflowPackKey;
     }) => {
       try {
         await api.createTask(input as Parameters<typeof api.createTask>[0]);
@@ -165,12 +154,10 @@ export function useAppActions({
   );
 
   const refreshTasksAndAgents = useCallback(async () => {
-    const activePack = normalizeOfficeWorkflowPack(settings.officeWorkflowPack ?? "development");
-    const includeSeedAgents = activePack !== "development";
-    const [tks, ags] = await Promise.all([api.getTasks(), api.getAgents({ includeSeed: includeSeedAgents })]);
+    const [tks, ags] = await Promise.all([api.getTasks(), api.getAgents()]);
     setTasks(tks);
     setAgents(ags);
-  }, [setTasks, setAgents, settings.officeWorkflowPack]);
+  }, [setTasks, setAgents]);
 
   const handleAssignTask = useCallback(
     async (taskId: string, agentId: string) => {
@@ -444,12 +431,10 @@ export function useAppActions({
   );
 
   const handleAgentsChange = useCallback(() => {
-    const activePack = normalizeOfficeWorkflowPack(settings.officeWorkflowPack ?? "development");
-    const includeSeedAgents = activePack !== "development";
-    api.getAgents({ includeSeed: includeSeedAgents }).then(setAgents).catch(console.error);
-    api.getDepartments({ workflowPackKey: activePack }).then(setDepartments).catch(console.error);
+    api.getAgents().then(setAgents).catch(console.error);
+    api.getDepartments().then(setDepartments).catch(console.error);
     api.getTasks().then(setTasks).catch(console.error);
-  }, [setAgents, setDepartments, setTasks, settings.officeWorkflowPack]);
+  }, [setAgents, setDepartments, setTasks]);
 
   const handleRefreshCli = useCallback(async () => {
     const status = await api.getCliStatus(true);

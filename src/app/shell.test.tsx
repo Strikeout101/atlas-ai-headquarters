@@ -88,7 +88,6 @@ describe("AppHeaderBar more menu", () => {
       reportLabel: "Reports",
       announcementLabel: "Announcement",
       roomManagerLabel: "Office Manager",
-      officePackControl: null,
       theme: "dark",
       mobileHeaderMenuOpen: true,
       onOpenMobileNav: vi.fn(),

@@ -96,13 +96,10 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         let hasSupplementSignals = false;
         const seatIndexByAgent = new Map(leaders.slice(0, 6).map((leader: any, idx: number) => [leader.id, idx]));
 
-        const taskCtx = db
-          .prepare("SELECT description, project_path, workflow_pack_key FROM tasks WHERE id = ?")
-          .get(taskId) as
-          | { description: string | null; project_path: string | null; workflow_pack_key: string | null }
+        const taskCtx = db.prepare("SELECT description, project_path FROM tasks WHERE id = ?").get(taskId) as
+          | { description: string | null; project_path: string | null }
           | undefined;
         const taskDescription = taskCtx?.description ?? null;
-        const taskWorkflowPackKey = taskCtx?.workflow_pack_key ?? null;
         const projectPath = resolveProjectPath({
           title: taskTitle,
           description: taskDescription,
@@ -167,7 +164,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
           transcript.push({
             speaker_agent_id: leader.id,
             speaker: getAgentDisplayName(leader, lang),
-            department: getDeptName(leader.department_id ?? "", taskWorkflowPackKey),
+            department: getDeptName(leader.department_id ?? ""),
             role: getRoleLabel(leader.role, lang),
             content,
           });
@@ -185,7 +182,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
           emitMeetingSpeech(leader.id, seatIndex, "kickoff", taskId, content, lang);
           pushTranscript(leader, content);
           if (meetingId) {
-            appendMeetingMinuteEntry(meetingId, minuteSeq++, leader, lang, messageType, content, taskWorkflowPackKey);
+            appendMeetingMinuteEntry(meetingId, minuteSeq++, leader, lang, messageType, content);
           }
         };
 
@@ -215,7 +212,6 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
           round,
           taskTitle,
           taskDescription,
-          workflowPackKey: taskWorkflowPackKey,
           transcript,
           turnObjective:
             "Open the planned kickoff meeting and ask each leader for concrete supplement points and planning actions.",
@@ -236,7 +232,6 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
             round,
             taskTitle,
             taskDescription,
-            workflowPackKey: taskWorkflowPackKey,
             transcript,
             turnObjective: "Share concise readiness feedback plus concrete supplement items to be planned as subtasks.",
             stanceHint: "Do not hold approval here; provide actionable plan additions with evidence/check item.",
@@ -258,7 +253,6 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
           round,
           taskTitle,
           taskDescription,
-          workflowPackKey: taskWorkflowPackKey,
           transcript,
           turnObjective:
             "Summarize supplement points and announce that they will be converted to subtasks before execution.",
@@ -279,7 +273,6 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
             round,
             taskTitle,
             taskDescription,
-            workflowPackKey: taskWorkflowPackKey,
             transcript,
             turnObjective: "Propose one immediate planning action item for your team in subtask style.",
             stanceHint:

@@ -2,21 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SettingsSection from "./SettingsSection";
 import * as api from "../../api";
 import AgentAvatar, { useSpriteMap } from "../AgentAvatar";
-import {
-  MESSENGER_CHANNELS,
-  WORKFLOW_PACK_KEYS,
-  type Agent,
-  type MessengerSessionConfig,
-  type WorkflowPackKey,
-} from "../../types";
+import { MESSENGER_CHANNELS, type Agent, type MessengerSessionConfig } from "../../types";
 import type { ChannelSettingsTabProps } from "./types";
 import ChatEditorModal from "./gateway-settings/ChatEditorModal";
-import { CHANNEL_META, isWorkflowPackKey } from "./gateway-settings/constants";
+import { CHANNEL_META } from "./gateway-settings/constants";
 import {
   type ChatRow,
   createEditorState,
   createSessionId,
-  defaultWorkflowPackLabel,
   normalizeChannelsConfig,
   resolveChannelsConfig,
 } from "./gateway-settings/state";
@@ -43,8 +36,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
   > | null>(null);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [workflowPacksLoading, setWorkflowPacksLoading] = useState(false);
-  const [workflowPacks, setWorkflowPacks] = useState<Awaited<ReturnType<typeof api.getWorkflowPacks>>["packs"]>([]);
   const spriteMap = useSpriteMap(agents);
 
   const [editor, setEditor] = useState(() => createEditorState(channelsConfig));
@@ -91,31 +82,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     }
     return map;
   }, [agents]);
-
-  const workflowPackOptions = useMemo(() => {
-    const map = new Map<WorkflowPackKey, { key: WorkflowPackKey; name: string; enabled: boolean }>();
-    for (const key of WORKFLOW_PACK_KEYS) {
-      map.set(key, { key, name: defaultWorkflowPackLabel(t, key), enabled: true });
-    }
-    for (const pack of workflowPacks) {
-      if (!isWorkflowPackKey(pack.key)) continue;
-      const existing = map.get(pack.key);
-      map.set(pack.key, {
-        key: pack.key,
-        name: typeof pack.name === "string" && pack.name.trim() ? pack.name.trim() : (existing?.name ?? pack.key),
-        enabled: pack.enabled !== false,
-      });
-    }
-    return Array.from(map.values());
-  }, [workflowPacks, t]);
-
-  const workflowPackNameByKey = useMemo(() => {
-    const map = new Map<WorkflowPackKey, string>();
-    for (const option of workflowPackOptions) {
-      map.set(option.key, option.name);
-    }
-    return map;
-  }, [workflowPackOptions]);
 
   const resolveDiscordLookupErrorMessage = useCallback(
     (error: unknown): string => {
@@ -231,7 +197,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
       targetId: row.session.targetId ?? "",
       enabled: row.session.enabled !== false,
       agentId: row.session.agentId ?? "",
-      workflowPackKey: isWorkflowPackKey(row.session.workflowPackKey) ? row.session.workflowPackKey : "development",
       receiveEnabled: channelsConfig[row.channel].receiveEnabled !== false,
     });
     setEditorError(null);
@@ -296,7 +261,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
       enabled: editor.enabled,
       token,
       agentId: agentId || undefined,
-      workflowPackKey: editor.workflowPackKey,
     };
 
     let insertIndex: number | null = null;
@@ -406,21 +370,8 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     }
   };
 
-  const loadWorkflowPacks = async () => {
-    setWorkflowPacksLoading(true);
-    try {
-      const result = await api.getWorkflowPacks();
-      setWorkflowPacks(result.packs ?? []);
-    } catch {
-      setWorkflowPacks([]);
-    } finally {
-      setWorkflowPacksLoading(false);
-    }
-  };
-
   useEffect(() => {
     void loadAgents();
-    void loadWorkflowPacks();
   }, []);
 
   useEffect(() => {
@@ -532,11 +483,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
               const assignedAgentName = assignedAgent
                 ? assignedAgent.name_ko || assignedAgent.name
                 : row.session.agentId || "";
-              const workflowPackKey = isWorkflowPackKey(row.session.workflowPackKey)
-                ? row.session.workflowPackKey
-                : "development";
-              const workflowPackLabel =
-                workflowPackNameByKey.get(workflowPackKey) ?? defaultWorkflowPackLabel(t, workflowPackKey);
               const tokenReady = row.token.trim().length > 0;
               return (
                 <div key={row.key} className="rounded-md border border-slate-700/70 bg-slate-800/50 px-3 py-2">
@@ -553,9 +499,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
                           {meta.transportReady
                             ? t({ ko: "직접연동", en: "Native", ja: "直接連携", zh: "直连" })
                             : t({ ko: "호환설정", en: "Compat", ja: "互換設定", zh: "兼容配置" })}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600/20 text-indigo-300">
-                          {workflowPackLabel}
                         </span>
                         {!tokenReady && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-600/20 text-red-300">
@@ -778,8 +721,6 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
           channelsConfig={channelsConfig}
           agents={agents}
           agentsLoading={agentsLoading}
-          workflowPackOptions={workflowPackOptions}
-          workflowPacksLoading={workflowPacksLoading}
           editorError={editorError}
           discordChannels={discordChannelOptions}
           discordChannelsLoading={discordChannelsLoading}

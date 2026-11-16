@@ -3,8 +3,6 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import type { Lang } from "../../../types/lang.ts";
-import { resolveWorkflowPackKeyForTask } from "../../workflow/packs/task-pack-resolver.ts";
-import { ensureVideoPreprodRemotionBestPracticesSkill } from "../../workflow/core/video-skill-bootstrap.ts";
 import { resolveConstrainedAgentScopeForTask } from "../core/tasks/execution-run-auto-assign.ts";
 import type { AgentRow } from "./direct-chat.ts";
 import type { L10n } from "./language-policy.ts";
@@ -27,7 +25,6 @@ type ParentTaskRow = {
   project_id: string | null;
   project_path: string | null;
   department_id: string | null;
-  workflow_pack_key?: string | null;
 };
 
 interface BatchDeps {
@@ -35,7 +32,7 @@ interface BatchDeps {
   l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   resolveLang: (text?: string, fallback?: Lang) => Lang;
-  getDeptName: (deptId: string, workflowPackKey?: string | null) => string;
+  getDeptName: (deptId: string) => string;
   getAgentDisplayName: (agent: AgentRow, lang: string) => string;
   findTeamLeader: (deptId: string | null, candidateAgentIds?: string[] | null) => AgentRow | null;
   findBestSubordinate: (deptId: string, excludeId: string, candidateAgentIds?: string[] | null) => AgentRow | null;
@@ -153,7 +150,6 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
 
   function getConstrainedAgentIds(parentTask: ParentTaskRow, targetDeptId: string | null): string[] | null {
     return resolveConstrainedAgentScopeForTask(db as any, {
-      workflow_pack_key: parentTask.workflow_pack_key ?? null,
       department_id: targetDeptId ?? parentTask.department_id ?? null,
       project_id: parentTask.project_id,
     });
@@ -203,7 +199,7 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
     }
 
     const targetDeptId = subtasks[0].target_department_id!;
-    const targetDeptName = getDeptName(targetDeptId, parentTask.workflow_pack_key ?? null);
+    const targetDeptName = getDeptName(targetDeptId);
     const subtaskIds = subtasks.map((st) => st.id);
     const firstTitle = subtasks[0].title;
     const batchTitle = subtasks.length > 1 ? `${firstTitle} +${subtasks.length - 1}` : firstTitle;
@@ -342,20 +338,14 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
         l,
         pickL,
         lang,
-        sourceDeptName: getDeptName(parentTask.department_id ?? "", parentTask.workflow_pack_key ?? null),
+        sourceDeptName: getDeptName(parentTask.department_id ?? ""),
         parentSummary: parentTask.description || parentTask.title,
         delegatedChecklist,
       });
-      const delegatedWorkflowPackKey = resolveWorkflowPackKeyForTask({
-        db: db as any,
-        sourceTaskPackKey: parentTask.workflow_pack_key,
-        sourceTaskId: parentTask.id,
-        projectId: parentTask.project_id,
-      });
       db.prepare(
         `
-    INSERT INTO tasks (id, title, description, department_id, project_id, status, priority, task_type, workflow_pack_key, project_path, source_task_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'planned', 1, 'general', ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, title, description, department_id, project_id, status, priority, task_type, project_path, source_task_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'planned', 1, 'general', ?, ?, ?, ?)
   `,
       ).run(
         delegatedTaskId,
@@ -363,7 +353,6 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
         delegatedDescription,
         targetDeptId,
         parentTask.project_id ?? null,
-        delegatedWorkflowPackKey,
         parentTask.project_path,
         parentTask.id,
         ct,
@@ -468,14 +457,6 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
             `Git worktree created: ${worktreePath} (branch: climpire/${delegatedTaskId.slice(0, 8)})`,
           );
           const logFilePath = path.join(logsDir, `${delegatedTaskId}.log`);
-          ensureVideoPreprodRemotionBestPracticesSkill({
-            db: db as any,
-            nowMs,
-            workflowPackKey: parentTask.workflow_pack_key ?? null,
-            provider: execProvider,
-            taskId: delegatedTaskId,
-            appendTaskLog,
-          });
           const spawnPrompt = buildSubtaskDelegationPrompt(
             parentTask,
             subtasks,
@@ -503,9 +484,7 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
               const shortId = sib.delegated_task_id.slice(0, 8);
               const wtPath = path.join(projPath, ".climpire-worktrees", shortId);
               if (fs.existsSync(wtPath)) {
-                const deptLabel = sib.target_department_id
-                  ? getDeptName(sib.target_department_id, parentTask.workflow_pack_key)
-                  : "unknown";
+                const deptLabel = sib.target_department_id ? getDeptName(sib.target_department_id) : "unknown";
                 validSiblings.push(`- [${deptLabel}] ${wtPath}`);
               }
             }

@@ -35,7 +35,6 @@ function makeApiState(): ApiStateBundle {
         name: "Dev Lead",
         name_ko: "개발 리드",
         department_id: "planning",
-        workflow_pack_key: "development",
         role: "team_leader",
         cli_provider: "claude",
         avatar_emoji: "A",
@@ -48,10 +47,9 @@ function makeApiState(): ApiStateBundle {
       },
       {
         id: "agent-video",
-        name: "Video Lead",
-        name_ko: "영상 리드",
-        department_id: "planning",
-        workflow_pack_key: "video_preprod",
+        name: "Design Lead",
+        name_ko: "디자인 리드",
+        department_id: null,
         role: "team_leader",
         cli_provider: "claude",
         avatar_emoji: "B",
@@ -74,19 +72,6 @@ function makeApiState(): ApiStateBundle {
         prompt: null,
         sort_order: 0,
         created_at: 1,
-        workflow_pack_key: "development",
-      },
-      {
-        id: "planning",
-        name: "Storyboard",
-        name_ko: "스토리보드",
-        icon: "S",
-        color: "#111111",
-        description: null,
-        prompt: null,
-        sort_order: 0,
-        created_at: 2,
-        workflow_pack_key: "video_preprod",
       },
     ],
     apiAssigning: false,
@@ -110,15 +95,14 @@ function makeApiState(): ApiStateBundle {
 }
 
 describe("ApiAssignModal", () => {
-  it("separates duplicate department ids by workflow pack", () => {
+  it("groups agents by department and lists the rest as unassigned", () => {
     render(<ApiAssignModal t={t} localeTag="en-US" apiState={makeApiState()} />);
 
-    expect(screen.getByText("Development Office")).toBeInTheDocument();
-    expect(screen.getByText("Video Pre-production")).toBeInTheDocument();
-    expect(screen.getByText("Dev Lead")).toBeInTheDocument();
-    expect(screen.getByText("Video Lead")).toBeInTheDocument();
     expect(screen.getByText("Planning")).toBeInTheDocument();
-    expect(screen.getByText("Storyboard")).toBeInTheDocument();
+    expect(screen.getByText("Dev Lead")).toBeInTheDocument();
+    expect(screen.getByText("Unassigned")).toBeInTheDocument();
+    expect(screen.getByText("Design Lead")).toBeInTheDocument();
+    expect(screen.queryByText("Development Office")).not.toBeInTheDocument();
   });
 
   it("shows the context window setting for Ollama assignments", () => {

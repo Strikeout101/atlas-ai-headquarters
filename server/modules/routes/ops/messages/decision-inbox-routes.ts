@@ -320,37 +320,6 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
       runYoloDecisionAutopilot({
         getDecisionInboxItems,
         applyDecisionReply,
-        shouldSkipItem: (item) => {
-          if (item.kind === "review_round_pick" && item.task_id) {
-            const row = db.prepare("SELECT workflow_pack_key FROM tasks WHERE id = ? LIMIT 1").get(item.task_id) as
-              | { workflow_pack_key?: string | null }
-              | undefined;
-            return row?.workflow_pack_key === "video_preprod";
-          }
-          if (item.kind === "project_review_ready" && item.project_id) {
-            const recentHold = db
-              .prepare(
-                `
-                SELECT 1
-                FROM task_logs tl
-                JOIN tasks t ON t.id = tl.task_id
-                WHERE t.project_id = ?
-                  AND t.status = 'review'
-                  AND t.source_task_id IS NULL
-                  AND t.workflow_pack_key = 'video_preprod'
-                  AND tl.kind = 'system'
-                  AND tl.message LIKE 'Review hold: video artifact gate blocked approval%'
-                  AND tl.created_at >= ?
-                ORDER BY tl.created_at DESC
-                LIMIT 1
-              `,
-              )
-              .get(item.project_id, nowMs() - 120_000);
-            if (recentHold) return true;
-          }
-
-          return false;
-        },
       });
     } catch (err) {
       console.warn(`[decision-yolo] autopilot failed: ${String(err)}`);

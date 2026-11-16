@@ -105,14 +105,6 @@ or
 }
 ```
 
-### Workflow Pack Routing
-
-| Method | Path                       | Purpose                                                        |
-| ------ | -------------------------- | -------------------------------------------------------------- |
-| GET    | `/api/workflow-packs`      | List workflow packs and effective enable state                 |
-| PUT    | `/api/workflow-packs/:key` | Update workflow pack metadata/flags/json fields                |
-| POST   | `/api/workflow/route`      | Resolve workflow pack by explicit/session/project/text context |
-
 ### Runtime / Org
 
 | Method | Path                             | Purpose                                                         |
@@ -164,7 +156,7 @@ or
 | POST   | `/api/tasks/:id/subtasks`        | Create subtask                                              |
 | PATCH  | `/api/subtasks/:id`              | Update subtask                                              |
 
-`GET /api/tasks` supports query filters: `status`, `department_id`, `agent_id`, `project_id`, `workflow_pack_key`.
+`GET /api/tasks` supports query filters: `status`, `department_id`, `agent_id`, `project_id`.
 
 ### Reports / Diagnostics
 
@@ -216,7 +208,7 @@ or
 | POST   | `/api/oauth/disconnect`         | OAuth disconnect                                          |
 | POST   | `/api/oauth/refresh`            | OAuth token refresh                                       |
 | POST   | `/api/oauth/accounts/activate`  | Activate, add, remove, or toggle a stored OAuth account   |
-| PUT    | `/api/oauth/accounts/:id`       | Update OAuth account metadata and model override           |
+| PUT    | `/api/oauth/accounts/:id`       | Update OAuth account metadata and model override          |
 | GET    | `/api/oauth/models`             | OAuth-backed model catalog (Copilot/OpenCode/Antigravity) |
 | GET    | `/api/cli-models`               | Local CLI model catalog (Claude/Codex/Gemini/OpenCode)    |
 

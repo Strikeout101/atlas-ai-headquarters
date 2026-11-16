@@ -16,7 +16,6 @@ import type {
   Department,
   MessengerChannelType,
   MessengerSessionConfig,
-  WorkflowPackKey,
 } from "../../types";
 
 export type Locale = UiLanguage;
@@ -71,9 +70,7 @@ export interface ApiAssignTarget {
   model: string;
 }
 
-export interface ApiAssignDepartment extends Department {
-  workflow_pack_key: WorkflowPackKey;
-}
+export type ApiAssignDepartment = Department;
 
 export interface CliSettingsTabProps {
   t: TFunction;

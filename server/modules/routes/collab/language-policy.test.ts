@@ -23,7 +23,7 @@ function setupDb(): DatabaseSync {
 }
 
 describe("language-policy detectTargetDepartments", () => {
-  it("오피스팩 커스텀 부서명(로컬라이즈드 이름)으로 관련 부서를 감지한다", () => {
+  it("detects related departments by their custom localized names", () => {
     const db = setupDb();
     try {
       db.prepare("INSERT INTO settings (key, value) VALUES ('language', '\"ko\"')").run();

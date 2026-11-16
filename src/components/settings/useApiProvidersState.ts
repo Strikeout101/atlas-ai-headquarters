@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../../api";
 import type { ApiProvider } from "../../api";
-import type { Agent, CompanySettings, WorkflowPackKey } from "../../types";
+import type { Agent } from "../../types";
 import type {
   ApiAssignDepartment,
   ApiAssignTarget,
@@ -19,40 +19,7 @@ const DEFAULT_API_FORM: ApiFormState = {
   preset_key: null,
 };
 
-const VALID_WORKFLOW_PACK_KEYS = new Set<WorkflowPackKey>([
-  "development",
-  "novel",
-  "report",
-  "video_preprod",
-  "web_research_report",
-  "roleplay",
-]);
-
-function normalizeWorkflowPackKey(value: unknown): WorkflowPackKey {
-  return typeof value === "string" && VALID_WORKFLOW_PACK_KEYS.has(value as WorkflowPackKey)
-    ? (value as WorkflowPackKey)
-    : "development";
-}
-
-function resolveAssignablePackKeys(settings: Pick<CompanySettings, "officePackHydratedPacks">): WorkflowPackKey[] {
-  const hydrated = Array.isArray(settings.officePackHydratedPacks) ? settings.officePackHydratedPacks : [];
-  const orderedKeys: WorkflowPackKey[] = ["development"];
-  for (const value of hydrated) {
-    const packKey = normalizeWorkflowPackKey(value);
-    if (!orderedKeys.includes(packKey)) orderedKeys.push(packKey);
-  }
-  return orderedKeys;
-}
-
-export function useApiProvidersState({
-  tab,
-  t,
-  settings,
-}: {
-  tab: SettingsTab;
-  t: TFunction;
-  settings: Pick<CompanySettings, "officePackHydratedPacks">;
-}): ApiStateBundle {
+export function useApiProvidersState({ tab, t }: { tab: SettingsTab; t: TFunction }): ApiStateBundle {
   const [apiProviders, setApiProviders] = useState<ApiProvider[]>([]);
   const [apiProvidersLoading, setApiProvidersLoading] = useState(false);
   const [apiOfficialPresets, setApiOfficialPresets] = useState<Record<string, api.ApiProviderOfficialPreset>>({});
@@ -208,32 +175,17 @@ export function useApiProvidersState({
     });
   }, []);
 
-  const handleApiModelAssign = useCallback(
-    async (providerId: string, model: string) => {
-      setApiAssignTarget({ providerId, model });
-      setContextWindowTokensInput("");
-      try {
-        const assignPackKeys = resolveAssignablePackKeys(settings);
-        const [agents, deptLists] = await Promise.all([
-          api.getAgents({ includeSeed: true }),
-          Promise.all(
-            assignPackKeys.map(async (packKey) => {
-              const depts = await api.getDepartments({ workflowPackKey: packKey });
-              return depts.map((dept) => ({ ...dept, workflow_pack_key: packKey }));
-            }),
-          ),
-        ]);
-        const allowedPackKeys = new Set(assignPackKeys);
-        setApiAssignAgents(
-          agents.filter((agent) => allowedPackKeys.has(normalizeWorkflowPackKey(agent.workflow_pack_key))),
-        );
-        setApiAssignDepts(deptLists.flat());
-      } catch (error) {
-        console.error("Failed to load agents:", error);
-      }
-    },
-    [settings],
-  );
+  const handleApiModelAssign = useCallback(async (providerId: string, model: string) => {
+    setApiAssignTarget({ providerId, model });
+    setContextWindowTokensInput("");
+    try {
+      const [agents, depts] = await Promise.all([api.getAgents(), api.getDepartments()]);
+      setApiAssignAgents(agents);
+      setApiAssignDepts(depts);
+    } catch (error) {
+      console.error("Failed to load agents:", error);
+    }
+  }, []);
 
   const handleApiAssignToAgent = useCallback(
     async (agentId: string) => {

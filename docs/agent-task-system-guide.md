@@ -12,7 +12,7 @@ Code-traced guide, November 16, 2026. This describes current behavior, including
 - **Execution session / run:** an actual attempt to do task work. A task can have several runs after pause, remediation, failure or context rollover.
 - **Meeting:** short coordinated agent calls with recorded minutes, participants and conclusions. A meeting is separate from the worker execution.
 - **Decision / approval:** a record waiting for a specific choice. Workflow decisions and permission to execute a specific external action are separate systems.
-- **Workflow pack:** task guidance, routing and output expectations. Current packs are development, novel, report, video preproduction, web research report and roleplay. Task type (general/development/design/analysis/presentation/documentation) is another field; neither a type nor a pack guarantees a short execution path.
+- **Task type:** general/development/design/analysis/presentation/documentation. It does not guarantee a short execution path. (Office and workflow packs were removed on 2026-11-16; there is one office and one way of working.)
 
 ## 2. All user-facing entry points
 
@@ -24,7 +24,7 @@ Code-traced guide, November 16, 2026. This describes current behavior, including
 | Company Announcement | Broadcasts and requests leader acknowledgements. Cross-department or agent mentions can trigger delegation. | Company-wide context or coordination. A mentioned action can start work. |
 | `$` directive | Company-wide directive coordinated by Planning, with project context and optional initial planning-meeting skip. Policy checks can recognize a coordination/hold instruction instead of immediately executing. | Multi-team objectives and coordinated work. |
 | Work / task board: Create task | Creates a durable board record, normally Inbox. Choosing an assignee does not itself execute it. Use Run separately. | Prepare and inspect a task before starting. |
-| Task Run | Starts the selected task; can select an eligible worker when unassigned. Project manual-agent restrictions and workflow-pack eligibility affect selection. | Explicitly launch recorded work. |
+| Task Run | Starts the selected task; can select an eligible worker when unassigned. Project manual-agent restrictions affect selection. | Explicitly launch recorded work. |
 | Today / Decision Inbox | Resolves workflow choices or external-action approvals. | Unblock the relevant gate. Read the option's action; not every approval resumes execution. |
 | Task terminal intervention | Pauses a task, queues an extra instruction for the next run, and resumes. | Change a task's execution instructions. Ordinary chat is not this injection mechanism. |
 | Configured messenger session | Routes incoming ordinary messages to its mapped agent; supports directive and decision-reply paths. | Interact outside the browser once the channel/session is configured. |
@@ -68,7 +68,7 @@ There is no distinct top-level Failed or Blocked status. Subtasks do have blocke
 ## 4. Routing, planning and execution
 
 1. **Resolve input and project:** record the request, determine scope and obtain the project goal/path. Some app routes have fallback behavior; explicit project binding is the clearest way to control the working directory.
-2. **Choose task guidance and owner:** use explicit agent choice, project assignment scope, workflow pack, department and availability. Run without an assignee can choose an available eligible worker; selection considers department fit, idle/break availability, role, previous workload and provider readiness. This is not a guarantee of optimal skill matching.
+2. **Choose task guidance and owner:** use explicit agent choice, project assignment scope, department and availability. Run without an assignee can choose an available eligible worker; selection considers department fit, idle/break availability, role, previous workload and provider readiness. This is not a guarantee of optimal skill matching.
 3. **Optional coordination:** a leader may run a Planning-led kickoff, collect action items and create subtasks. Skipping the planned meeting only skips that meeting. It does not disable later review or necessarily disable task decomposition.
 4. **Dispatch contributions:** related subtasks can be grouped by department into delegated child tasks. Do not assume all branches run concurrently: batches, same-agent constraints and parent/child dependencies affect order. The parent can remain Collaborating or wait while child work proceeds.
 5. **Prepare execution:** select provider/model, establish a task session, prepare/reuse a working directory and Git worktree when applicable, and construct task context.
@@ -98,8 +98,6 @@ The office animation is a presentation of status, collaboration and meeting even
 
 - **Reports:** specialized report completion can close without the ordinary leader review meeting, while still generating an archive/report.
 - **Presentation workflow:** can create a Design checkpoint child, put the parent Pending, then automatically rerun the parent to regenerate the final deck after Design completes. This is a deliberate workflow wait, not an SSH permission failure.
-- **Video:** final-render ordering can wait for documentation/subtask/collaboration work. Render evidence and nonempty output-file gates can block completion; a text claim that rendering succeeded is insufficient for those checks. Failed gates can lead to further remediation/delegation.
-- **Other packs:** modify routing, instructions and expected artifacts; their names alone do not imply the report completion exception applies.
 
 Report routing has a current project-linking caveat: although chat collects project metadata, its report handler is invoked without forwarding that metadata. It derives linkage from a path in the request or the target agent's current task. Confirm the report task's actual project/path. A presentation Design checkpoint can be skipped if no Design agent exists; final regeneration does not imply a second Design confirmation.
 

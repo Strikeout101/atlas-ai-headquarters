@@ -1,4 +1,4 @@
-import { WORKFLOW_PACK_KEYS, type MessengerChannelType, type WorkflowPackKey } from "../../../types";
+import type { MessengerChannelType } from "../../../types";
 
 export const CHANNEL_META: Record<
   MessengerChannelType,
@@ -24,12 +24,6 @@ export const CHANNEL_META: Record<
   signal: { label: "Signal", targetHint: "+8210..., group:<id>, username:<id>", transportReady: true },
   imessage: { label: "iMessage", targetHint: "전화번호/이메일 (macOS Messages)", transportReady: true },
 };
-
-const WORKFLOW_PACK_KEY_SET = new Set<string>(WORKFLOW_PACK_KEYS as readonly string[]);
-
-export function isWorkflowPackKey(value: unknown): value is WorkflowPackKey {
-  return typeof value === "string" && WORKFLOW_PACK_KEY_SET.has(value);
-}
 
 export function channelTargetHint(channel: MessengerChannelType): string {
   return CHANNEL_META[channel].targetHint;

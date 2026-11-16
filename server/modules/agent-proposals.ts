@@ -40,7 +40,6 @@ export interface AutonomyAgent {
   api_model: string | null;
   cli_model: string | null;
   cli_reasoning_level: string | null;
-  workflow_pack_key?: string | null;
 }
 
 export interface ParsedProposal {
@@ -421,14 +420,12 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     return changed ? { ok: true, status: "dismissed" } : { ok: false, error: "proposal_not_pending" };
   }
 
-  const agent = db
-    .prepare("SELECT id, department_id, workflow_pack_key FROM agents WHERE id = ?")
-    .get(proposal.agent_id) as
-    | { id: string; department_id: string | null; workflow_pack_key: string | null }
+  const agent = db.prepare("SELECT id, department_id FROM agents WHERE id = ?").get(proposal.agent_id) as
+    | { id: string; department_id: string | null }
     | undefined;
   const project = proposal.project_id
-    ? (db.prepare("SELECT id, project_path, default_pack_key FROM projects WHERE id = ?").get(proposal.project_id) as
-        | { id: string; project_path: string; default_pack_key: string | null }
+    ? (db.prepare("SELECT id, project_path FROM projects WHERE id = ?").get(proposal.project_id) as
+        | { id: string; project_path: string }
         | undefined)
     : undefined;
   const taskId = randomUUID();
@@ -454,8 +451,8 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     }
     db.prepare(
       `INSERT INTO tasks (id, title, description, department_id, assigned_agent_id, project_id, status, priority, task_type,
-         workflow_pack_key, project_path, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?, ?)`,
+         project_path, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?)`,
     ).run(
       taskId,
       proposal.title,
@@ -463,7 +460,6 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
       departmentId,
       agent?.id ?? null,
       project?.id ?? null,
-      project?.default_pack_key || agent?.workflow_pack_key || "development",
       project?.project_path ?? null,
       now,
       now,

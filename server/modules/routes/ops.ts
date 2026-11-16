@@ -13,7 +13,6 @@ import { registerModelRoutes } from "./ops/models-routes.ts";
 import { registerOAuthRoutes } from "./ops/oauth/routes.ts";
 import { registerSkillRoutes } from "./ops/skills/routes.ts";
 import { registerApiDocsRoutes } from "./ops/api-docs.ts";
-import { registerWorkflowPackRoutes } from "./ops/workflow-packs.ts";
 import { registerModelRoutingRoutes } from "./ops/model-routing.ts";
 import { registerBusinessRoutes } from "./ops/business.ts";
 import { registerBusinessMailboxRoutes } from "./ops/business-mailboxes.ts";
@@ -248,12 +247,6 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
     app,
     db,
     nowMs,
-  });
-  registerWorkflowPackRoutes({
-    app,
-    db,
-    nowMs,
-    normalizeTextField,
   });
 
   registerTaskReportRoutes(__ctx);

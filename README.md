@@ -82,19 +82,6 @@ Claw-Empire transforms your AI coding assistants — connected via **CLI**, **OA
 - API docs: [`docs/api.md`](docs/api.md), [`docs/openapi.json`](docs/openapi.json)
 - Security policy: [`SECURITY.md`](SECURITY.md)
 
-## Office Pack Profiles (v2.0.1)
-
-Each office pack applies a different collaboration topology, naming seed, and workflow bias.
-
-| Pack                          | Core Focus                                                     | Representative Structure                                         |
-| ----------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `development` (`DEV`)         | Default engineering baseline with backward-compatible behavior | Planning / Development / Design / QA-QC / DevSecOps / Operations |
-| `report` (`RPT`)              | Structured report and document production                      | Editorial Planning, Research Engine, Doc Design, Review Desk     |
-| `web_research_report` (`WEB`) | Source collection and citation-first fact validation           | Research Strategy, Crawler Team, Fact Check                      |
-| `novel` (`NOV`)               | Worldbuilding, narrative flow, and tone consistency            | Worldbuilding, Narrative Engine, Character Art, Tone QA          |
-| `video_preprod` (`VID`)       | Concept/script/shot-list/editing-note pre-production           | Pre-production, Scene Engine, Art & Camera, Cut QA               |
-| `roleplay` (`RPG`)            | In-character dialogue immersion and role consistency           | Character Planning, Dialogue Engine, Stage Art, Character QA     |
-
 ## Screenshots
 
 <table>
@@ -200,8 +187,6 @@ Usage path: **Chat window > Report Request button**, then enter your request.
 | Feature                        | Description                                                                                                                                                                                                 |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Pixel-Art Office**           | Animated office view with agents walking, working, and attending meetings across 6 departments                                                                                                              |
-| **Workflow Pack Profiles**     | Six built-in workflow packs (`development`, `report`, `web_research_report`, `novel`, `video_preprod`, `roleplay`) provide pack-specific routing schema, QA rules, and output templates                     |
-| **Office Pack Profiles**       | Pack-scoped office profiles apply dedicated department topology, naming/theme presets, and isolated agent/department data per pack (except DB-backed development baseline)                                  |
 | **Kanban Task Board**          | Full task lifecycle — Inbox, Planned, Collaborating, In Progress, Review, Done — with drag-and-drop                                                                                                         |
 | **CEO Chat & Directives**      | Direct communication with team leaders; `$` directives support meeting choice plus project path/context routing (`project_path`, `project_context`)                                                         |
 | **Multi-Provider Support**     | Claude Code, Codex CLI, Gemini CLI, OpenCode, Kimi Code, Antigravity — all from one dashboard                                                                                                               |
@@ -790,7 +775,6 @@ Notes:
 
 - Bailian Coding Plan API keys must start with `sk-sp-`.
 - These presets seed fallback model lists immediately so agents can be assigned even when live `/models` discovery is unavailable or incomplete.
-- The assignment modal uses `development` as the default baseline and also includes office packs that have already completed initial setup and been hydrated into runtime state.
 - Direct API presets use the provider endpoint model IDs such as `glm-5`, `kimi-k2.5`, and `minimax-m2.5`. They do **not** use OpenCode CLI model IDs like `opencode-go/<model-id>`.
 - Bailian Coding Plan keys are intended for the interactive coding tool flow. Review the provider documentation before reusing those keys in other environments.
 

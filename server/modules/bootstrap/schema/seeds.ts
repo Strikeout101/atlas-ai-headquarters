@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { seedDefaultWorkflowPacks } from "./workflow-pack-seeds.ts";
 
 type DbLike = Pick<DatabaseSync, "exec" | "prepare">;
 
@@ -231,8 +230,6 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
 ];
 
 export function applyDefaultSeeds(db: DbLike): void {
-  seedDefaultWorkflowPacks(db);
-
   const deptCount = (db.prepare("SELECT COUNT(*) as cnt FROM departments").get() as { cnt: number }).cnt;
 
   if (deptCount === 0) {
@@ -289,7 +286,7 @@ export function applyDefaultSeeds(db: DbLike): void {
     const rename = db.prepare(
       `UPDATE agents SET name = ?, name_ko = ?, name_ja = ?, name_zh = ?,
         sprite_number = COALESCE(sprite_number, ?)
-      WHERE name = ? AND department_id = ? AND role = ? AND COALESCE(workflow_pack_key, 'development') = 'development'`,
+      WHERE name = ? AND department_id = ? AND role = ?`,
     );
     for (const agent of DEFAULT_AGENTS) {
       rename.run(
@@ -488,9 +485,20 @@ export function applyDefaultSeeds(db: DbLike): void {
     );
 
     // Agents added to installs that predate them (originally Luna, Clio, Turbo, Hawk, Lint, Vault, Pipe).
+    // This top-up happens once per install. Running it on every start re-created default agents the owner had
+    // deleted, so an install that already has any of them (or has done the top-up) is left alone.
     const LATER_DEFAULTS = new Set(["Luna", "Clio", "Turbo", "Hawk", "Lint", "Vault", "Pipe"]);
+    const LATER_DEFAULTS_DONE_KEY = "laterDefaultAgentsAdded";
+    const laterDefaultsDone = Boolean(
+      db.prepare("SELECT 1 FROM settings WHERE key = ? LIMIT 1").get(LATER_DEFAULTS_DONE_KEY),
+    );
+    const hasAnyLaterDefault = DEFAULT_AGENTS.some(
+      (agent) =>
+        LATER_DEFAULTS.has(agent.legacyName) && (existingNames.has(agent.name) || existingNames.has(agent.legacyName)),
+    );
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, 'true')").run(LATER_DEFAULTS_DONE_KEY);
     let added = 0;
-    for (const agent of DEFAULT_AGENTS) {
+    for (const agent of laterDefaultsDone || hasAnyLaterDefault ? [] : DEFAULT_AGENTS) {
       if (!LATER_DEFAULTS.has(agent.legacyName)) continue;
       if (existingNames.has(agent.name) || existingNames.has(agent.legacyName)) continue;
       if (!existingDeptIds.has(agent.department)) {

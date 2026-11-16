@@ -1,16 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import AgentSelect from "../../AgentSelect";
-import type { Agent, MessengerChannelType, MessengerChannelsConfig, WorkflowPackKey } from "../../../types";
+import type { Agent, MessengerChannelType, MessengerChannelsConfig } from "../../../types";
 import type { ChannelSettingsTabProps } from "../types";
-import { CHANNEL_META, channelTargetHint, isWorkflowPackKey } from "./constants";
+import { CHANNEL_META, channelTargetHint } from "./constants";
 import type { ChatEditorState } from "./state";
 import { MESSENGER_CHANNELS } from "../../../types";
-
-type WorkflowPackOption = {
-  key: WorkflowPackKey;
-  name: string;
-  enabled: boolean;
-};
 
 type ChatEditorModalProps = {
   t: ChannelSettingsTabProps["t"];
@@ -21,8 +15,6 @@ type ChatEditorModalProps = {
   channelsConfig: MessengerChannelsConfig;
   agents: Agent[];
   agentsLoading: boolean;
-  workflowPackOptions: WorkflowPackOption[];
-  workflowPacksLoading: boolean;
   editorError: string | null;
   discordChannels: Array<{
     id: string;
@@ -44,8 +36,6 @@ export default function ChatEditorModal({
   channelsConfig,
   agents,
   agentsLoading,
-  workflowPackOptions,
-  workflowPacksLoading,
   editorError,
   discordChannels,
   discordChannelsLoading,
@@ -257,39 +247,6 @@ export default function ChatEditorModal({
             })}
             className={agentsLoading ? "pointer-events-none opacity-60" : ""}
           />
-        </div>
-
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">
-            {t({ ko: "워크플로우 팩", en: "Workflow Pack", ja: "ワークフローパック", zh: "工作流包" })}
-          </label>
-          <select
-            value={editor.workflowPackKey}
-            onChange={(e) =>
-              setEditor((prev) => ({
-                ...prev,
-                workflowPackKey: isWorkflowPackKey(e.target.value) ? e.target.value : "development",
-              }))
-            }
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-          >
-            {workflowPackOptions.map((pack) => (
-              <option key={pack.key} value={pack.key} disabled={!pack.enabled && pack.key !== editor.workflowPackKey}>
-                {pack.name}
-                {!pack.enabled ? ` (${t({ ko: "비활성", en: "disabled", ja: "無効", zh: "禁用" })})` : ""}
-              </option>
-            ))}
-          </select>
-          {workflowPacksLoading && (
-            <div className="mt-1 text-[11px] text-slate-500">
-              {t({
-                ko: "팩 목록 불러오는 중...",
-                en: "Loading packs...",
-                ja: "パックを読み込み中...",
-                zh: "正在加载工作流包...",
-              })}
-            </div>
-          )}
         </div>
 
         {editor.channel === "telegram" && (

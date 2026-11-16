@@ -3,7 +3,6 @@ type CompactPromptInput = {
   title: string;
   checkpointText: string;
   contextWindowTokens?: number | null;
-  workflowGuidance?: string | null;
   departmentConstraint?: string | null;
   departmentSharedPrompt?: string | null;
   interruptPrompt?: string | null;
@@ -28,7 +27,6 @@ export function buildCompactContextRolloverPrompt(
   const fixed = [
     `[Task Session] task=${input.taskId}; fresh context, same task and worktree`,
     `[Task] ${input.title}`,
-    input.workflowGuidance ? `[Workflow Pack Execution Rules]\n${clipMiddle(input.workflowGuidance, 500)}` : "",
     input.departmentConstraint ? clipMiddle(input.departmentConstraint, 300) : "",
     input.departmentSharedPrompt ? clipMiddle(input.departmentSharedPrompt, 400) : "",
     input.interruptPrompt ? clipMiddle(input.interruptPrompt, 600) : "",

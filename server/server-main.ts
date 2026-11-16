@@ -40,6 +40,7 @@ import { createSecurityAuditTools } from "./modules/bootstrap/security-audit.ts"
 import { applyBaseSchema } from "./modules/bootstrap/schema/base-schema.ts";
 import { initializeOAuthRuntime } from "./modules/bootstrap/schema/oauth-runtime.ts";
 import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schema-migrations.ts";
+import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-packs.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
@@ -63,6 +64,15 @@ applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
+{
+  // Office packs were removed (2026-11-16); this deletes whatever an older install still has. No-op afterwards.
+  const cleanup = removeOfficePacks(db);
+  if (cleanup.agents || cleanup.tasks || cleanup.droppedTables.length) {
+    console.log(
+      `[Claw-Empire] Removed office packs: ${cleanup.agents} agent(s), ${cleanup.tasks} task(s), tables: ${cleanup.droppedTables.join(", ") || "none"}`,
+    );
+  }
+}
 
 const messageIdempotency = createMessageIdempotencyTools({
   db,

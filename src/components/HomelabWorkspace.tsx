@@ -153,7 +153,7 @@ export default function HomelabWorkspace({ agents: providedAgents }: { agents?: 
       return;
     }
     let active = true;
-    getAgents({ includeSeed: true })
+    getAgents()
       .then((result) => {
         if (active) setAgents(result);
       })

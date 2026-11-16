@@ -61,7 +61,7 @@ describe("buildDirectReplyPrompt", () => {
 });
 
 describe("buildMeetingPrompt", () => {
-  it("passes workflow pack key into department name lookup", () => {
+  it("names the agent's department in the prompt", () => {
     const getDeptName = vi.fn(() => "씬 엔진팀");
     const tools = createMeetingPromptTools({
       getDeptName,
@@ -78,14 +78,14 @@ describe("buildMeetingPrompt", () => {
     const prompt = tools.buildMeetingPrompt(createAgent({ department_id: "dev", role: "team_leader" }), {
       meetingType: "planned",
       round: 1,
-      taskTitle: "영상 제작",
+      taskTitle: "기능 개발",
       taskDescription: "킥오프",
-      workflowPackKey: "video_preprod",
       transcript: [],
       turnObjective: "킥오프",
       lang: "ko",
     });
-    expect(getDeptName).toHaveBeenCalledWith("dev", "video_preprod");
-    expect(prompt).toContain("Remotion");
+    expect(getDeptName).toHaveBeenCalledWith("dev");
+    expect(prompt).toContain("씬 엔진팀");
+    expect(prompt).not.toContain("Remotion");
   });
 });

@@ -58,7 +58,7 @@ describe("useApiProvidersState preset loading", () => {
   });
 
   it("does not auto-retry failed preset loads, but allows manual retry", async () => {
-    const { result } = renderHook(() => useApiProvidersState({ tab: "api", t, settings: makeSettings() }));
+    const { result } = renderHook(() => useApiProvidersState({ tab: "api", t }));
 
     await waitFor(() => {
       expect(apiMocks.getApiProviderPresets).toHaveBeenCalledTimes(1);
@@ -106,47 +106,21 @@ describe("useApiProvidersState model assignment", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("loads development plus hydrated pack targets when assigning an API model", async () => {
-    apiMocks.getAgents.mockResolvedValueOnce([
-      { id: "agent-dev", workflow_pack_key: "development" },
-      { id: "agent-video", workflow_pack_key: "video_preprod" },
-      { id: "agent-report", workflow_pack_key: "report" },
-      { id: "agent-legacy" },
-    ]);
-    apiMocks.getDepartments.mockImplementation(async (options?: { workflowPackKey?: string }) => {
-      if (options?.workflowPackKey === "video_preprod") {
-        return [{ id: "planning", name: "Storyboard", name_ko: "스토리보드", workflow_pack_key: "video_preprod" }];
-      }
-      return [{ id: "planning", name: "Planning", name_ko: "기획", workflow_pack_key: "development" }];
-    });
+  it("loads every agent and department when assigning an API model", async () => {
+    apiMocks.getAgents.mockResolvedValueOnce([{ id: "agent-dev" }, { id: "agent-ops" }]);
+    apiMocks.getDepartments.mockResolvedValueOnce([{ id: "planning", name: "Planning", name_ko: "기획" }]);
 
-    const { result } = renderHook(() =>
-      useApiProvidersState({
-        tab: "api",
-        t,
-        settings: makeSettings({ officePackHydratedPacks: ["video_preprod"] }),
-      }),
-    );
-
+    const { result } = renderHook(() => useApiProvidersState({ tab: "api", t }));
     await waitFor(() => {
       expect(apiMocks.getApiProviders).toHaveBeenCalledTimes(1);
     });
-
     await act(async () => {
       await result.current.handleApiModelAssign("provider-1", "gpt-4o");
     });
 
-    expect(apiMocks.getAgents).toHaveBeenCalledWith({ includeSeed: true });
-    expect(apiMocks.getDepartments).toHaveBeenNthCalledWith(1, { workflowPackKey: "development" });
-    expect(apiMocks.getDepartments).toHaveBeenNthCalledWith(2, { workflowPackKey: "video_preprod" });
-    expect(result.current.apiAssignAgents).toEqual([
-      { id: "agent-dev", workflow_pack_key: "development" },
-      { id: "agent-video", workflow_pack_key: "video_preprod" },
-      { id: "agent-legacy" },
-    ]);
-    expect(result.current.apiAssignDepts).toEqual([
-      { id: "planning", name: "Planning", name_ko: "기획", workflow_pack_key: "development" },
-      { id: "planning", name: "Storyboard", name_ko: "스토리보드", workflow_pack_key: "video_preprod" },
-    ]);
+    expect(apiMocks.getAgents).toHaveBeenCalledWith();
+    expect(apiMocks.getDepartments).toHaveBeenCalledWith();
+    expect(result.current.apiAssignAgents).toEqual([{ id: "agent-dev" }, { id: "agent-ops" }]);
+    expect(result.current.apiAssignDepts).toEqual([{ id: "planning", name: "Planning", name_ko: "기획" }]);
   });
 });

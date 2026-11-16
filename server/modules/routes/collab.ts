@@ -12,7 +12,7 @@ import { initializeCollabLanguagePolicy } from "./collab/language-policy.ts";
 import { initializeProjectResolution, type DelegationOptions } from "./collab/project-resolution.ts";
 import { initializeSubtaskDelegation } from "./collab/subtask-delegation.ts";
 import { createTaskDelegationHandler } from "./collab/task-delegation.ts";
-import { getDepartmentForPack, readActiveOfficeWorkflowPackKey } from "../workflow/packs/department-scope.ts";
+import { getDepartment } from "../workflow/department-lookup.ts";
 
 export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
   const __ctx: RuntimeContext = ctx;
@@ -732,13 +732,9 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     );
   }
 
-  function getDeptName(deptId: string, workflowPackKey?: string | null): string {
+  function getDeptName(deptId: string): string {
     const lang = getPreferredLanguage();
-    const scoped = getDepartmentForPack(
-      db as any,
-      workflowPackKey ?? readActiveOfficeWorkflowPackKey(db as any),
-      deptId,
-    );
+    const scoped = getDepartment(db as any, deptId);
     if (!scoped) return deptId;
     if (lang === "ko") return scoped.name_ko || scoped.name || deptId;
     if (lang === "ja") return scoped.name_ja || scoped.name || scoped.name_ko || deptId;

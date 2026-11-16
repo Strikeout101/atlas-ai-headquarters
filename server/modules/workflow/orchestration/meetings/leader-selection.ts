@@ -102,11 +102,10 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
     const fallbackAll = opts?.fallbackAll ?? true;
 
     const taskMeta = db
-      .prepare("SELECT project_id, workflow_pack_key, department_id, title, description FROM tasks WHERE id = ?")
+      .prepare("SELECT project_id, department_id, title, description FROM tasks WHERE id = ?")
       .get(taskId) as
       | {
           project_id: string | null;
-          workflow_pack_key: string | null;
           department_id: string | null;
           title: string;
           description: string | null;
@@ -114,12 +113,6 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
       | undefined;
     const constrainedAgentIds = resolveConstrainedAgentScopeForTask(db as any, {
       project_id: taskMeta?.project_id ?? null,
-      workflow_pack_key: taskMeta?.workflow_pack_key ?? null,
-      department_id: taskMeta?.department_id ?? fallbackDeptId ?? null,
-    });
-    const packScopedAgentIds = resolveConstrainedAgentScopeForTask(db as any, {
-      project_id: null,
-      workflow_pack_key: taskMeta?.workflow_pack_key ?? null,
       department_id: taskMeta?.department_id ?? fallbackDeptId ?? null,
     });
 
@@ -141,11 +134,11 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
         const leaders = getLeadersByDepartmentIds(desiredDeptIds, constrainedAgentIds);
         const seen = new Set(leaders.map((l) => l.id));
 
-        // manual 스코프로 찾지 못한 관련부서 팀장은 팩 스코프로 한 번 더 시도한다.
+        // Related departments with no leader among the assigned staff fall back to that department's leader.
         for (const deptId of relatedDeptIds) {
           const hasDeptLeader = leaders.some((leader) => leader.department_id === deptId);
           if (hasDeptLeader) continue;
-          const fallbackLeader = findTeamLeader(deptId, packScopedAgentIds);
+          const fallbackLeader = findTeamLeader(deptId, null);
           if (!fallbackLeader || seen.has(fallbackLeader.id)) continue;
           leaders.push(fallbackLeader);
           seen.add(fallbackLeader.id);
@@ -153,21 +146,16 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
 
         if (includePlanning) {
           // 기획팀장은 항상 포함
-          const planningLeader =
-            findTeamLeader("planning", constrainedAgentIds) ?? findTeamLeader("planning", packScopedAgentIds);
+          const planningLeader = findTeamLeader("planning", constrainedAgentIds) ?? findTeamLeader("planning", null);
           if (planningLeader && !seen.has(planningLeader.id)) {
             leaders.unshift(planningLeader);
             seen.add(planningLeader.id);
           }
         }
 
-        // manual 모드에서도 관련부서를 감지하지 못했거나 소수일 때는 팩 범위 팀장으로 보강한다.
+        // Too few leaders even in manual mode: top up from the project's assigned leaders.
         if (fallbackAll && leaders.length < minLeaders) {
-          const fallbackScope =
-            Array.isArray(packScopedAgentIds) && packScopedAgentIds.length > 0
-              ? packScopedAgentIds
-              : constrainedAgentIds;
-          for (const leader of getAllActiveTeamLeaders(fallbackScope)) {
+          for (const leader of getAllActiveTeamLeaders(constrainedAgentIds)) {
             if (seen.has(leader.id)) continue;
             leaders.push(leader);
             seen.add(leader.id);

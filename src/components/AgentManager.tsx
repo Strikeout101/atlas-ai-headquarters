@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react
 import type { Agent, Department } from "../types";
 import { useI18n } from "../i18n";
 import * as api from "../api";
-import { normalizeOfficeWorkflowPack } from "../app/office-workflow-pack";
 import { buildSpriteMap } from "./AgentAvatar";
 import AgentFormModal from "./agent-manager/AgentFormModal";
 import AgentsTab from "./agent-manager/AgentsTab";
@@ -13,20 +12,10 @@ import DepartmentsTab from "./agent-manager/DepartmentsTab";
 import type { AgentManagerProps, FormData } from "./agent-manager/types";
 import { pickRandomSpritePair } from "./agent-manager/utils";
 
-export default function AgentManager({
-  agents,
-  departments,
-  onAgentsChange,
-  activeOfficeWorkflowPack,
-  dbBackedOfficePack = false,
-  onSaveOfficePackProfile,
-}: AgentManagerProps) {
+export default function AgentManager({ agents, departments, onAgentsChange }: AgentManagerProps) {
   const { t, locale } = useI18n();
   const isKo = locale.startsWith("ko");
   const tr = (ko: string, en: string) => t({ ko, en, ja: en, zh: en });
-  const officePackKey = normalizeOfficeWorkflowPack(activeOfficeWorkflowPack);
-  const isIsolatedPack = officePackKey !== "development";
-  const useDbBackedPack = isIsolatedPack && dbBackedOfficePack;
 
   const [subTab, setSubTab] = useState<"agents" | "departments">("agents");
   const [search, setSearch] = useState("");
@@ -45,18 +34,6 @@ export default function AgentManager({
   const [draggingDeptId, setDraggingDeptId] = useState<string | null>(null);
   const [dragOverDeptId, setDragOverDeptId] = useState<string | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<"before" | "after" | null>(null);
-
-  const persistIsolatedProfile = useCallback(
-    async (nextDepartments: Department[], nextAgents: Agent[]) => {
-      if (!isIsolatedPack) return;
-      await onSaveOfficePackProfile(officePackKey, {
-        departments: nextDepartments,
-        agents: nextAgents,
-        updated_at: Date.now(),
-      });
-    },
-    [isIsolatedPack, officePackKey, onSaveOfficePackProfile],
-  );
 
   useEffect(() => {
     setDeptOrder([...departments].sort((a, b) => a.sort_order - b.sort_order));
@@ -148,112 +125,32 @@ export default function AgentManager({
         personality: form.personality.trim() || null,
         autonomy_enabled: form.autonomy_enabled ? 1 : 0,
       };
-      if (isIsolatedPack) {
-        if (useDbBackedPack) {
-          if (modalAgent) {
-            await api.updateAgent(modalAgent.id, {
-              ...basePayload,
-              department_id: departmentId || null,
-              workflow_pack_key: officePackKey,
-            });
-            const nextAgents = agents.map((agent) =>
-              agent.id === modalAgent.id
-                ? {
-                    ...agent,
-                    ...basePayload,
-                    department_id: departmentId || null,
-                  }
-                : agent,
-            );
-            await persistIsolatedProfile(departments, nextAgents);
-          } else {
-            const createdAgent = await api.createAgent({
-              ...basePayload,
-              department_id: departmentId || null,
-              workflow_pack_key: officePackKey,
-            });
-            await persistIsolatedProfile(departments, [...agents, createdAgent]);
-          }
-          onAgentsChange();
-        } else {
-          const nextAgents = modalAgent
-            ? agents.map((agent) =>
-                agent.id === modalAgent.id
-                  ? {
-                      ...agent,
-                      ...basePayload,
-                      department_id: departmentId || null,
-                    }
-                  : agent,
-              )
-            : [
-                ...agents,
-                {
-                  id:
-                    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                      ? crypto.randomUUID()
-                      : `agent-${Date.now()}`,
-                  ...basePayload,
-                  department_id: departmentId || null,
-                  status: "idle" as const,
-                  current_task_id: null,
-                  stats_tasks_done: 0,
-                  stats_xp: 0,
-                  created_at: Date.now(),
-                },
-              ];
-          await persistIsolatedProfile(departments, nextAgents);
-        }
+      if (modalAgent) {
+        await api.updateAgent(modalAgent.id, {
+          ...basePayload,
+          department_id: departmentId || null,
+        });
       } else {
-        if (modalAgent) {
-          await api.updateAgent(modalAgent.id, {
-            ...basePayload,
-            department_id: departmentId || null,
-          });
-        } else {
-          await api.createAgent({
-            ...basePayload,
-            department_id: departmentId || null,
-          });
-        }
-        onAgentsChange();
+        await api.createAgent({
+          ...basePayload,
+          department_id: departmentId || null,
+        });
       }
+      onAgentsChange();
       closeModal();
     } catch (err) {
       console.error("Save failed:", err);
     } finally {
       setSaving(false);
     }
-  }, [
-    agents,
-    closeModal,
-    departments,
-    form,
-    isIsolatedPack,
-    modalAgent,
-    onAgentsChange,
-    persistIsolatedProfile,
-    useDbBackedPack,
-  ]);
+  }, [closeModal, form, modalAgent, onAgentsChange]);
 
   const handleDelete = useCallback(
     async (id: string) => {
       setSaving(true);
       try {
-        if (isIsolatedPack) {
-          if (useDbBackedPack) {
-            await api.deleteAgent(id);
-            const nextAgents = agents.filter((agent) => agent.id !== id);
-            await persistIsolatedProfile(departments, nextAgents);
-            onAgentsChange();
-          } else {
-            const nextAgents = agents.filter((agent) => agent.id !== id);
-            await persistIsolatedProfile(departments, nextAgents);
-          }
-        } else {
-          await api.deleteAgent(id);
-          onAgentsChange();
-        }
+        await api.deleteAgent(id);
+        onAgentsChange();
         setConfirmDeleteId(null);
         if (modalAgent?.id === id) closeModal();
       } catch (err) {
@@ -262,16 +159,7 @@ export default function AgentManager({
         setSaving(false);
       }
     },
-    [
-      agents,
-      closeModal,
-      departments,
-      isIsolatedPack,
-      modalAgent,
-      onAgentsChange,
-      persistIsolatedProfile,
-      useDbBackedPack,
-    ],
+    [closeModal, modalAgent, onAgentsChange],
   );
 
   const openCreateDept = useCallback(() => {
@@ -341,30 +229,16 @@ export default function AgentManager({
         ...department,
         sort_order: index + 1,
       }));
-      if (isIsolatedPack) {
-        if (useDbBackedPack) {
-          const orders = nextDepartments.map((department) => ({
-            id: department.id,
-            sort_order: department.sort_order,
-          }));
-          await api.reorderDepartments(orders, { workflowPackKey: officePackKey });
-          await persistIsolatedProfile(nextDepartments, agents);
-          onAgentsChange();
-        } else {
-          await persistIsolatedProfile(nextDepartments, agents);
-        }
-      } else {
-        const orders = nextDepartments.map((department) => ({ id: department.id, sort_order: department.sort_order }));
-        await api.reorderDepartments(orders);
-        onAgentsChange();
-      }
+      const orders = nextDepartments.map((department) => ({ id: department.id, sort_order: department.sort_order }));
+      await api.reorderDepartments(orders);
+      onAgentsChange();
       setDeptOrderDirty(false);
     } catch (err) {
       console.error("Reorder failed:", err);
     } finally {
       setReorderSaving(false);
     }
-  }, [agents, deptOrder, isIsolatedPack, onAgentsChange, persistIsolatedProfile, useDbBackedPack]);
+  }, [deptOrder, onAgentsChange]);
 
   const resetDeptOrder = useCallback(() => {
     setDeptOrder([...departments].sort((a, b) => a.sort_order - b.sort_order));
@@ -403,85 +277,6 @@ export default function AgentManager({
       clearDeptDragState();
     },
     [clearDeptDragState, draggingDeptId, getDropPosition, moveDeptByDrag],
-  );
-
-  const handleIsolatedDepartmentSave = useCallback(
-    async (input: {
-      mode: "create" | "update";
-      id: string;
-      payload: {
-        name: string;
-        name_ko: string;
-        name_ja: string | null;
-        name_zh: string | null;
-        icon: string;
-        color: string;
-        description: string | null;
-        prompt: string | null;
-        sort_order: number;
-      };
-    }) => {
-      if (!isIsolatedPack) return;
-      const nextDepartments =
-        input.mode === "create"
-          ? [
-              ...departments,
-              {
-                id: input.id,
-                name: input.payload.name,
-                name_ko: input.payload.name_ko,
-                name_ja: input.payload.name_ja,
-                name_zh: input.payload.name_zh,
-                icon: input.payload.icon,
-                color: input.payload.color,
-                description: input.payload.description,
-                prompt: input.payload.prompt,
-                sort_order: input.payload.sort_order,
-                created_at: Date.now(),
-              },
-            ]
-          : departments.map((department) =>
-              department.id === input.id
-                ? {
-                    ...department,
-                    name: input.payload.name,
-                    name_ko: input.payload.name_ko,
-                    name_ja: input.payload.name_ja,
-                    name_zh: input.payload.name_zh,
-                    icon: input.payload.icon,
-                    color: input.payload.color,
-                    description: input.payload.description,
-                    prompt: input.payload.prompt,
-                    sort_order: input.payload.sort_order,
-                  }
-                : department,
-            );
-      await persistIsolatedProfile(nextDepartments, agents);
-    },
-    [agents, departments, isIsolatedPack, persistIsolatedProfile],
-  );
-
-  const handleIsolatedDepartmentDelete = useCallback(
-    async (departmentId: string) => {
-      if (!isIsolatedPack) return;
-      const filteredDepartments = departments
-        .filter((department) => department.id !== departmentId)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((department, index) => ({
-          ...department,
-          sort_order: index + 1,
-        }));
-      const nextAgents = agents.map((agent) =>
-        agent.department_id === departmentId
-          ? {
-              ...agent,
-              department_id: null,
-            }
-          : agent,
-      );
-      await persistIsolatedProfile(filteredDepartments, nextAgents);
-    },
-    [agents, departments, isIsolatedPack, persistIsolatedProfile],
   );
 
   return (
@@ -598,12 +393,7 @@ export default function AgentManager({
           tr={tr}
           department={editDept}
           departments={departments}
-          workflowPackKey={isIsolatedPack ? officePackKey : undefined}
-          onSave={() => {
-            if (!isIsolatedPack || useDbBackedPack) onAgentsChange();
-          }}
-          onSaveDepartment={isIsolatedPack && !useDbBackedPack ? handleIsolatedDepartmentSave : undefined}
-          onDeleteDepartment={isIsolatedPack && !useDbBackedPack ? handleIsolatedDepartmentDelete : undefined}
+          onSave={onAgentsChange}
           onClose={closeDeptModal}
         />
       )}

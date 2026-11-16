@@ -5,7 +5,6 @@ import GatewaySettingsTab from "./GatewaySettingsTab";
 
 const apiMocks = vi.hoisted(() => ({
   getAgents: vi.fn(),
-  getWorkflowPacks: vi.fn(),
   getMessengerRuntimeSessions: vi.fn(),
   getTelegramReceiverStatus: vi.fn(),
   getDiscordReceiverStatus: vi.fn(),
@@ -15,7 +14,6 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock("../../api", () => ({
   getAgents: apiMocks.getAgents,
-  getWorkflowPacks: apiMocks.getWorkflowPacks,
   getMessengerRuntimeSessions: apiMocks.getMessengerRuntimeSessions,
   getTelegramReceiverStatus: apiMocks.getTelegramReceiverStatus,
   getDiscordReceiverStatus: apiMocks.getDiscordReceiverStatus,
@@ -48,7 +46,6 @@ function createFormWithMessengerChannels(overrides?: Record<string, unknown>): R
 describe("GatewaySettingsTab characterization", () => {
   beforeEach(() => {
     apiMocks.getAgents.mockReset();
-    apiMocks.getWorkflowPacks.mockReset();
     apiMocks.getMessengerRuntimeSessions.mockReset();
     apiMocks.getTelegramReceiverStatus.mockReset();
     apiMocks.getDiscordReceiverStatus.mockReset();
@@ -56,7 +53,6 @@ describe("GatewaySettingsTab characterization", () => {
     apiMocks.listDiscordChannelsByToken.mockReset();
 
     apiMocks.getAgents.mockResolvedValue([]);
-    apiMocks.getWorkflowPacks.mockResolvedValue({ packs: [] });
     apiMocks.getMessengerRuntimeSessions.mockResolvedValue([]);
     apiMocks.getTelegramReceiverStatus.mockResolvedValue({
       running: false,
@@ -91,14 +87,13 @@ describe("GatewaySettingsTab characterization", () => {
         token: "telegram-token",
         receiveEnabled: true,
         sessions: [
-          { id: "empty", name: "Empty Chat", targetId: "", enabled: true, token: "t1", workflowPackKey: "development" },
+          { id: "empty", name: "Empty Chat", targetId: "", enabled: true, token: "t1" },
           {
             id: "valid",
             name: "Valid Chat",
             targetId: "-100123456",
             enabled: true,
             token: "t2",
-            workflowPackKey: "development",
           },
         ],
       },
@@ -129,7 +124,6 @@ describe("GatewaySettingsTab characterization", () => {
             targetId: "-100123456",
             enabled: true,
             token: "t-ops",
-            workflowPackKey: "development",
           },
         ],
       },
