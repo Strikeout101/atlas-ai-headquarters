@@ -25,6 +25,7 @@ import CommandPalette, { type CommandItem } from "../components/command/CommandP
 import TodayView from "../components/today/TodayView";
 import TaskDrawer from "../components/work/TaskDrawer";
 import TeamTabs from "../components/team/TeamTabs";
+import RevenueWorkspace from "../components/revenue/RevenueWorkspace";
 import AutonomyWorkspace from "../components/autonomy/AutonomyWorkspace";
 import VpDecisions from "../components/team/VpDecisions";
 import { SETTINGS_TAB_EVENT, type SettingsTab } from "../components/settings/types";
@@ -771,6 +772,7 @@ export default function AppMainLayout({
               </TodayView>
             )}
 
+            {view === "revenue" && <RevenueWorkspace />}
             {view === "autonomy" && <AutonomyWorkspace departments={departments} />}
 
             {view === "tasks" && (

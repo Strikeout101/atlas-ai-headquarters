@@ -22,6 +22,7 @@ import { isApiRequestError } from "../../api/core";
 import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/business";
 import type { Department, Project } from "../../types";
 import { useI18n } from "../../i18n";
+import { currencyDigits, parseMoney } from "../revenue/money";
 
 const inputClass = "mt-1 min-h-[40px] w-full min-w-0 rounded-lg border px-3 py-2 text-sm";
 const inputStyle = {
@@ -148,7 +149,15 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
     const form = new FormData(event.currentTarget);
     const row: Record<string, unknown> = Object.fromEntries(form.entries());
     if (resource === "goals") {
-      row.target = Number(row.target);
+      if (["verified_revenue", "revenue", "verified_profit", "profit"].includes(String(row.metric))) {
+        try {
+          row.target =
+            parseMoney(String(row.target), String(row.currency)) / 10 ** currencyDigits(String(row.currency));
+        } catch (cause) {
+          setError(message(cause));
+          return;
+        }
+      } else row.target = Number(row.target);
       row.period_start = new Date(String(row.period_start)).getTime();
       row.period_end = new Date(String(row.period_end)).getTime();
     }
@@ -347,15 +356,47 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           className={inputClass}
                           style={inputStyle}
                         >
-                          {["completed_tasks", "contacts", "drafts"].map((metric) => (
+                          {["completed_tasks", "contacts", "drafts", "verified_revenue"].map((metric) => (
                             <option key={metric} value={metric}>
                               {pretty(metric)}
                             </option>
                           ))}
                           {Boolean(editing?.metric) &&
-                            !["completed_tasks", "contacts", "drafts"].includes(String(editing?.metric)) && (
-                              <option value={String(editing?.metric)}>{pretty(String(editing?.metric))}</option>
-                            )}
+                            !["completed_tasks", "contacts", "drafts", "verified_revenue"].includes(
+                              String(editing?.metric),
+                            ) && <option value={String(editing?.metric)}>{pretty(String(editing?.metric))}</option>}
+                        </select>
+                      </Field>
+                      <Field
+                        label={t({
+                          ko: "금융 목표 통화",
+                          en: "Currency (financial goals)",
+                          ja: "通貨（財務目標）",
+                          zh: "币种（财务目标）",
+                        })}
+                      >
+                        <select
+                          name="currency"
+                          defaultValue={String(editing?.currency ?? "USD")}
+                          className={inputClass}
+                          style={inputStyle}
+                        >
+                          {[
+                            ...new Set([
+                              "USD",
+                              "CAD",
+                              "EUR",
+                              "GBP",
+                              "AUD",
+                              "JPY",
+                              "KWD",
+                              String(editing?.currency ?? "USD"),
+                            ]),
+                          ].map((code) => (
+                            <option key={code} value={code}>
+                              {code}
+                            </option>
+                          ))}
                         </select>
                       </Field>
                       {textField(
@@ -541,8 +582,12 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           : `${pretty(row.metric)} · ${row.progress === null ? t({ ko: "아직 측정되지 않음", en: "Not measured yet", ja: "未測定", zh: "尚未测量" }) : `${row.progress} / ${row.target}`}`}
                       </p>
                       <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-muted)" }}>
-                        {BUSINESS_NAMES[row.business]} ·{" "}
-                        {projects.find((project) => project.id === row.project_id)?.name ?? row.project_id}
+                        {BUSINESS_NAMES[row.business]}
+                        {"metric" in row &&
+                        ["verified_revenue", "revenue", "profit", "verified_profit"].includes(row.metric)
+                          ? ` · ${row.currency ?? "USD"}`
+                          : ""}{" "}
+                        · {projects.find((project) => project.id === row.project_id)?.name ?? row.project_id}
                         {"status" in row && row.status ? ` · ${row.status}` : ""}
                         {"enabled" in row
                           ? ` · ${row.enabled ? "Enabled" : "Paused"} · ${row.consecutive_failures} failures · ${new Date(row.next_run_at).toLocaleString(locale)}`

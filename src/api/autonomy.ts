@@ -7,6 +7,7 @@ export interface BusinessGoal {
   business: BusinessKind;
   project_id: string;
   metric: string;
+  currency?: string;
   target: number;
   period_start: number;
   period_end: number;

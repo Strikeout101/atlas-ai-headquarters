@@ -3,6 +3,10 @@ import { DEFAULT_DEPARTMENT_IDS, factsFromContent, routeApproval } from "./appro
 import { approvalRoute } from "./approval-review-state.ts";
 
 describe("approval policy hard floors", () => {
+  it("always routes spending requests to the owner regardless of business or facts", () => {
+    for (const business of ["tech", "rental", "ventures", null])
+      expect(routeApproval("spend_request", business, {})).toBe("owner");
+  });
   it.each(["spendsMoney", "newPaidAccount", "agreesToTerms", "destructiveSsh"] as const)(
     "routes %s to owner for every otherwise VP action",
     (fact) => {

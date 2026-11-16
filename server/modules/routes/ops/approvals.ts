@@ -10,6 +10,21 @@ import { getApprovalVpState, isOwnerApproval } from "../../approval-review-state
  */
 export type PendingApproval = (
   | {
+      kind: "spend_request";
+      id: string;
+      created_at: number;
+      task_id: string | null;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: BusinessKey;
+      amount_minor: number;
+      currency: string;
+      purpose: string;
+      opportunity_id: string | null;
+      decide_path: string;
+    }
+  | {
       kind: "business_email";
       id: string;
       created_at: number;
@@ -265,6 +280,30 @@ export function listPendingApprovals(
         decide_path: `/api/org-requests/${encodeURIComponent(String(row.id))}/decide`,
       });
     }
+  }
+  if (tableExists(db, "spend_requests")) {
+    const rows = db
+      .prepare(
+        `SELECT r.*,${taskTitle} AS task_title,${agentName} AS agent_name
+      FROM spend_requests r ${taskJoin} ${agentJoin} WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows)
+      items.push({
+        kind: "spend_request",
+        id: String(row.id),
+        created_at: Number(row.created_at),
+        task_id: row.task_id as string | null,
+        task_title: row.task_title as string | null,
+        agent_id: String(row.agent_id ?? "owner"),
+        agent_name: row.agent_name as string | null,
+        business: row.business as BusinessKey,
+        amount_minor: Number(row.amount_minor),
+        currency: String(row.currency),
+        purpose: String(row.purpose),
+        opportunity_id: row.opportunity_id as string | null,
+        decide_path: `/api/finance/spend-requests/${encodeURIComponent(String(row.id))}/decide`,
+      });
   }
   return items
     .sort((a, b) => b.created_at - a.created_at)

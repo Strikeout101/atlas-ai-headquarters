@@ -1,0 +1,46 @@
+.revenue-workspace .revenue-button {
+  min-height: 40px;
+  border: 1px solid var(--th-input-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--th-text-primary);
+  background: var(--th-card-bg);
+  font-size: 13px;
+  cursor: pointer;
+}
+.revenue-workspace .revenue-button:hover {
+  background: var(--th-hover-bg, var(--th-input-bg));
+}
+.revenue-workspace .revenue-button:focus-visible {
+  outline: 2px solid var(--th-accent, #60a5fa);
+  outline-offset: 2px;
+}
+.revenue-workspace .revenue-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.revenue-workspace .revenue-button[aria-selected="true"] {
+  border-color: var(--th-accent, #60a5fa);
+  background: var(--th-input-bg);
+  font-weight: 600;
+}
+.revenue-workspace input,
+.revenue-workspace select,
+.revenue-workspace textarea {
+  min-height: 40px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--th-input-border);
+  border-radius: 8px;
+  background: var(--th-input-bg);
+  color: var(--th-text-primary);
+  font-size: 13px;
+}
+.revenue-workspace input:focus-visible,
+.revenue-workspace select:focus-visible,
+.revenue-workspace textarea:focus-visible {
+  outline: 2px solid var(--th-accent, #60a5fa);
+  outline-offset: 1px;
+}

@@ -16,6 +16,7 @@ const ALL_VIEWS: View[] = [
   "tech",
   "events",
   "ventures",
+  "revenue",
   "outreach",
   "homelab",
   "model_director",

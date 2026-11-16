@@ -5,6 +5,7 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { requireOwnerSession } from "../../../security/auth.ts";
 import { appendAutonomyLedger, autonomyConfig, autonomyOverview, ensureAutonomySchema } from "../../autonomy-store.ts";
 import { isBusinessKey } from "../../businesses.ts";
+import { currencyMinorDigits } from "../../finance-store.ts";
 
 type Body = Record<string, unknown>;
 const SCORE_FIELDS = ["demand_score", "revenue_score", "cost_score", "difficulty_score", "time_to_launch_score"];
@@ -12,7 +13,7 @@ const RESOURCES = {
   goals: {
     table: "business_goals",
     singular: "goal",
-    fields: ["business", "project_id", "metric", "target", "period_start", "period_end"],
+    fields: ["business", "project_id", "metric", "target", "currency", "period_start", "period_end"],
   },
   opportunities: {
     table: "opportunities",
@@ -68,6 +69,8 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
   if (resource === "goals") {
     const metric = boundedText(row.metric, "metric", 80);
     row.metric = metric;
+    row.currency = typeof row.currency === "string" ? row.currency.trim().toUpperCase() : "USD";
+    currencyMinorDigits(String(row.currency));
     if (!/^[a-z][a-z0-9_]*$/i.test(metric)) fail("invalid_metric");
     numeric(row.target, "target", 0, 1e12);
     numeric(row.period_start, "period_start", 0, Number.MAX_SAFE_INTEGER, true);
@@ -112,7 +115,7 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
 }
 
 function defaults(resource: Resource, now: number): Body {
-  if (resource === "goals") return {};
+  if (resource === "goals") return { currency: "USD" };
   if (resource === "opportunities")
     return {
       goal_id: null,

@@ -15,6 +15,7 @@ import { isAutonomyAllowed } from "./control-state.ts";
 import { isPasswordConfigured } from "../security/login-sessions.ts";
 import { ensureAutonomyEngineSchema, runAutonomyEngineTick } from "./autonomy-engine.ts";
 import { runVpPlanningTick } from "./autonomy-planner.ts";
+import { runSquareSyncTick, SQUARE_SYNC_INTERVAL_MS } from "./square-sync.ts";
 import {
   getContextRollover,
   releaseStaleContextRolloverClaims,
@@ -565,6 +566,25 @@ export function startLifecycle(ctx: RuntimeContext): void {
   };
   setTimeout(vpTick, 2 * 60_000);
   setInterval(vpTick, VP_REVIEW_TICK_MS);
+  let squareTickRunning = false;
+  const squareTick = async () => {
+    if (
+      squareTickRunning ||
+      !isAutonomyAllowed() ||
+      db.prepare("SELECT 1 FROM settings WHERE key='__e2eRuntimeId'").get()
+    )
+      return;
+    squareTickRunning = true;
+    try {
+      await runSquareSyncTick(db);
+    } catch {
+      console.error("[square-sync] Read-only sync failed; review Square connection status in Settings.");
+    } finally {
+      squareTickRunning = false;
+    }
+  };
+  setTimeout(squareTick, 45_000);
+  setInterval(squareTick, SQUARE_SYNC_INTERVAL_MS);
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 

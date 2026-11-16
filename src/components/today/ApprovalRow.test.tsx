@@ -30,6 +30,27 @@ function renderRow(item: PendingApproval) {
 }
 
 describe("ApprovalRow", () => {
+  it("shows an owner-only spending permission in currency minor units without implying a payment", async () => {
+    const item: PendingApproval = {
+      kind: "spend_request",
+      id: "spend-1",
+      created_at: Date.now(),
+      task_id: null,
+      task_title: null,
+      agent_id: "worker",
+      agent_name: "Iris",
+      business: "ventures",
+      amount_minor: 125,
+      currency: "JPY",
+      purpose: "One design asset license",
+      opportunity_id: null,
+    };
+    const { onDecide } = renderRow(item);
+    expect(screen.getByText(/125/)).toBeInTheDocument();
+    expect(screen.getByText("Approval records permission only. It does not move money.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Approve$/ }));
+    expect(onDecide).toHaveBeenCalledWith(item, true);
+  });
   it("shows both VP reasons and the exact organization change for owner escalation", async () => {
     const item: PendingApproval = {
       kind: "org_request",

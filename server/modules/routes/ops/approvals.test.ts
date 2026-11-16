@@ -37,6 +37,22 @@ function harness() {
 }
 
 describe("GET /api/approvals", () => {
+  it("keeps all business spending requests on Today and exposes no action that transfers money", async () => {
+    const { app, db } = harness();
+    db.exec(`CREATE TABLE spend_requests(id TEXT,business TEXT,agent_id TEXT,task_id TEXT,amount_minor INTEGER,currency TEXT,purpose TEXT,opportunity_id TEXT,status TEXT,created_at INTEGER);
+      INSERT INTO spend_requests VALUES('spend-1','ventures','bolt','task-1',2450,'USD','Asset license',NULL,'pending',5000);`);
+    const response = await request(app).get("/api/approvals").expect(200);
+    expect(response.body.items).toEqual([
+      expect.objectContaining({
+        kind: "spend_request",
+        id: "spend-1",
+        amount_minor: 2450,
+        currency: "USD",
+        purpose: "Asset license",
+        decide_path: "/api/finance/spend-requests/spend-1/decide",
+      }),
+    ]);
+  });
   it("includes exact pending emails in the shared owner approval list", async () => {
     const { app, db } = harness();
     db.exec(`CREATE TABLE business_email_approvals (id TEXT, created_at INTEGER, task_id TEXT, agent_id TEXT,

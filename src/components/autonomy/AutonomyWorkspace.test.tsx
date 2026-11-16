@@ -40,6 +40,31 @@ beforeEach(() => {
 });
 
 describe("autonomy planning", () => {
+  it("requires financial targets to respect their currency's minor-unit precision", async () => {
+    const user = userEvent.setup();
+    render(<AutonomyWorkspace departments={[]} />);
+    await user.click(await screen.findByRole("button", { name: "Add goals" }));
+    const form = screen.getByRole("form", { name: "Add goals" });
+    await user.selectOptions(within(form).getByLabelText("Project"), "project-1");
+    await user.selectOptions(within(form).getByLabelText("Metric"), "verified_revenue");
+    await user.selectOptions(within(form).getByLabelText("Currency (financial goals)"), "JPY");
+    const target = within(form).getByLabelText("Target");
+    await user.clear(target);
+    await user.type(target, "4.31");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("0 decimal places for JPY");
+    expect(saveAutonomy).not.toHaveBeenCalled();
+    await user.clear(target);
+    await user.type(target, "431");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(saveAutonomy).toHaveBeenCalledWith(
+        "goals",
+        expect.objectContaining({ metric: "verified_revenue", currency: "JPY", target: 431 }),
+        undefined,
+      ),
+    );
+  });
   it("requires an explicit project and saves the lead preset disabled with drafts-only instructions", async () => {
     const user = userEvent.setup();
     render(<AutonomyWorkspace departments={[]} />);

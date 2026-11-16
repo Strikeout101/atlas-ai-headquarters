@@ -127,6 +127,22 @@ describe("VP review", () => {
     );
     expect(h.db.prepare("SELECT provider FROM vp_unavailability").get()).toMatchObject({ provider: "codex" });
   });
+  it("counts a valid verdict even when its reason mentions limits, so request text cannot sideline a reviewer", async () => {
+    const h = harness();
+    h.run
+      .mockResolvedValueOnce({
+        text: '{"verdict":"deny","reason":"The request talks about a usage limit and rate limits; not justified"}',
+      })
+      .mockResolvedValueOnce({ text: '{"verdict":"approve","reason":"Looks fine"}' });
+    await runVpReviewTick(h.deps);
+    // Both reviewed: a deny plus an approve is a disagreement for the owner, not a lone approval.
+    expect(h.run).toHaveBeenCalledTimes(2);
+    expect(h.execute).not.toHaveBeenCalled();
+    expect(h.state()).toMatchObject({ status: "escalated" });
+    expect(h.state()?.reviews).toHaveLength(2);
+    expect(h.db.prepare("SELECT COUNT(*) AS n FROM vp_unavailability").get()).toEqual({ n: 0 });
+  });
+
   it("never treats a busy VP as usage unavailable and keeps peer verdicts private on continuation", async () => {
     const h = harness();
     h.db.exec("UPDATE agents SET status='working' WHERE id='claude-vp'");

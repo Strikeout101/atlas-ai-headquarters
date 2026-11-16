@@ -9,6 +9,7 @@ export type View =
   | "tech"
   | "events"
   | "ventures"
+  | "revenue"
   | "outreach"
   | "homelab"
   | "model_director"

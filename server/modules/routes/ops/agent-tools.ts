@@ -11,6 +11,13 @@ import { requestEmailApproval, getEmailApprovalStatus } from "./business-email.t
 import { listAgentMailboxes } from "./business-mailboxes.ts";
 import { isBusinessKey } from "../../businesses.ts";
 import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
+import {
+  createDeal,
+  updateDeal,
+  createSpendRequest,
+  financeOverview,
+  ensureFinanceSchema,
+} from "../../finance-store.ts";
 
 const BUSINESS_RESOURCES = new Set(["contacts", "tickets", "quotes", "drafts"]);
 const BUSINESS_ACTIONS = new Set(["list", "get", "create", "update", "delete"]);
@@ -48,6 +55,51 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
       req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
     const operation = body.operation;
     try {
+      if (typeof operation === "string" && operation.startsWith("finance.")) {
+        ensureFinanceSchema(db);
+        if (operation === "finance.read") {
+          if (body.business !== undefined && !isBusinessKey(body.business))
+            return res.status(400).json({ error: "invalid_business" });
+          return res.json({
+            ok: true,
+            ...financeOverview(db, { business: typeof body.business === "string" ? body.business : undefined }),
+          });
+        }
+        const payload =
+          body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+            ? (body.payload as Record<string, unknown>)
+            : {};
+        if (operation === "finance.request_spend") {
+          const allowed = ["business", "opportunity_id", "amount_minor", "currency", "purpose"];
+          if (Object.keys(payload).some((key) => !allowed.includes(key)))
+            return res.status(400).json({ error: "finance_protected_field" });
+          const item = createSpendRequest(db, { ...payload, agent_id: claims.agentId, task_id: claims.taskId });
+          return res.status(201).json({ ok: true, item });
+        }
+        if (operation === "finance.deals.create" || operation === "finance.deals.update") {
+          const allowed = [
+            "business",
+            "contact_id",
+            "project_id",
+            "opportunity_id",
+            "title",
+            "stage",
+            "expected_amount_minor",
+            "currency",
+            "notes",
+            "generated_at",
+            "ordered_at",
+          ];
+          if (payload.stage === "paid" || Object.keys(payload).some((key) => !allowed.includes(key)))
+            return res.status(403).json({ error: "finance_protected_field" });
+          const item =
+            operation === "finance.deals.create"
+              ? createDeal(db, payload)
+              : updateDeal(db, typeof body.id === "string" ? body.id : "", payload);
+          return res.status(operation === "finance.deals.create" ? 201 : 200).json({ ok: true, item });
+        }
+        return res.status(403).json({ error: "finance_operation_forbidden" });
+      }
       if (operation === "org.request_status") {
         const request = db
           .prepare("SELECT * FROM org_requests WHERE id=? AND requested_by=?")

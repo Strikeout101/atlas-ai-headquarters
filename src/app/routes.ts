@@ -27,6 +27,7 @@ export const VIEW_PATHS: Record<View, string> = {
   tech: "/tech",
   events: "/events",
   ventures: "/ventures",
+  revenue: "/revenue",
   outreach: "/outreach",
   homelab: "/homelab",
   agents: "/team",
@@ -135,6 +136,13 @@ export const NAV_ITEMS: NavItem[] = [
     section: "workspaces",
     label: { ko: "벤처", en: "Ventures", ja: "ベンチャー", zh: "创业项目" },
     keywords: "business ai etsy shop digital products game assets itch dashboards online store",
+  },
+  {
+    view: "revenue",
+    icon: ListChecks,
+    section: "workspaces",
+    label: { ko: "매출", en: "Revenue", ja: "売上", zh: "收入" },
+    keywords: "receipts payments costs finance pipeline deals square spending verified",
   },
   {
     view: "outreach",

@@ -168,7 +168,11 @@ export async function runVpReviewTick(deps: ReviewDeps): Promise<void> {
           reply = { text: "", error: "review_failed" };
         }
         if (!isAutonomyAllowed()) return;
+        const parsed = !reply.error ? parseVpVerdict(reply.text) : null;
+        // A usable verdict always counts. Limit wording is only read from replies that are not verdicts, so text
+        // inside the request being reviewed can never get a reviewer skipped and leave the other deciding alone.
         if (
+          !parsed &&
           /usage_limit_reached|usage limit|quota exceeded|insufficient_quota|rate.limit|hit your limit/i.test(
             `${reply.error ?? ""} ${reply.text}`,
           )
@@ -179,7 +183,6 @@ export async function runVpReviewTick(deps: ReviewDeps): Promise<void> {
           skips.push(`${vp.name}: provider usage limit`);
           continue;
         }
-        const parsed = !reply.error ? parseVpVerdict(reply.text) : null;
         verdict = parsed ?? {
           verdict: "escalate",
           reason: `${vp.name} did not return a valid review; owner review required.`,

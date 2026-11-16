@@ -3,6 +3,7 @@ import { Cpu, Lightbulb, Mail, TerminalSquare } from "lucide-react";
 import type { PendingApproval } from "../../api";
 import { useI18n } from "../../i18n";
 import { timeAgo } from "../dashboard/model";
+import { formatMoney } from "../revenue/money";
 
 interface ApprovalRowProps {
   item: PendingApproval;
@@ -57,9 +58,11 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
       ? "Email to send"
       : isProposal
         ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
-        : item.kind === "org_request"
-          ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
-          : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+        : item.kind === "spend_request"
+          ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
+          : item.kind === "org_request"
+            ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
+            : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
@@ -146,6 +149,19 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             </pre>
             <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
               Approving sends this exact message once. No attachments or other recipients.
+            </p>
+          </div>
+        ) : item.kind === "spend_request" ? (
+          <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <p className="font-medium">{formatMoney(item.amount_minor, item.currency, localeTag)}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words">{item.purpose}</p>
+            <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {t({
+                ko: "승인은 권한만 기록하며 돈을 이동하지 않습니다.",
+                en: "Approval records permission only. It does not move money.",
+                ja: "承認は許可の記録のみです。送金は行いません。",
+                zh: "批准仅记录许可，不会转移资金。",
+              })}
             </p>
           </div>
         ) : item.kind === "org_request" ? (

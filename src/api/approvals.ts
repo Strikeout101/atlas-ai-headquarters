@@ -22,6 +22,14 @@ interface PendingApprovalBase {
 
 export type PendingApproval =
   | (PendingApprovalBase & {
+      kind: "spend_request";
+      business: BusinessKind;
+      amount_minor: number;
+      currency: string;
+      purpose: string;
+      opportunity_id: string | null;
+    })
+  | (PendingApprovalBase & {
       kind: "org_request";
       org_kind: string;
       payload: Record<string, unknown>;
@@ -73,6 +81,10 @@ export async function getPendingApprovals(): Promise<PendingApproval[]> {
 
 /** Decides one approval through the same endpoint its own page uses. */
 export async function decidePendingApproval(item: PendingApproval, approve: boolean): Promise<void> {
+  if (item.kind === "spend_request") {
+    await post(`/api/finance/spend-requests/${encodeURIComponent(item.id)}/decide`, { approve });
+    return;
+  }
   if (item.kind === "business_email") {
     const result = await businessEmailApi.decide(item.id, approve).catch((cause: unknown) => {
       if (approve && !isApiRequestError(cause)) {

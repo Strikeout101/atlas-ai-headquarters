@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, type BusinessKey } from "./businesses.ts";
+import { getFinancialGoalProgress } from "./finance-store.ts";
 
 export interface AutonomyConfig {
   id: number;
@@ -15,6 +16,7 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     CREATE TABLE IF NOT EXISTS business_goals (
       id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
       project_id TEXT NOT NULL REFERENCES projects(id), metric TEXT NOT NULL, target REAL NOT NULL CHECK(target>=0),
+      currency TEXT NOT NULL DEFAULT 'USD',
       period_start INTEGER NOT NULL, period_end INTEGER NOT NULL CHECK(period_end>period_start),
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
@@ -63,6 +65,12 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_autonomy_work_task ON autonomy_work(task_id);
     CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(enabled,next_run_at);
   `);
+  if (
+    !(db.prepare("PRAGMA table_info(business_goals)").all() as Array<{ name: string }>).some(
+      (column) => column.name === "currency",
+    )
+  )
+    db.exec("ALTER TABLE business_goals ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'");
 }
 
 export function autonomyConfig(db: DatabaseSync): AutonomyConfig {
@@ -95,6 +103,8 @@ function goalProgress(
   db: DatabaseSync,
   goal: Record<string, unknown>,
 ): { progress: number | null; progress_scope: string | null } {
+  if (["revenue", "verified_revenue", "profit"].includes(String(goal.metric)) && tableExists(db, "ledger_entries"))
+    return getFinancialGoalProgress(db, goal);
   if (goal.metric === "completed_tasks" && tableExists(db, "tasks")) {
     const row = db
       .prepare(

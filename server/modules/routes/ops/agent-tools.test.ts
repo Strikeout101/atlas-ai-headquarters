@@ -12,6 +12,8 @@ import { ensureBusinessSchema } from "./business.ts";
 import { ensureBusinessMailboxSchema } from "./business-mailboxes.ts";
 import { ensureBusinessEmailSchema } from "./business-email.ts";
 import { ensureBusinessSocialSchema } from "./business-social.ts";
+import { ensureAutonomySchema } from "../../autonomy-store.ts";
+import { ensureFinanceSchema } from "../../finance-store.ts";
 
 const databases: DatabaseSync[] = [];
 afterEach(() => {
@@ -41,6 +43,67 @@ function harness() {
 }
 
 describe("task-scoped agent tools", () => {
+  it("records a task-scoped spending request but cannot approve it, forge attribution, or move money", async () => {
+    const { app, db, token } = harness();
+    ensureAutonomySchema(db);
+    ensureFinanceSchema(db);
+    const call = (data: Record<string, unknown>) =>
+      request(app).post("/api/agent-tools").set("x-agent-task-token", token).send(data);
+    const created = await call({
+      operation: "finance.request_spend",
+      payload: {
+        business: "ventures",
+        amount_minor: 2300,
+        currency: "USD",
+        purpose: "One asset license for a prototype",
+      },
+    }).expect(201);
+    expect(created.body.item).toMatchObject({
+      agent_id: "worker",
+      task_id: "task-1",
+      status: "pending",
+      amount_minor: 2300,
+    });
+    await call({
+      operation: "finance.request_spend",
+      payload: { business: "ventures", amount_minor: 2300, currency: "USD", purpose: "Spoofed", agent_id: "owner" },
+    }).expect(400);
+    await call({ operation: "finance.spend.decide", id: created.body.item.id, payload: { approve: true } }).expect(403);
+    await call({ operation: "finance.square.sync" }).expect(403);
+    await call({ operation: "finance.ledger.create", payload: { verified: true, source: "square_payment" } }).expect(
+      403,
+    );
+    expect(db.prepare("SELECT status FROM spend_requests WHERE id=?").get(created.body.item.id)).toEqual({
+      status: "pending",
+    });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM ledger_entries").get()).toEqual({ n: 0 });
+  });
+  it("lets workers prepare internal pipeline records without fabricating paid or published evidence", async () => {
+    const { app, db, token } = harness();
+    ensureAutonomySchema(db);
+    ensureFinanceSchema(db);
+    const call = (data: Record<string, unknown>) =>
+      request(app).post("/api/agent-tools").set("x-agent-task-token", token).send(data);
+    const created = await call({
+      operation: "finance.deals.create",
+      payload: {
+        business: "tech",
+        title: "Router maintenance quote",
+        stage: "proposal",
+        expected_amount_minor: 39000,
+        currency: "USD",
+      },
+    }).expect(201);
+    await call({ operation: "finance.deals.update", id: created.body.item.id, payload: { stage: "paid" } }).expect(403);
+    await call({
+      operation: "finance.deals.update",
+      id: created.body.item.id,
+      payload: { published_at: Date.now() },
+    }).expect(403);
+    const read = await call({ operation: "finance.read", business: "tech" }).expect(200);
+    expect(read.body.deals[0]).toMatchObject({ stage: "proposal", expected_amount_minor: 39000 });
+    expect(JSON.stringify(read.body)).not.toMatch(/token_enc|password_enc/);
+  });
   it("lets leaders request hires for their own department and inspect only their requests", async () => {
     const { app, db, token } = harness();
     db.exec(

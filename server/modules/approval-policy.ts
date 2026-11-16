@@ -15,6 +15,7 @@ export interface ApprovalFacts {
 export function routeApproval(kind: string, business?: string | null, facts: ApprovalFacts = {}): "owner" | "vp" {
   if (facts.spendsMoney || facts.newPaidAccount || facts.agreesToTerms || facts.destructiveSsh) return "owner";
   if (kind === "ssh_command") return "owner";
+  if (kind === "spend_request") return "owner";
   if (
     facts.orgKind === "dissolve_department" &&
     DEFAULT_DEPARTMENT_IDS.includes(facts.departmentId as (typeof DEFAULT_DEPARTMENT_IDS)[number])
