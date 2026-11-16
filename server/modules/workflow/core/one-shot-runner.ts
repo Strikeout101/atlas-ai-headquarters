@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import type { AgentRow, OneShotRunOptions, OneShotRunResult } from "./conversation-types.ts";
+import { areRunsAllowed, registerOneShotAbort, RUNS_HALTED_ERROR } from "../../control-state.ts";
 
 type CreateOneShotRunnerDeps = {
   logsDir: string;
@@ -83,6 +84,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     prompt: string,
     opts: OneShotRunOptions = {},
   ): Promise<OneShotRunResult> {
+    if (!areRunsAllowed()) return { text: "", error: RUNS_HALTED_ERROR };
     const provider = agent.cli_provider || "claude";
     const timeoutMs = opts.timeoutMs ?? 180_000;
     const projectPath = opts.projectPath || process.cwd();
@@ -100,7 +102,13 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     let activeErrorListener: ((err: Error) => void) | null = null;
     let activeCloseListener: ((code: number | null) => void) | null = null;
     let abortActiveRun: ((reason: string) => void) | null = null;
+    let activeController: AbortController | null = null;
     let noToolsViolationDetected = false;
+    // Lets the owner's "stop everything" end this call, whichever transport it uses.
+    const unregisterHalt = registerOneShotAbort((reason) => {
+      if (abortActiveRun) abortActiveRun(reason);
+      else activeController?.abort();
+    });
     const detachChildListeners = () => {
       const child = activeChild;
       if (!child) return;
@@ -140,6 +148,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     try {
       if (provider === "api") {
         const controller = new AbortController();
+        activeController = controller;
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         try {
           await executeApiProviderAgent(
@@ -161,6 +170,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
         if (!rawOutput.trim() && fs.existsSync(logPath)) rawOutput = fs.readFileSync(logPath, "utf8");
       } else if (provider === "copilot" || provider === "antigravity") {
         const controller = new AbortController();
+        activeController = controller;
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         const oauthWrite = (text: string) => {
           rawOutput += text;
@@ -300,7 +310,9 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
       }
       return { text: "", error: message };
     } finally {
+      unregisterHalt();
       abortActiveRun = null;
+      activeController = null;
       detachChildListeners();
       await new Promise<void>((resolve) => safeEnd(resolve));
     }

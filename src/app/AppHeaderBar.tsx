@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { View } from "./types";
+import { EmergencyButtons } from "../components/control/EmergencyControls";
 
 interface AppHeaderBarProps {
   currentView: View;
@@ -115,6 +116,7 @@ export default function AppHeaderBar({
       </div>
 
       <div className="flex items-center gap-1 sm:gap-1.5">
+        <EmergencyButtons />
         {onOpenCommandBar && (
           <button
             type="button"

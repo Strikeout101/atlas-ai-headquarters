@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import type { DecryptedOAuthToken } from "./types.ts";
 import { createStreamTools } from "./stream-tools.ts";
+import { assertRunsAllowed } from "../../../control-state.ts";
 
 type DbLike = {
   prepare: (sql: string) => {
@@ -329,6 +330,7 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
     preferredOAuthAccountId?: string | null,
     onComplete?: (exitCode: number) => void,
   ): void {
+    assertRunsAllowed();
     const logStream = fs.createWriteStream(logPath, { flags: "a" });
     const { safeWrite, safeEnd } = createSafeLogStreamOps(logStream);
     safeWrite(`\n===== task run start ${new Date().toISOString()} | provider=${agent} =====\n`);

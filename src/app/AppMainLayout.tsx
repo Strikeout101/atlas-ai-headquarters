@@ -49,6 +49,7 @@ import AppHeaderBar from "./AppHeaderBar";
 import { DEFAULT_OFFICE_POSE } from "../components/atlas-office/layout";
 import BusinessWorkspace from "../components/BusinessWorkspace";
 import HomelabWorkspace from "../components/HomelabWorkspace";
+import { EmergencyBanner } from "../components/control/EmergencyControls";
 import ModelDirectorWorkspace from "../components/ModelDirectorWorkspace";
 
 const AtlasOffice = lazy(() => import("../components/atlas-office/AtlasOffice"));
@@ -552,6 +553,8 @@ export default function AppMainLayout({
             commandBarLabel={tr({ ko: "검색 및 이동", en: "Search and jump", ja: "検索・移動", zh: "搜索与跳转" })}
             moreLabel={tr({ ko: "더보기", en: "More", ja: "その他", zh: "更多" })}
           />
+
+          <EmergencyBanner />
 
           {executiveDesktopOpen && view !== "office" && (
             <div className="flex items-center justify-between border-b border-slate-500/30 bg-slate-800 px-4 py-2 text-sm text-white">

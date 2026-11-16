@@ -7,6 +7,7 @@ import { IncompleteProviderStreamError } from "./stream-tools.ts";
 import { getCurrentTaskModelRoute } from "../../../model-routing.ts";
 import { createOpenCodeContextMonitor } from "./opencode-context-monitor.ts";
 import { setContextRolloverProcessPid } from "../context-rollover-store.ts";
+import { assertRunsAllowed } from "../../../control-state.ts";
 
 class ProviderUnavailableError extends Error {
   constructor(message: string) {
@@ -294,6 +295,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     fakePid: number,
     onComplete?: (exitCode: number) => void,
   ): void {
+    assertRunsAllowed();
     const provider = apiProviderId ? getApiProviderById(apiProviderId) : null;
     const taskRoute = getCurrentTaskModelRoute(db as any, taskId);
     if (taskRoute?.provider === "api") apiModel = taskRoute.model;

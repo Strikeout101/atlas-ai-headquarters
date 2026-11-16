@@ -1,4 +1,5 @@
 import path from "node:path";
+import { areRunsAllowed, RUNS_HALTED_ERROR } from "../../../control-state.ts";
 import { notifyTaskStatus } from "../../../../gateway/client.ts";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
 import type { AgentRow } from "../../shared/types.ts";
@@ -101,6 +102,7 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
         }
       | undefined;
     if (!task) return res.status(404).json({ error: "not_found" });
+    if (!areRunsAllowed()) return res.status(409).json({ error: RUNS_HALTED_ERROR });
     const taskLang = resolveLang(task.description ?? task.title);
 
     if (activeProcesses.has(id)) {

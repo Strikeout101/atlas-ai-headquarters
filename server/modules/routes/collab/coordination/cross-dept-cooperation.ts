@@ -4,6 +4,7 @@ import type { Lang } from "../../../../types/lang.ts";
 import { getDepartmentPrompt } from "../../../workflow/department-lookup.ts";
 import { resolveConstrainedAgentScopeForTask } from "../../core/tasks/execution-run-auto-assign.ts";
 import type { AgentRow } from "./types.ts";
+import { areRunsAllowed } from "../../../control-state.ts";
 
 interface CrossDeptContext {
   teamLeader: AgentRow;
@@ -238,6 +239,7 @@ export function createCrossDeptCooperationTools(deps: CrossDeptCooperationDeps) 
     ctx: CrossDeptContext,
     onAllDone?: () => void,
   ): void {
+    if (!areRunsAllowed()) return;
     if (index >= deptIds.length) {
       onAllDone?.();
       return;

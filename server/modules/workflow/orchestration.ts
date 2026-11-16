@@ -1,4 +1,5 @@
 import type { RuntimeContext, WorkflowOrchestrationExports } from "../../types/runtime-context.ts";
+import { areRunsAllowed } from "../control-state.ts";
 import type { Lang } from "../../types/lang.ts";
 import fs from "node:fs";
 import os from "node:os";
@@ -675,6 +676,7 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
   }
 
   function resumePendingContextRollovers(): void {
+    if (!areRunsAllowed()) return;
     for (const state of listPendingContextRollovers(db)) scheduleContextRolloverResume(state.taskId);
   }
 

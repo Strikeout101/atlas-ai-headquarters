@@ -43,6 +43,7 @@ import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schem
 import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-packs.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
+import { ensureControlStateSchema } from "./modules/control-state.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
@@ -62,6 +63,7 @@ configureLoginStore(db);
 const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);
+ensureControlStateSchema(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 {

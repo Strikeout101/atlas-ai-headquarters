@@ -1,4 +1,5 @@
 import os from "node:os";
+import { areRunsAllowed, RUNS_HALTED_ERROR } from "../../../control-state.ts";
 import path from "node:path";
 import { INBOX_WEBHOOK_SECRET } from "../../../../config/runtime.ts";
 import { sendMessengerMessage, sendMessengerSessionMessage } from "../../../../gateway/client.ts";
@@ -435,6 +436,8 @@ export function registerDirectiveAndInboxRoutes(
         return;
       return res.status(401).json({ error: "unauthorized" });
     }
+    // Outside messages would start agent work; refuse them clearly while the owner has everything stopped.
+    if (!areRunsAllowed()) return res.status(503).json({ error: RUNS_HALTED_ERROR });
 
     const text = body.text;
     if (!text || typeof text !== "string" || !text.trim()) {

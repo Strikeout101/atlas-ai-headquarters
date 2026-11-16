@@ -17236,6 +17236,387 @@
           }
         }
       }
+    },
+    "/api/control": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Read the emergency control mode",
+        "description": "running: normal. autonomy_paused: agents start nothing on their own. stopped: no agent run may start and everything in flight is paused. Owner only.",
+        "responses": {
+          "200": {
+            "description": "Current mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": ["running", "autonomy_paused", "stopped"]
+                        },
+                        "changed_at": {
+                          "type": "integer"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "changed_at"],
+                      "additionalProperties": true
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "state": {
+                    "mode": "running",
+                    "changed_at": 0,
+                    "reason": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["settings"],
+        "summary": "Change the emergency control mode",
+        "description": "Pauses running work as needed (sessions and worktrees are kept, nothing is cancelled). Returning to running does not restart paused tasks. Owner only; agent task tokens are rejected.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": ["running", "autonomy_paused", "stopped"]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["mode"],
+                "additionalProperties": true
+              },
+              "example": {
+                "mode": "stopped"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mode changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": ["running", "autonomy_paused", "stopped"]
+                        },
+                        "changed_at": {
+                          "type": "integer"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["mode", "changed_at"],
+                      "additionalProperties": true
+                    },
+                    "paused_tasks": {
+                      "type": "integer"
+                    },
+                    "aborted_calls": {
+                      "type": "integer"
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "state": {
+                    "mode": "stopped",
+                    "changed_at": 1763280000000,
+                    "reason": null
+                  },
+                  "paused_tasks": 2,
+                  "aborted_calls": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "invalid_mode"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   }
 }

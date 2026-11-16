@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ensureControlStateSchema, isAutonomyAllowed } from "./control-state.ts";
 import type { DatabaseSync } from "node:sqlite";
 
 /**
@@ -93,6 +94,8 @@ function columnExists(db: DatabaseSync, table: string, column: string): boolean 
 }
 
 export function ensureAgentProposalSchema(db: DatabaseSync): void {
+  // Suggested tasks are tagged with who started them (tasks.origin).
+  ensureControlStateSchema(db);
   if (!columnExists(db, "agents", "autonomy_enabled")) {
     db.exec("ALTER TABLE agents ADD COLUMN autonomy_enabled INTEGER NOT NULL DEFAULT 0");
   }
@@ -325,7 +328,7 @@ export async function runAutonomyTick(
 ): Promise<{ agentId: string; created: number; error?: string } | null> {
   const { db } = deps;
   const now = deps.now?.() ?? Date.now();
-  if (!isAutonomyEnabled(db)) return null;
+  if (!isAutonomyEnabled(db) || !isAutonomyAllowed()) return null;
   expireStaleProposals(db, now);
   const agent = pickAgentDueForThinking(db, now, { isAgentInMeeting: deps.isAgentInMeeting });
   if (!agent) return null;
@@ -451,8 +454,8 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     }
     db.prepare(
       `INSERT INTO tasks (id, title, description, department_id, assigned_agent_id, project_id, status, priority, task_type,
-         project_path, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?)`,
+         project_path, created_at, updated_at, origin)
+       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?, 'autonomy')`,
     ).run(
       taskId,
       proposal.title,

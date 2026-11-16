@@ -4,6 +4,7 @@ import { getDepartmentPrompt } from "../department-lookup.ts";
 import { routeTaskModel } from "../../model-routing.ts";
 import { getContextRollover, markContextRolloverStarted } from "../agents/context-rollover-store.ts";
 import { buildCompactContextRolloverPrompt } from "../agents/context-rollover-prompt.ts";
+import { automaticStartBlockReason } from "../../control-state.ts";
 import {
   buildInterruptPromptBlock,
   consumeInterruptPrompts,
@@ -81,6 +82,11 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     deptId: string | null,
     deptName: string,
   ): Promise<void> {
+    const blocked = automaticStartBlockReason(db, taskId);
+    if (blocked) {
+      appendTaskLog(taskId, "system", `Not started: ${blocked}`);
+      return;
+    }
     const execName = execAgent.name_ko || execAgent.name;
     const t = nowMs();
     db.prepare(

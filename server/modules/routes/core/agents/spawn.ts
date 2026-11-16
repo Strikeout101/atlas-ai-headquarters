@@ -1,4 +1,5 @@
 import path from "node:path";
+import { areRunsAllowed, RUNS_HALTED_ERROR } from "../../../control-state.ts";
 import { notifyTaskStatus } from "../../../../gateway/client.ts";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
 
@@ -33,6 +34,7 @@ export function registerAgentSpawnRoute(ctx: RuntimeContext): void {
 
   app.post("/api/agents/:id/spawn", (req, res) => {
     const id = String(req.params.id);
+    if (!areRunsAllowed()) return res.status(409).json({ error: RUNS_HALTED_ERROR });
     let agent:
       | {
           id: string;

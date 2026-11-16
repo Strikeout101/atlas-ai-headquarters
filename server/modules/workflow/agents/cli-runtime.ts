@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { getCurrentTaskModelRoute } from "../../model-routing.ts";
 import { createAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { PORT } from "../../../config/runtime.ts";
+import { assertRunsAllowed } from "../../control-state.ts";
 
 type CliRuntimeDeps = {
   db: any;
@@ -231,6 +232,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     extraEnv?: Record<string, string>,
     onRawOutput?: (chunk: Buffer, stream: "stdout" | "stderr") => void,
   ): ChildProcess {
+    assertRunsAllowed();
     clearCliOutputDedup(taskId);
     // Save prompt for debugging
     const promptPath = path.join(logsDir, `${taskId}.prompt.txt`);

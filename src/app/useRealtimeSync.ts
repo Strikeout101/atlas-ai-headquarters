@@ -26,6 +26,7 @@ import {
 } from "./constants";
 import { parseCliSubAgentEvents, shouldParseCliChunkForSubAgents } from "./sub-agent-events";
 import type { View } from "./types";
+import { applyControlState, refreshControlState } from "./controlStore";
 import { appendCapped, areAgentsEquivalent } from "./utils";
 
 type SocketOn = (event: WSEventType, handler: (payload: unknown) => void) => () => void;
@@ -88,6 +89,9 @@ export function useRealtimeSync({
       on("task_update", () => {
         scheduleLiveSync(80);
       }),
+      on("control_state", (payload: unknown) => applyControlState(payload)),
+      // After a reconnect the mode may have changed while this tab was offline.
+      on("connected", () => void refreshControlState()),
       on("agent_status", (payload: unknown) => {
         const p = payload as Agent & { subAgents?: SubAgent[] };
         const { subAgents: incomingSubAgents, ...agentPatch } = p;

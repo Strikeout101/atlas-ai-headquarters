@@ -23,6 +23,7 @@ import { registerAgentToolRoutes } from "./ops/agent-tools.ts";
 import { registerSshApprovalRoutes } from "./ops/ssh-approvals.ts";
 import { registerApprovalRoutes } from "./ops/approvals.ts";
 import { registerAgentProposalRoutes } from "./ops/agent-proposals.ts";
+import { registerControlRoutes } from "./ops/control.ts";
 
 export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   const __ctx: RuntimeContext = ctx;
@@ -233,6 +234,33 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
     recordTaskCreationAudit: (input) => __ctx.recordTaskCreationAudit(input as any),
   });
   registerApprovalRoutes(app, db);
+  registerControlRoutes(app, db, {
+    nowMs,
+    broadcast,
+    activeProcesses,
+    stopRequestedTasks,
+    stopRequestModeByTask,
+    interruptPidTree,
+    stopProgressTimer,
+    appendTaskLog,
+    // Reviews that were waiting behind "stop everything" are picked up again, spaced out like at startup.
+    onRunsAllowedAgain: () => {
+      const reviewTasks = db
+        .prepare("SELECT id, title FROM tasks WHERE status = 'review' ORDER BY updated_at ASC")
+        .all() as Array<{ id: string; title: string }>;
+      reviewTasks.forEach((task, idx) => {
+        setTimeout(
+          () => {
+            const current = db.prepare("SELECT status FROM tasks WHERE id = ?").get(task.id) as
+              | { status: string }
+              | undefined;
+            if (current?.status === "review") finishReview(task.id, task.title);
+          },
+          1200 + idx * 400,
+        );
+      });
+    },
+  });
   registerAgentToolRoutes(app, db, runAgentOneShot);
 
   const { normalizeSkillLearnProviders } = registerSkillRoutes(__ctx);

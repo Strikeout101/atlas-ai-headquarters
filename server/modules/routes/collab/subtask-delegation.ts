@@ -5,6 +5,7 @@ import { createSubtaskDelegationBatch } from "./subtask-delegation-batch.ts";
 import { createSubtaskDelegationPromptBuilder } from "./subtask-delegation-prompt.ts";
 import { initializeSubtaskSummary, type SubtaskRow } from "./subtask-summary.ts";
 import type { L10n } from "./language-policy.ts";
+import { areRunsAllowed } from "../../control-state.ts";
 
 interface SubtaskDelegationDeps {
   db: any;
@@ -204,6 +205,7 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
   }
 
   function processSubtaskDelegations(taskId: string): void {
+    if (!areRunsAllowed()) return;
     if (subtaskDelegationDispatchInFlight.has(taskId)) {
       pendingDelegationRerun.add(taskId);
       return;

@@ -1,4 +1,5 @@
 import { readYoloModeEnabled } from "../../routes/ops/messages/decision-inbox/yolo-mode.ts";
+import { areRunsAllowed } from "../../control-state.ts";
 
 type CreateReviewFinalizeToolsDeps = Record<string, any>;
 
@@ -120,6 +121,8 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     taskTitle: string,
     options?: { bypassProjectDecisionGate?: boolean; trigger?: string },
   ): void {
+    // Stays in review; picked up again when the owner lets runs continue.
+    if (!areRunsAllowed()) return;
     const lang = resolveLang(taskTitle);
     const currentTask = db
       .prepare("SELECT status, department_id, source_task_id, project_id, project_path FROM tasks WHERE id = ?")

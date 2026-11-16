@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { isAutonomyAllowed } from "../../../../control-state.ts";
 import type { DecisionInboxRouteItem } from "./types.ts";
 
 export type DecisionApplyResult = {
@@ -41,6 +42,8 @@ function normalizeBooleanLike(value: unknown): boolean | null {
 }
 
 export function readYoloModeEnabled(db: Pick<DatabaseSync, "prepare">): boolean {
+  // Auto-answering decisions is the agents acting for the owner, so it stops with autonomy.
+  if (!isAutonomyAllowed()) return false;
   const row = db.prepare("SELECT value FROM settings WHERE key = 'yoloMode' LIMIT 1").get() as
     | { value?: unknown }
     | undefined;
