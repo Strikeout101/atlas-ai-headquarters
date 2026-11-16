@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { businessApi, type BusinessProfile } from "../../api/business";
+import { BUSINESS_SETTINGS_NAMES, businessApi, type BusinessProfile } from "../../api/business";
 import BusinessMailboxes from "./BusinessMailboxes";
 import BusinessSocialAccounts from "./BusinessSocialAccounts";
 import SettingsSection from "./SettingsSection";
@@ -48,7 +48,7 @@ function ProfileEditor({
         }
       }}
     >
-      <h3 className="text-sm font-semibold">{profile.business === "tech" ? "Tech services" : "Events and rentals"}</h3>
+      <h3 className="text-sm font-semibold">{BUSINESS_SETTINGS_NAMES[profile.business]}</h3>
       <fieldset disabled={saving} className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {fields.map(([key, label, maxLength]) => (
           <div key={key} className={`flex flex-col gap-2 ${maxLength >= 2000 ? "md:col-span-2" : ""}`}>
@@ -157,7 +157,7 @@ export default function BusinessSettingsTab() {
                 style={{ borderColor: "var(--th-border)" }}
               >
                 <summary className="cursor-pointer text-sm font-medium">
-                  {profile.name || (profile.business === "tech" ? "Tech services" : "Events and rentals")}
+                  {profile.name || BUSINESS_SETTINGS_NAMES[profile.business]}
                 </summary>
                 <ProfileEditor
                   profile={profile}

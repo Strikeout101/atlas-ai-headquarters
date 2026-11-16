@@ -7,7 +7,7 @@ vi.hoisted(() => {
   process.env.ALLOWED_HOSTS = "atlas.lan";
 });
 
-import { installSecurityMiddleware } from "./auth.ts";
+import { installSecurityMiddleware, requireOwnerSession } from "./auth.ts";
 import { __resetLoginStoreForTests } from "./login-sessions.ts";
 import {
   isTrustedNetworkRequest,
@@ -20,11 +20,22 @@ function fakeRequest(remoteAddress: string, headers: Record<string, string>): He
   return { socket: { remoteAddress }, header: (name) => headers[name.toLowerCase()] };
 }
 
-function buildApp() {
+function buildApp(socketPeer?: () => string) {
   const app = express();
+  // Supertest connects over loopback; simulate the transport peer directly,
+  // never through headers that an untrusted local worker could forge.
+  if (socketPeer)
+    app.use((req, _res, next) => {
+      Object.defineProperty(req.socket, "remoteAddress", { value: socketPeer(), configurable: true });
+      next();
+    });
   installSecurityMiddleware(app);
   app.get("/api/protected", (_req, res) => res.json({ ok: true }));
   app.post("/api/protected", (_req, res) => res.json({ ok: true }));
+  app.post("/api/owner-decision", (req, res) => {
+    if (!requireOwnerSession(req, res)) return;
+    res.json({ ok: true });
+  });
   return app;
 }
 
@@ -79,15 +90,29 @@ describe("sign-in flow", () => {
   });
 
   it("signs in trusted-VLAN browsers automatically, and their cookie stops working off the VLAN", async () => {
-    const app = buildApp();
-    const vlan = { Host: "192.168.10.5:8790", "X-Forwarded-For": "192.168.20.7" };
+    let peer = "192.168.20.7";
+    const app = buildApp(() => peer);
+    const vlan = { Host: "192.168.10.5:8790" };
     const res = await request(app).get("/api/auth/session").set(vlan).expect(200);
     expect(res.body.auth.method).toBe("network");
     expect(res.body.auth.trusted_networks).toEqual(["192.168.10.0/24", "192.168.20.0/24", "fd00:10::/64"]);
     const cookie = sessionCookie(res);
 
     await request(app).get("/api/protected").set(vlan).set("Cookie", cookie).expect(200);
+    await request(app).post("/api/owner-decision").set(vlan).set("Cookie", cookie).expect(200);
+    peer = "203.0.113.9";
     await request(app).get("/api/protected").set(OUTSIDER).set("Cookie", cookie).expect(401);
+  });
+
+  it("refuses loopback workers pretending to be a trusted VLAN through forwarding headers", async () => {
+    const app = buildApp();
+    for (const forged of [
+      { Host: "192.168.10.5:8790", "X-Forwarded-For": "192.168.20.7" },
+      { Host: "atlas.lan", "X-Real-IP": "192.168.10.77" },
+      { Host: "atlas.lan", Forwarded: "for=192.168.10.77" },
+    ]) {
+      await request(app).get("/api/auth/session").set(forged).expect(401);
+    }
   });
 
   it("asks everyone else to log in, and refuses until a password exists", async () => {
@@ -213,8 +238,8 @@ describe("sign-in flow", () => {
   });
 
   it("accepts the page's own origin on a known host and rejects foreign origins", async () => {
-    const app = buildApp();
-    const vlan = { Host: "192.168.10.5:8790", "X-Forwarded-For": "192.168.10.77" };
+    const app = buildApp(() => "192.168.10.77");
+    const vlan = { Host: "192.168.10.5:8790" };
     const session = await request(app).get("/api/auth/session").set(vlan).expect(200);
     await request(app)
       .post("/api/protected")

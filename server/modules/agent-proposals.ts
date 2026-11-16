@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ensureControlStateSchema, isAutonomyAllowed } from "./control-state.ts";
+import { BUSINESSES, isBusinessKey } from "./businesses.ts";
 import type { DatabaseSync } from "node:sqlite";
 
 /**
@@ -60,11 +61,6 @@ interface ThinkingContext {
   businesses: string[];
 }
 
-const BUSINESS_LABELS: Record<string, string> = {
-  tech: "Tech services business",
-  rental: "Events and rentals business",
-};
-
 function readBusinessSummaries(db: DatabaseSync): string[] {
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'business_profiles'").get();
   if (!exists) return [];
@@ -83,7 +79,7 @@ function readBusinessSummaries(db: DatabaseSync): string[] {
     ].filter(Boolean);
     const name = clean(row.name, 160);
     if (!name && !details.length) continue;
-    const label = BUSINESS_LABELS[String(row.business)] ?? "Business";
+    const label = isBusinessKey(row.business) ? BUSINESSES[row.business].label : "Business";
     summaries.push(`- ${label}${name ? ` "${name}"` : ""}${details.length ? `. ${details.join(". ")}` : ""}`);
   }
   return summaries;
@@ -119,6 +115,9 @@ export function ensureAgentProposalSchema(db: DatabaseSync): void {
     last_thought_at INTEGER NOT NULL,
     last_error TEXT
   );`);
+  if (!columnExists(db, "agent_task_proposals", "decided_by")) {
+    db.exec("ALTER TABLE agent_task_proposals ADD COLUMN decided_by TEXT");
+  }
 }
 
 export function isAutonomyEnabled(db: DatabaseSync): boolean {
@@ -387,6 +386,7 @@ export async function runAutonomyTick(
 }
 
 export interface DecideDeps {
+  decidedBy?: string;
   appendTaskLog?: (taskId: string, kind: string, message: string) => void;
   broadcast?: (event: string, payload: unknown) => void;
   recordTaskCreationAudit?: (input: Record<string, unknown>) => void;
@@ -400,6 +400,7 @@ export type DecideResult =
 
 /** Approve turns the suggestion into a planned task assigned to the agent who suggested it; dismiss just records it. */
 export function decideProposal(db: DatabaseSync, id: string, approve: boolean, deps: DecideDeps = {}): DecideResult {
+  const decidedBy = deps.decidedBy ?? "owner";
   const now = deps.now?.() ?? Date.now();
   const proposal = db.prepare("SELECT * FROM agent_task_proposals WHERE id = ? AND status = 'pending'").get(id) as
     | {
@@ -417,9 +418,9 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
   if (!approve) {
     const changed = db
       .prepare(
-        "UPDATE agent_task_proposals SET status = 'dismissed', decided_at = ? WHERE id = ? AND status = 'pending'",
+        "UPDATE agent_task_proposals SET status = 'dismissed', decided_at = ?, decided_by = ? WHERE id = ? AND status = 'pending'",
       )
-      .run(now, id).changes;
+      .run(now, decidedBy, id).changes;
     return changed ? { ok: true, status: "dismissed" } : { ok: false, error: "proposal_not_pending" };
   }
 
@@ -436,7 +437,7 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
   const description = [
     proposal.description,
     proposal.reason ? `[WHY] ${proposal.reason}` : "",
-    "[SOURCE] Suggested by the agent and approved by the owner.",
+    `[SOURCE] Suggested by the agent and approved by ${decidedBy}.`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -445,9 +446,9 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
   try {
     const changed = db
       .prepare(
-        "UPDATE agent_task_proposals SET status = 'approved', decided_at = ?, task_id = ? WHERE id = ? AND status = 'pending'",
+        "UPDATE agent_task_proposals SET status = 'approved', decided_at = ?, task_id = ?, decided_by = ? WHERE id = ? AND status = 'pending'",
       )
-      .run(now, taskId, id).changes;
+      .run(now, taskId, decidedBy, id).changes;
     if (!changed) {
       db.exec("ROLLBACK");
       return { ok: false, error: "proposal_not_pending" };
@@ -483,12 +484,12 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     projectPath: project?.project_path ?? null,
     trigger: "autonomy.proposal_approved",
     triggerDetail: `agent proposal ${proposal.id}`,
-    actorType: "user",
+    actorType: decidedBy === "owner" ? "user" : "agent",
   });
   deps.appendTaskLog?.(
     taskId,
     "system",
-    `Task created from an agent suggestion approved by the owner: ${proposal.title}`,
+    `Task created from an agent suggestion approved by ${decidedBy}: ${proposal.title}`,
   );
   deps.broadcast?.("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
   return { ok: true, status: "approved", task_id: taskId };

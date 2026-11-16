@@ -19,7 +19,7 @@ export interface Department {
 }
 
 // Agent roles
-export type AgentRole = "team_leader" | "senior" | "junior" | "intern";
+export type AgentRole = "vp" | "team_leader" | "senior" | "junior" | "intern";
 export type AgentStatus = "idle" | "working" | "break" | "offline";
 export type CliProvider = "claude" | "codex" | "gemini" | "opencode" | "kimi" | "copilot" | "antigravity" | "api";
 export type MeetingReviewDecision = "reviewing" | "approved" | "hold";
@@ -33,6 +33,7 @@ export interface Agent {
   department_id: string | null;
   department?: Department;
   role: AgentRole;
+  cli_fallback_provider?: "codex" | "claude";
   acts_as_planning_leader?: number | null;
   /** 1 when this agent may suggest tasks on its own. Team leaders always can, whatever this says. */
   autonomy_enabled?: number | null;
@@ -268,6 +269,7 @@ export type WSEventType =
   | "agent_created"
   | "agent_deleted"
   | "departments_changed"
+  | "agents_changed"
   | "new_message"
   | "announcement"
   | "cli_output"

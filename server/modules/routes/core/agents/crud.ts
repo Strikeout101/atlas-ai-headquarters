@@ -97,7 +97,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       }
 
       const role =
-        typeof body.role === "string" && ["team_leader", "senior", "junior", "intern"].includes(body.role)
+        typeof body.role === "string" && ["vp", "team_leader", "senior", "junior", "intern"].includes(body.role)
           ? body.role
           : "junior";
       const cli_provider =
@@ -105,6 +105,8 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
         ["claude", "codex", "gemini", "opencode", "kimi", "copilot", "antigravity", "api"].includes(body.cli_provider)
           ? body.cli_provider
           : "claude";
+      if (role === "vp" && (department_id || !["codex", "claude"].includes(cli_provider)))
+        return res.status(400).json({ error: "vp_requires_cli_provider_and_no_department" });
       const avatar_emoji =
         typeof body.avatar_emoji === "string" && body.avatar_emoji.trim() ? body.avatar_emoji.trim() : "🤖";
       const sprite_number =
@@ -145,6 +147,9 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
         }
       }
 
+      if (["codex", "claude"].includes(String(body.cli_fallback_provider))) {
+        db.prepare("UPDATE agents SET cli_fallback_provider=? WHERE id=?").run(String(body.cli_fallback_provider), id);
+      }
       const created = selectAgentWithDepartment(id);
       broadcast("agent_created", created);
       res.status(201).json({ ok: true, agent: created });
@@ -191,6 +196,18 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
     if (!existing) return res.status(404).json({ error: "not_found" });
 
     const body = (req.body ?? {}) as Record<string, unknown>;
+    if (
+      existing.role === "vp" &&
+      (("cli_provider" in body && body.cli_provider !== existing.cli_provider) ||
+        ("role" in body && body.role !== "vp") ||
+        ("department_id" in body && body.department_id))
+    )
+      return res.status(400).json({ error: "vp_identity_locked" });
+    if ("role" in body && !["vp", "team_leader", "senior", "junior", "intern"].includes(String(body.role)))
+      return res.status(400).json({ error: "invalid_role" });
+    if (body.role === "vp" && existing.role !== "vp") return res.status(400).json({ error: "vp_identity_locked" });
+    if ("cli_fallback_provider" in body && !["codex", "claude"].includes(String(body.cli_fallback_provider)))
+      return res.status(400).json({ error: "invalid_cli_fallback_provider" });
     const nextProviderRaw = ("cli_provider" in body ? body.cli_provider : existing.cli_provider) as
       | string
       | null
@@ -321,6 +338,7 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
       "department_id",
       "role",
       "cli_provider",
+      "cli_fallback_provider",
       "oauth_account_id",
       "api_provider_id",
       "api_model",

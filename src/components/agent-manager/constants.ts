@@ -1,7 +1,7 @@
 import type { AgentRole, CliProvider } from "../../types";
 import type { DeptForm, FormData } from "./types";
 
-export const ROLES: AgentRole[] = ["team_leader", "senior", "junior", "intern"];
+export const ROLES: AgentRole[] = ["vp", "team_leader", "senior", "junior", "intern"];
 export const CLI_PROVIDERS: CliProvider[] = [
   "claude",
   "codex",
@@ -14,6 +14,7 @@ export const CLI_PROVIDERS: CliProvider[] = [
 ];
 
 export const ROLE_LABEL: Record<string, { ko: string; en: string }> = {
+  vp: { ko: "부사장", en: "VP" },
   team_leader: { ko: "팀장", en: "Leader" },
   senior: { ko: "시니어", en: "Senior" },
   junior: { ko: "주니어", en: "Junior" },
@@ -21,6 +22,7 @@ export const ROLE_LABEL: Record<string, { ko: string; en: string }> = {
 };
 
 export const ROLE_BADGE: Record<string, string> = {
+  vp: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   team_leader: "bg-amber-500/15 text-amber-400 border-amber-500/25",
   senior: "bg-sky-500/15 text-sky-400 border-sky-500/25",
   junior: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",

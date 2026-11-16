@@ -12,6 +12,7 @@ type Agent = {
   api_model: string | null;
   api_provider_id: string | null;
   cli_reasoning_level: string | null;
+  cli_fallback_provider?: string | null;
 };
 type Task = { id: string; title: string; description: string | null; assigned_agent_id: string | null; status: string };
 type DirectorRun = (
@@ -60,6 +61,11 @@ export function ensureModelRoutingSchema(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS idx_model_upgrade_requests_task ON model_upgrade_requests(task_id, created_at DESC);
   `);
+  const columns = db.prepare("PRAGMA table_info(model_upgrade_requests)").all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === "requested_provider"))
+    db.exec("ALTER TABLE model_upgrade_requests ADD COLUMN requested_provider TEXT");
+  if (!columns.some((c) => c.name === "decided_by"))
+    db.exec("ALTER TABLE model_upgrade_requests ADD COLUMN decided_by TEXT");
 }
 
 function setting<T>(db: Db, key: string, fallback: T): T {
@@ -124,11 +130,7 @@ function taskAndAgent(db: Db, taskId: string): { task: Task; agent: Agent } | nu
     .prepare("SELECT id, title, description, assigned_agent_id, status FROM tasks WHERE id = ?")
     .get(taskId) as Task | undefined;
   if (!task?.assigned_agent_id) return null;
-  const agent = db
-    .prepare(
-      "SELECT id, name, cli_provider, cli_model, api_model, api_provider_id, cli_reasoning_level FROM agents WHERE id = ?",
-    )
-    .get(task.assigned_agent_id) as Agent | undefined;
+  const agent = db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id) as Agent | undefined;
   return agent ? { task, agent } : null;
 }
 
@@ -273,27 +275,48 @@ export function createModelUpgradeRequest(
   reason: string,
   requestedModel?: string | null,
   requestedReasoningLevel?: string | null,
+  requestedProvider?: string | null,
 ) {
   const found = taskAndAgent(db, taskId);
   if (!found) throw new Error("task_or_agent_not_found");
   const explanation = reason.trim();
   if (explanation.length < 10 || explanation.length > 2000) throw new Error("invalid_reason");
-  const candidates = availableModels(db, found.agent);
+  const provider =
+    requestedProvider?.trim() ||
+    (found.agent.cli_provider === "api"
+      ? found.agent.cli_fallback_provider || "codex"
+      : found.agent.cli_provider || "claude");
+  if (provider !== found.agent.cli_provider && !["codex", "claude"].includes(provider))
+    throw new Error("invalid_upgrade_provider");
+  const targetAgent =
+    provider === found.agent.cli_provider
+      ? found.agent
+      : { ...found.agent, cli_provider: provider, cli_model: null, cli_reasoning_level: null };
+  const candidates = availableModels(db, targetAgent);
+  const currentRoute = getTaskModelRoute(db, taskId, found.agent.id);
   const current =
-    getTaskModelRoute(db, taskId, found.agent.id)?.model ??
-    (found.agent.cli_provider === "api" ? found.agent.api_model : found.agent.cli_model);
+    currentRoute?.model ?? (found.agent.cli_provider === "api" ? found.agent.api_model : found.agent.cli_model);
   const next =
     requestedModel?.trim() ||
     candidates[Math.min(Math.max(candidates.indexOf(current ?? "") + 1, 0), candidates.length - 1)] ||
     null;
   if (!next || !candidates.includes(next)) throw new Error("requested_model_not_available");
-  if (next === current && !requestedReasoningLevel?.trim()) throw new Error("no_model_upgrade_available");
+  if (
+    provider === (currentRoute?.provider || found.agent.cli_provider) &&
+    next === current &&
+    !requestedReasoningLevel?.trim()
+  )
+    throw new Error("no_model_upgrade_available");
+  const pending = db
+    .prepare("SELECT * FROM model_upgrade_requests WHERE task_id = ? AND status = 'pending'")
+    .get(taskId);
+  if (pending) return pending as Record<string, unknown>;
   const id = randomUUID();
   db.prepare(
     `INSERT INTO model_upgrade_requests
-    (id,task_id,agent_id,requested_model,requested_reasoning_level,reason,status,created_at)
-    VALUES (?,?,?,?,?,?,'pending',?)`,
-  ).run(id, taskId, found.agent.id, next, requestedReasoningLevel?.trim() || null, explanation, Date.now());
+    (id,task_id,agent_id,requested_model,requested_reasoning_level,reason,status,created_at,requested_provider)
+    VALUES (?,?,?,?,?,?,'pending',?,?)`,
+  ).run(id, taskId, found.agent.id, next, requestedReasoningLevel?.trim() || null, explanation, Date.now(), provider);
   return db.prepare("SELECT * FROM model_upgrade_requests WHERE id = ?").get(id) as Record<string, unknown>;
 }
 
@@ -302,67 +325,57 @@ export async function decideModelUpgrade(
   requestId: string,
   approve: boolean | null,
   decisionReason: string,
-  runDirector?: DirectorRun,
-) {
+  _runDirector?: DirectorRun,
+  decidedBy: string = "owner",
+): Promise<Record<string, unknown>> {
   const request = db.prepare("SELECT * FROM model_upgrade_requests WHERE id = ?").get(requestId) as
     | {
         id: string;
         task_id: string;
         agent_id: string;
         requested_model: string;
+        requested_provider: string | null;
         requested_reasoning_level: string | null;
-        reason: string;
         status: string;
       }
     | undefined;
   if (!request) throw new Error("request_not_found");
   if (request.status !== "pending") throw new Error("request_already_decided");
+  // Only the dual-VP review loop or an explicit owner decision may decide an upgrade.
+  if (approve === null) return request;
   const found = taskAndAgent(db, request.task_id);
   if (!found || found.agent.id !== request.agent_id) throw new Error("task_assignment_changed");
-  const candidates = availableModels(db, found.agent);
-  if (!candidates.includes(request.requested_model)) throw new Error("requested_model_not_available");
-  const directorAgent = director(db);
-  const byDirector = approve === null;
-  let reason = decisionReason.trim();
-  if (approve === null) {
-    if (!directorAgent || !runDirector) return request;
-    const prompt = [
-      "You are the model director. Decide whether the worker needs the requested model upgrade. Do not use tools.",
-      `Task: ${found.task.title}\n${(found.task.description ?? "").slice(0, 4000)}`,
-      `Current model: ${getTaskModelRoute(db, request.task_id, found.agent.id)?.model ?? "default"}`,
-      `Requested model: ${request.requested_model}; worker's reason: ${request.reason}`,
-      'Reply only JSON: {"approve":true or false,"reason":"brief justification"}.',
-    ].join("\n\n");
-    try {
-      const result = await runDirector(directorAgent, prompt, { noTools: true, rawOutput: true, timeoutMs: 60_000 });
-      const decision = !result.error ? jsonDecision(result.text) : null;
-      if (typeof decision?.approve !== "boolean") return request;
-      approve = decision.approve;
-      reason = String(decision.reason ?? "Director decision").slice(0, 500);
-    } catch {
-      return request;
-    }
+  const provider = request.requested_provider || found.agent.cli_provider || "claude";
+  const targetAgent =
+    provider === found.agent.cli_provider
+      ? found.agent
+      : { ...found.agent, cli_provider: provider, cli_model: null, cli_reasoning_level: null };
+  if (approve && !availableModels(db, targetAgent).includes(request.requested_model))
+    throw new Error("requested_model_not_available");
+  db.exec("SAVEPOINT decide_model_upgrade");
+  try {
+    const changed = db
+      .prepare(
+        "UPDATE model_upgrade_requests SET status = ?, decided_by = ?, decision_reason = ?, decided_at = ? WHERE id = ? AND status = 'pending'",
+      )
+      .run(approve ? "approved" : "denied", decidedBy, decisionReason.trim().slice(0, 2000), Date.now(), requestId);
+    if (!changed.changes) throw new Error("request_already_decided");
+    if (approve)
+      saveRoute(
+        db,
+        request.task_id,
+        targetAgent,
+        request.requested_model,
+        request.requested_reasoning_level,
+        "upgrade",
+        decisionReason,
+        null,
+      );
+    db.exec("RELEASE decide_model_upgrade");
+  } catch (error) {
+    db.exec("ROLLBACK TO decide_model_upgrade; RELEASE decide_model_upgrade");
+    throw error;
   }
-  db.prepare(
-    "UPDATE model_upgrade_requests SET status = ?, director_agent_id = ?, decision_reason = ?, decided_at = ? WHERE id = ? AND status = 'pending'",
-  ).run(
-    approve ? "approved" : "denied",
-    byDirector ? (directorAgent?.id ?? null) : null,
-    reason,
-    Date.now(),
-    requestId,
-  );
-  if (approve)
-    saveRoute(
-      db,
-      request.task_id,
-      found.agent,
-      request.requested_model,
-      request.requested_reasoning_level,
-      "upgrade",
-      reason,
-      byDirector ? (directorAgent?.id ?? null) : null,
-    );
   return db.prepare("SELECT * FROM model_upgrade_requests WHERE id = ?").get(requestId) as Record<string, unknown>;
 }
 
@@ -382,6 +395,7 @@ export function consumeModelUpgradeMarker(
       String(parsed.reason ?? ""),
       typeof parsed.model === "string" ? parsed.model : null,
       typeof parsed.reasoning_level === "string" ? parsed.reasoning_level : null,
+      typeof parsed.provider === "string" ? parsed.provider : null,
     );
     fs.unlinkSync(marker);
     return request;

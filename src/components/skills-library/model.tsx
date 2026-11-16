@@ -299,6 +299,7 @@ export const LEARNED_PROVIDER_ORDER: SkillHistoryProvider[] = [
 export type UnlearnEffect = "pot" | "hammer";
 
 const ROLE_ORDER: Record<AgentRole, number> = {
+  vp: -1,
   team_leader: 0,
   senior: 1,
   junior: 2,
@@ -306,6 +307,7 @@ const ROLE_ORDER: Record<AgentRole, number> = {
 };
 
 export function roleLabel(role: AgentRole, t: TFunction): string {
+  if (role === "vp") return t({ ko: "부사장", en: "Vice President", ja: "副社長", zh: "副总裁" });
   if (role === "team_leader") return t({ ko: "팀장", en: "Team Lead", ja: "チームリード", zh: "团队负责人" });
   if (role === "senior") return t({ ko: "시니어", en: "Senior", ja: "シニア", zh: "资深" });
   if (role === "junior") return t({ ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" });

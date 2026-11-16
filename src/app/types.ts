@@ -5,11 +5,14 @@ export type View =
   | "agents"
   | "dashboard"
   | "tasks"
+  | "autonomy"
   | "tech"
   | "events"
+  | "ventures"
   | "outreach"
   | "homelab"
   | "model_director"
+  | "vp_decisions"
   | "skills"
   | "settings";
 export type TaskPanelTab = "terminal" | "minutes";

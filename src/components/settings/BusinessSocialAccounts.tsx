@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { socialApi, type SocialAccount, type InstagramPost } from "../../api/business-social";
-import type { BusinessKind } from "../../api/business";
+import { BUSINESS_KINDS, BUSINESS_SETTINGS_NAMES, BUSINESS_SHORT_NAMES, type BusinessKind } from "../../api/business";
 import SettingsSection from "./SettingsSection";
 
 const inputClass = "w-full rounded-lg border px-3 py-2 text-sm";
@@ -207,16 +207,14 @@ export default function BusinessSocialAccounts() {
       ) : (
         items && (
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
-            {(["tech", "rental"] as const).map((business) => (
+            {BUSINESS_KINDS.map((business) => (
               <section
                 key={business}
                 className="min-w-0 space-y-3"
-                aria-label={business === "tech" ? "Tech social accounts" : "Rental social accounts"}
+                aria-label={`${BUSINESS_SHORT_NAMES[business]} social accounts`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">
-                    {business === "tech" ? "Tech services" : "Events and rentals"}
-                  </h3>
+                  <h3 className="text-sm font-semibold">{BUSINESS_SETTINGS_NAMES[business]}</h3>
                   <button type="button" className={buttonClass} onClick={() => setAdding(business)}>
                     Add Instagram
                   </button>

@@ -12,11 +12,14 @@ const ALL_VIEWS: View[] = [
   "agents",
   "dashboard",
   "tasks",
+  "autonomy",
   "tech",
   "events",
+  "ventures",
   "outreach",
   "homelab",
   "model_director",
+  "vp_decisions",
   "skills",
   "settings",
 ];
@@ -35,7 +38,7 @@ describe("view routes", () => {
     expect(sidebar).not.toContain("skills");
     expect(sidebar).not.toContain("model_director");
     const team = NAV_ITEMS.find((item) => item.view === "agents");
-    expect(team?.activeFor).toEqual(["skills", "model_director"]);
+    expect(team?.activeFor).toEqual(["skills", "model_director", "vp_decisions"]);
   });
 
   it("tolerates trailing slashes and case, and sends unknown paths to Today", () => {

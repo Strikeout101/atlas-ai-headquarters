@@ -6,8 +6,9 @@ import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { decryptSecret, encryptSecret } from "../../../oauth/helpers.ts";
 import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
+import { BUSINESS_SQL_LIST, isBusinessKey, syncBusinessCheck, type BusinessKey } from "../../businesses.ts";
 
-type Business = "tech" | "rental";
+type Business = BusinessKey;
 type MailboxRow = {
   id: string;
   is_default: number;
@@ -18,11 +19,16 @@ type MailboxRow = {
   imap_port: number;
   smtp_host: string;
   smtp_port: number;
+  imap_security: MailSecurity;
+  smtp_security: MailSecurity;
   password_enc: string;
   updated_at: number;
   last_test_at: number | null;
   last_test_ok: number | null;
 };
+/** `tls`: encrypted from the first byte (993/465). `starttls`: upgraded after connecting (143/587); never plain. */
+export type MailSecurity = "tls" | "starttls";
+const isMailSecurity = (value: unknown): value is MailSecurity => value === "tls" || value === "starttls";
 type Probe = { ok: boolean; error?: string };
 const TIMEOUT = 15_000;
 
@@ -38,7 +44,7 @@ export function ensureBusinessMailboxSchema(db: DatabaseSync): void {
     }
     db.exec(`CREATE TABLE IF NOT EXISTS business_mailboxes (
     id TEXT PRIMARY KEY NOT NULL,
-    business TEXT NOT NULL CHECK(business IN ('tech','rental')),
+    business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
     is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0,1)),
     email TEXT NOT NULL,
     username TEXT NOT NULL,
@@ -49,7 +55,9 @@ export function ensureBusinessMailboxSchema(db: DatabaseSync): void {
     password_enc TEXT NOT NULL,
     updated_at INTEGER NOT NULL,
     last_test_at INTEGER,
-    last_test_ok INTEGER CHECK(last_test_ok IN (0,1))
+    last_test_ok INTEGER CHECK(last_test_ok IN (0,1)),
+    imap_security TEXT NOT NULL DEFAULT 'tls' CHECK(imap_security IN ('tls','starttls')),
+    smtp_security TEXT NOT NULL DEFAULT 'tls' CHECK(smtp_security IN ('tls','starttls'))
   )`);
     if (legacy) {
       db.exec(`INSERT INTO business_mailboxes
@@ -65,6 +73,15 @@ export function ensureBusinessMailboxSchema(db: DatabaseSync): void {
     if (migrationStarted) db.exec("ROLLBACK");
     throw error;
   }
+  const current = db.prepare("PRAGMA table_info(business_mailboxes)").all() as Array<{ name: string }>;
+  for (const column of ["imap_security", "smtp_security"]) {
+    if (!current.some((existing) => existing.name === column)) {
+      db.exec(
+        `ALTER TABLE business_mailboxes ADD COLUMN ${column} TEXT NOT NULL DEFAULT 'tls' CHECK(${column} IN ('tls','starttls'))`,
+      );
+    }
+  }
+  syncBusinessCheck(db, "business_mailboxes");
 }
 
 export function listAgentMailboxes(db: DatabaseSync) {
@@ -100,7 +117,9 @@ async function probeImap(config: MailboxRow, password: string): Promise<Probe> {
   const client = new ImapFlow({
     host: config.imap_host,
     port: config.imap_port,
-    secure: true,
+    secure: config.imap_security !== "starttls",
+    // With STARTTLS the connection must upgrade before signing in; a server that cannot is a failure, not a fallback.
+    ...(config.imap_security === "starttls" ? { doSTARTTLS: true } : {}),
     auth: { user: config.username, pass: password },
     tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
     logger: false,
@@ -122,11 +141,16 @@ async function probeImap(config: MailboxRow, password: string): Promise<Probe> {
   }
 }
 
+/** Never sends credentials or mail in the clear: STARTTLS is required, not opportunistic. */
+export function smtpSecurityOptions(security: unknown): { secure: boolean; requireTLS?: boolean } {
+  return security === "starttls" ? { secure: false, requireTLS: true } : { secure: true };
+}
+
 async function probeSmtp(config: MailboxRow, password: string): Promise<Probe> {
   const transport = nodemailer.createTransport({
     host: config.smtp_host,
     port: config.smtp_port,
-    secure: true,
+    ...smtpSecurityOptions(config.smtp_security),
     auth: { user: config.username, pass: password },
     tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
     connectionTimeout: TIMEOUT,
@@ -187,6 +211,8 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
       "imap_port",
       "smtp_host",
       "smtp_port",
+      "imap_security",
+      "smtp_security",
       "password",
       "is_default",
     ]);
@@ -213,6 +239,11 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
       )
     ) {
       return res.status(400).json({ error: "invalid_mail_port" });
+    }
+    const imapSecurity = values.imap_security ?? "tls";
+    const smtpSecurity = values.smtp_security ?? "tls";
+    if (!isMailSecurity(imapSecurity) || !isMailSecurity(smtpSecurity)) {
+      return res.status(400).json({ error: "invalid_mail_security" });
     }
     if (
       "password" in body &&
@@ -250,11 +281,13 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
       }
       db.prepare(
         `INSERT INTO business_mailboxes
-        (id,business,is_default,email,username,imap_host,imap_port,smtp_host,smtp_port,password_enc,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+        (id,business,is_default,email,username,imap_host,imap_port,smtp_host,smtp_port,password_enc,updated_at,
+         imap_security,smtp_security)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
         is_default=excluded.is_default,
         email=excluded.email,username=excluded.username,imap_host=excluded.imap_host,imap_port=excluded.imap_port,
         smtp_host=excluded.smtp_host,smtp_port=excluded.smtp_port,password_enc=excluded.password_enc,
+        imap_security=excluded.imap_security,smtp_security=excluded.smtp_security,
         updated_at=excluded.updated_at,last_test_at=NULL,last_test_ok=NULL`,
       ).run(
         id,
@@ -268,6 +301,8 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
         smtpPort as number,
         passwordEnc,
         Date.now(),
+        imapSecurity,
+        smtpSecurity,
       );
       db.exec("COMMIT");
       transactionStarted = false;
@@ -280,7 +315,7 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
   };
   app.post(base, (req, res) => {
     const business = req.body?.business;
-    if (business !== "tech" && business !== "rental") return res.status(400).json({ error: "invalid_business" });
+    if (!isBusinessKey(business)) return res.status(400).json({ error: "invalid_business" });
     const { business: _business, ...body } = req.body;
     return save(business, undefined, body, res, true);
   });
@@ -293,7 +328,7 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
   });
   app.patch(`${base}/:business`, (req, res) => {
     const business = String(req.params.business);
-    if (business !== "tech" && business !== "rental") return res.status(400).json({ error: "invalid_business" });
+    if (!isBusinessKey(business)) return res.status(400).json({ error: "invalid_business" });
     const current = db.prepare("SELECT * FROM business_mailboxes WHERE business=? AND is_default=1").get(business) as
       | MailboxRow
       | undefined;
@@ -345,7 +380,7 @@ export function registerBusinessMailboxRoutes(app: Express, db: DatabaseSync): v
   );
   app.post(`${base}/:business/test`, (req, res) => {
     const business = String(req.params.business);
-    if (business !== "tech" && business !== "rental") return res.status(400).json({ error: "invalid_business" });
+    if (!isBusinessKey(business)) return res.status(400).json({ error: "invalid_business" });
     return test(
       db.prepare("SELECT * FROM business_mailboxes WHERE business=? AND is_default=1").get(business) as
         | MailboxRow

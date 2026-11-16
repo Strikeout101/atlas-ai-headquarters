@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { registerApprovalRoutes } from "./approvals.ts";
+import { listPendingApprovals, registerApprovalRoutes } from "./approvals.ts";
 import { createSshApprovalRequest, ensureSshApprovalSchema } from "../../ssh-approvals.ts";
 
 vi.mock("../../../oauth/helpers.ts", () => ({
@@ -71,8 +71,8 @@ describe("GET /api/approvals", () => {
     ).run();
 
     const res = await request(app).get("/api/approvals").expect(200);
-    expect(res.body.count).toBe(2);
-    expect(res.body.items[0]).toMatchObject({
+    expect(res.body.count).toBe(1);
+    expect(listPendingApprovals(db, 100, "all")[0]).toMatchObject({
       kind: "model_upgrade",
       id: "up-1",
       task_title: "Site refactor",
@@ -80,7 +80,7 @@ describe("GET /api/approvals", () => {
       requested_model: "gpt-big",
       decide_path: "/api/model-upgrades/up-1/decide",
     });
-    expect(res.body.items[1]).toMatchObject({
+    expect(res.body.items[0]).toMatchObject({
       kind: "ssh_command",
       id: ssh.id,
       command: "systemctl restart pihole-FTL",

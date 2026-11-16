@@ -178,7 +178,8 @@ export default function ModelDirectorWorkspace() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-500">Agent operations</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Model director</h1>
         <p className="mt-2 max-w-[65ch] text-sm text-[var(--th-text-secondary)]">
-          Choose a Claude or Codex director, set the models each worker may use, and review model upgrades as tasks run.
+          Set the models each worker may use. The two VPs review upgrades, including local workers moving to their
+          configured CLI fallback.
         </p>
       </header>
 
@@ -255,7 +256,8 @@ export default function ModelDirectorWorkspace() {
             <div className="border-b border-slate-500/20 pb-4">
               <h2 className="text-lg font-semibold">Task model</h2>
               <p className="mt-1 text-sm text-[var(--th-text-secondary)]">
-                The selected worker keeps its provider. The director chooses among that provider’s configured models.
+                Initial routing uses the worker’s provider. An approved upgrade can move a local worker to Codex or
+                Claude for this task.
               </p>
             </div>
             {tasks.length === 0 ? (
@@ -326,7 +328,10 @@ export default function ModelDirectorWorkspace() {
                   {requests.map((item) => (
                     <article key={item.id} className="rounded-xl border border-slate-500/25 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="break-all font-mono text-sm">{item.requested_model}</p>
+                        <p className="break-all font-mono text-sm">
+                          {item.requested_provider ? `${item.requested_provider}/` : ""}
+                          {item.requested_model}
+                        </p>
                         <span className="rounded-full border border-slate-500/30 px-2 py-0.5 text-xs capitalize">
                           {item.status}
                         </span>

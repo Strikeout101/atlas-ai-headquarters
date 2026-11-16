@@ -3,7 +3,14 @@ import { isApiRequestError, post, request } from "./core";
 import { decideHomelabSshApproval } from "./homelab";
 import { decideModelUpgrade } from "./model-routing";
 
+import type { BusinessKind } from "./business";
+
 interface PendingApprovalBase {
+  vp_review?: {
+    status: string;
+    reason: string;
+    reviews: Array<{ vp_agent_id: string; verdict: string; reason: string }>;
+  } | null;
   id: string;
   created_at: number;
   /** Null only for agent task suggestions, which have no task until approved. */
@@ -15,8 +22,14 @@ interface PendingApprovalBase {
 
 export type PendingApproval =
   | (PendingApprovalBase & {
+      kind: "org_request";
+      org_kind: string;
+      payload: Record<string, unknown>;
+      reason: string;
+    })
+  | (PendingApprovalBase & {
       kind: "business_email";
-      business: "tech" | "rental";
+      business: BusinessKind;
       sender: string;
       recipient: string;
       subject: string;
@@ -33,6 +46,7 @@ export type PendingApproval =
   | (PendingApprovalBase & {
       kind: "model_upgrade";
       requested_model: string | null;
+      requested_provider?: string | null;
       requested_reasoning_level: string | null;
       reason: string;
     })
@@ -75,6 +89,8 @@ export async function decidePendingApproval(item: PendingApproval, approve: bool
           : `Email was not sent (${result.item.error_code ?? result.error ?? result.item.status}). Check Email delivery history.`,
       );
     }
+  } else if (item.kind === "org_request") {
+    await post(`/api/org-requests/${encodeURIComponent(item.id)}/decide`, { approve });
   } else if (item.kind === "task_proposal") {
     await decideAgentProposal(item.id, approve);
   } else if (item.kind === "ssh_command") {

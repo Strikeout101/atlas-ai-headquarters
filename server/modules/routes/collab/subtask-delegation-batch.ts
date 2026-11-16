@@ -1,3 +1,5 @@
+import { admitAutonomyTaskStart, autonomyTaskStartBlockReason } from "../../autonomy-engine.ts";
+import { automaticStartBlockReason } from "../../control-state.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -177,7 +179,7 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
 
     const agents = db
       .prepare(
-        `SELECT * FROM agents WHERE id IN (${idPlaceholders}) ${deptClause} ${excludeClause} ORDER BY
+        `SELECT * FROM agents WHERE role != 'vp' AND id IN (${idPlaceholders}) ${deptClause} ${excludeClause} ORDER BY
          CASE status WHEN 'idle' THEN 0 WHEN 'break' THEN 1 WHEN 'working' THEN 2 ELSE 3 END,
          CASE role WHEN 'senior' THEN 0 WHEN 'junior' THEN 1 WHEN 'intern' THEN 2 WHEN 'team_leader' THEN 3 ELSE 4 END`,
       )
@@ -387,6 +389,24 @@ export function createSubtaskDelegationBatch(deps: BatchDeps) {
       appendTaskLog(delegatedTaskId, "system", `Subtask delegation from '${parentTask.title}' → ${targetDeptName}`);
       broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(delegatedTaskId));
 
+      const admissionBlock =
+        automaticStartBlockReason(db as any, delegatedTaskId) ||
+        admitAutonomyTaskStart(db as any, delegatedTaskId, nowMs()) ||
+        autonomyTaskStartBlockReason(db as any, delegatedTaskId, nowMs());
+      if (admissionBlock) {
+        db.prepare("UPDATE tasks SET status='pending',updated_at=? WHERE id=?").run(nowMs(), delegatedTaskId);
+        appendTaskLog(delegatedTaskId, "system", `Autonomous delegation held: ${admissionBlock}`);
+        for (const sid of subtaskIds) {
+          db.prepare("UPDATE subtasks SET delegated_task_id=?,status='blocked',blocked_reason=? WHERE id=?").run(
+            delegatedTaskId,
+            admissionBlock,
+            sid,
+          );
+          broadcast("subtask_update", db.prepare("SELECT * FROM subtasks WHERE id=?").get(sid));
+        }
+        broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id=?").get(delegatedTaskId));
+        return;
+      }
       const ct2 = nowMs();
       db.prepare(
         "UPDATE tasks SET assigned_agent_id = ?, status = 'in_progress', started_at = ?, updated_at = ? WHERE id = ?",

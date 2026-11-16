@@ -69,7 +69,7 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
   );
 
   const sortedAgents = useMemo(() => {
-    const roleOrder: Record<string, number> = { team_leader: 0, senior: 1, junior: 2, intern: 3 };
+    const roleOrder: Record<string, number> = { vp: -1, team_leader: 0, senior: 1, junior: 2, intern: 3 };
     return [...filteredAgents].sort(
       (a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9) || a.name.localeCompare(b.name),
     );
@@ -93,6 +93,7 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
         department_id: agent.department_id || "",
         role: agent.role,
         cli_provider: agent.cli_provider,
+        cli_fallback_provider: agent.cli_fallback_provider ?? "codex",
         avatar_emoji: agent.avatar_emoji,
         sprite_number: computed,
         personality: agent.personality || "",
@@ -120,6 +121,7 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
         name_zh: form.name_zh.trim(),
         role: form.role,
         cli_provider: form.cli_provider,
+        cli_fallback_provider: form.cli_fallback_provider ?? "codex",
         avatar_emoji: form.avatar_emoji || "🤖",
         sprite_number: form.sprite_number,
         personality: form.personality.trim() || null,

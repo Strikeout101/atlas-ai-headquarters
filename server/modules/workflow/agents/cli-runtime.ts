@@ -1,3 +1,4 @@
+import { agentEnvironment } from "../../../security/agent-environment.ts";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -5,7 +6,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { getCurrentTaskModelRoute } from "../../model-routing.ts";
 import { createAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { PORT } from "../../../config/runtime.ts";
-import { assertRunsAllowed } from "../../control-state.ts";
+import { autonomyTaskUsageBlockReason } from "../../autonomy-engine.ts";
+import { assertRunsAllowed, automaticStartBlockReason } from "../../control-state.ts";
 
 type CliRuntimeDeps = {
   db: any;
@@ -233,6 +235,9 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     onRawOutput?: (chunk: Buffer, stream: "stdout" | "stderr") => void,
   ): ChildProcess {
     assertRunsAllowed();
+    const autonomyBlock =
+      automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
+    if (autonomyBlock) throw new Error(autonomyBlock);
     clearCliOutputDedup(taskId);
     // Save prompt for debugging
     const promptPath = path.join(logsDir, `${taskId}.prompt.txt`);
@@ -246,7 +251,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     safeWrite(`\n===== task run start ${new Date().toISOString()} | provider=${provider} =====\n`);
 
     // Remove CLAUDECODE env var to prevent "nested session" detection
-    const cleanEnv = { ...process.env };
+    const cleanEnv = agentEnvironment();
     for (const key of ["API_AUTH_TOKEN", "SESSION_SECRET", "OAUTH_ENCRYPTION_SECRET", "INBOX_WEBHOOK_SECRET"]) {
       delete cleanEnv[key];
     }

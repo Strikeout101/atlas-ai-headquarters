@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import BusinessEmailHistory from "./BusinessEmailHistory";
 import {
+  BUSINESS_KINDS,
+  BUSINESS_NAMES,
   businessApi,
   type BusinessContact,
   type BusinessKind,
@@ -190,12 +192,13 @@ export default function BusinessWorkspace({
       const [nextContacts, nextDrafts, nextWork] = await Promise.all([
         businessApi.contacts.list(kind),
         businessApi.drafts.list(kind),
-        kind === "tech" ? businessApi.tickets.list() : businessApi.quotes.list(),
+        // Tickets belong to Tech Services and quotes to Events and Rentals; other businesses have neither.
+        kind === "tech" ? businessApi.tickets.list() : kind === "rental" ? businessApi.quotes.list() : [],
       ]);
       setContacts(nextContacts);
       setDrafts(nextDrafts);
       if (kind === "tech") setTickets(nextWork as TechTicket[]);
-      else setQuotes(nextWork as RentalQuote[]);
+      else if (kind === "rental") setQuotes(nextWork as RentalQuote[]);
     } catch (cause) {
       setError(friendlyError(cause, "Could not load business records."));
     } finally {
@@ -346,7 +349,7 @@ export default function BusinessWorkspace({
           role="group"
           aria-label="Business"
         >
-          {(["tech", "rental"] as const).map((kind) => (
+          {BUSINESS_KINDS.map((kind) => (
             <button
               key={kind}
               type="button"
@@ -354,7 +357,7 @@ export default function BusinessWorkspace({
               onClick={() => selectBusiness(kind)}
               className={`rounded-lg px-4 py-2 text-sm font-medium transition active:scale-[0.98] ${business === kind ? "bg-sky-600 text-white" : "text-[var(--th-text-secondary)] hover:bg-slate-500/10"}`}
             >
-              {kind === "tech" ? "Tech Services" : "Events and Rentals"}
+              {BUSINESS_NAMES[kind]}
             </button>
           ))}
         </div>

@@ -4,6 +4,7 @@ import {
   getAuthInfo,
   isApiRequestError,
   logout,
+  loginWithPassword,
   signOutEverywhere,
   type AuthInfo,
   type AuthMethod,
@@ -54,9 +55,11 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
   const [auth, setAuth] = useState<AuthInfo | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [current, setCurrent] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+  const [signInError, setSignInError] = useState(false);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [busy, setBusy] = useState<"password" | "revoke" | "logout" | null>(null);
+  const [busy, setBusy] = useState<"password" | "revoke" | "logout" | "signin" | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -226,6 +229,60 @@ export default function SecuritySettingsTab({ t }: SecuritySettingsTabProps) {
             )}
           </div>
         </div>
+        {auth.method !== "password" && auth.password_configured && (
+          <form
+            className="mt-4 flex flex-wrap items-end gap-3"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setBusy("signin");
+              setSignInError(false);
+              try {
+                const result = await loginWithPassword(signInPassword);
+                if (result.ok) {
+                  setAuth(result.auth);
+                  setSignInPassword("");
+                } else setSignInError(true);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            <label className="min-w-0 flex-1 text-sm">
+              {t({
+                ko: "승인을 위해 비밀번호로 로그인",
+                en: "Sign in with your password to approve actions",
+                ja: "承認するにはパスワードでサインイン",
+                zh: "使用密码登录以批准操作",
+              })}
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={signInPassword}
+                onChange={(event) => setSignInPassword(event.target.value)}
+                className={`${inputClass} mt-2`}
+                style={inputStyle}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy !== null || !signInPassword}
+              className={secondaryButtonClass}
+              style={secondaryButtonStyle}
+            >
+              {t({ ko: "로그인", en: "Sign in", ja: "サインイン", zh: "登录" })}
+            </button>
+            {signInError && (
+              <p role="alert" className="w-full text-sm" style={{ color: "var(--th-danger-border)" }}>
+                {t({
+                  ko: "로그인하지 못했습니다. 비밀번호를 확인하거나 잠시 후 다시 시도하세요.",
+                  en: "Could not sign in. Check your password or try again later.",
+                  ja: "サインインできませんでした。パスワードを確認するか後で再試行してください。",
+                  zh: "无法登录。请检查密码或稍后重试。",
+                })}
+              </p>
+            )}
+          </form>
+        )}
       </SettingsSection>
 
       <SettingsSection

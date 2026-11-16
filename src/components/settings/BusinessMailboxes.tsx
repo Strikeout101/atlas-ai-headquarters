@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import {
   mailboxApi,
   type MailboxConfig,
+  type MailSecurity,
   type MailboxInput,
   type MailboxTestResult,
 } from "../../api/business-mailboxes";
-import type { BusinessKind } from "../../api/business";
+import { BUSINESS_KINDS, BUSINESS_SETTINGS_NAMES, BUSINESS_SHORT_NAMES, type BusinessKind } from "../../api/business";
 import SettingsSection from "./SettingsSection";
 
 const inputClass = "w-full rounded-lg border px-3 py-2 text-sm";
@@ -37,6 +38,8 @@ function MailboxEditor({
     imap_port: saved?.imap_port ?? template?.imap_port ?? 993,
     smtp_host: saved?.smtp_host ?? template?.smtp_host ?? "",
     smtp_port: saved?.smtp_port ?? template?.smtp_port ?? 465,
+    imap_security: saved?.imap_security ?? template?.imap_security ?? "tls",
+    smtp_security: saved?.smtp_security ?? template?.smtp_security ?? "tls",
   }));
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -87,9 +90,9 @@ function MailboxEditor({
             ["email", "Mailbox address", "email"],
             ["username", "Login username (defaults to mailbox address)", "text"],
             ["imap_host", "IMAP hostname", "text"],
-            ["imap_port", "IMAP TLS port", "number"],
+            ["imap_port", "IMAP port", "number"],
             ["smtp_host", "SMTP hostname", "text"],
-            ["smtp_port", "SMTP TLS port", "number"],
+            ["smtp_port", "SMTP port", "number"],
           ] as const
         ).map(([key, label, type]) => (
           <div key={key} className="flex flex-col gap-2">
@@ -110,6 +113,28 @@ function MailboxEditor({
                 setForm({ ...form, [key]: type === "number" ? Number(event.target.value) : event.target.value })
               }
             />
+          </div>
+        ))}
+        {(
+          [
+            ["imap_security", "IMAP encryption", 993, 143],
+            ["smtp_security", "SMTP encryption", 465, 587],
+          ] as const
+        ).map(([key, label, tlsPort, startTlsPort]) => (
+          <div key={key} className="flex flex-col gap-2">
+            <label htmlFor={`${prefix}-${key}`} className="text-xs">
+              {label}
+            </label>
+            <select
+              id={`${prefix}-${key}`}
+              value={form[key]}
+              className={inputClass}
+              style={inputStyle}
+              onChange={(event) => setForm({ ...form, [key]: event.target.value as MailSecurity })}
+            >
+              <option value="tls">{`TLS from the start (usually port ${tlsPort})`}</option>
+              <option value="starttls">{`STARTTLS (usually port ${startTlsPort})`}</option>
+            </select>
           </div>
         ))}
         <div className="flex flex-col gap-2 md:col-span-2">
@@ -222,8 +247,8 @@ export default function BusinessMailboxes() {
     >
       <p className="mb-4 max-w-prose text-sm" style={{ color: "var(--th-text-secondary)" }}>
         Each mailbox has its own login. Agents can choose a sender; the default is used when none is selected. Every
-        outgoing message still needs your approval. Connection tests sign in without sending mail. Implicit TLS only:
-        IMAP 993, SMTP 465; STARTTLS/587 is not supported yet.
+        outgoing message still needs your approval. Connection tests sign in without sending mail. Connections are
+        always encrypted: TLS from the start (IMAP 993, SMTP 465) or STARTTLS (IMAP 143, SMTP 587).
       </p>
       {error && (
         <p role="alert" className="mb-3 text-sm">
@@ -242,7 +267,7 @@ export default function BusinessMailboxes() {
       ) : (
         items && (
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
-            {(["tech", "rental"] as const).map((business) => {
+            {BUSINESS_KINDS.map((business) => {
               const accounts = items
                 .filter((item) => item.business === business)
                 .sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.email.localeCompare(b.email));
@@ -250,11 +275,11 @@ export default function BusinessMailboxes() {
                 <section
                   key={business}
                   className="min-w-0 space-y-3"
-                  aria-label={business === "tech" ? "Tech mailboxes" : "Rental mailboxes"}
+                  aria-label={`${BUSINESS_SHORT_NAMES[business]} mailboxes`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold">
-                      {business === "tech" ? "Tech services" : "Events and rentals"}{" "}
+                      {BUSINESS_SETTINGS_NAMES[business]}{" "}
                       <span className="font-normal text-[var(--th-text-secondary)]">({accounts.length})</span>
                     </h3>
                     <button type="button" className={buttonClass} onClick={() => setAdding(business)}>

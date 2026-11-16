@@ -2,8 +2,15 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { Express } from "express";
 import { registerBusinessProfileRoutes } from "./business-profiles.ts";
+import {
+  BUSINESS_KEYS,
+  BUSINESS_SQL_LIST,
+  isBusinessKey,
+  syncBusinessCheck,
+  type BusinessKey,
+} from "../../businesses.ts";
 
-type Business = "tech" | "rental";
+type Business = BusinessKey;
 type Body = Record<string, unknown>;
 
 type Field = { name: string; required?: boolean; max?: number; values?: readonly string[] };
@@ -14,7 +21,7 @@ type Entity = {
   fields: readonly Field[];
 };
 
-const BUSINESSES = ["tech", "rental"] as const;
+const BUSINESSES = BUSINESS_KEYS;
 const TICKET_STATUSES = ["new", "scheduled", "active", "waiting", "done"] as const;
 const QUOTE_STATUSES = ["draft", "shared", "accepted", "declined", "archived"] as const;
 const DRAFT_STATUSES = ["draft", "ready", "archived"] as const;
@@ -80,7 +87,7 @@ export function ensureBusinessSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS business_contacts (
       id TEXT PRIMARY KEY,
-      business TEXT NOT NULL CHECK (business IN ('tech','rental')),
+      business TEXT NOT NULL CHECK (business IN (${BUSINESS_SQL_LIST})),
       name TEXT NOT NULL,
       email TEXT,
       phone TEXT,
@@ -113,7 +120,7 @@ export function ensureBusinessSchema(db: DatabaseSync): void {
     );
     CREATE TABLE IF NOT EXISTS business_drafts (
       id TEXT PRIMARY KEY,
-      business TEXT NOT NULL CHECK (business IN ('tech','rental')),
+      business TEXT NOT NULL CHECK (business IN (${BUSINESS_SQL_LIST})),
       contact_id TEXT REFERENCES business_contacts(id) ON DELETE SET NULL,
       channel TEXT NOT NULL CHECK (channel IN ('email','social','sms')),
       purpose TEXT NOT NULL CHECK (purpose IN ('outreach','promotion','follow_up','checkin','checkout','general')),
@@ -132,6 +139,9 @@ export function ensureBusinessSchema(db: DatabaseSync): void {
   if (!contactColumns.some((column) => column.name === "do_not_contact")) {
     db.exec("ALTER TABLE business_contacts ADD COLUMN do_not_contact INTEGER NOT NULL DEFAULT 0");
   }
+  // Older databases only allow the first two businesses in these tables.
+  syncBusinessCheck(db, "business_contacts");
+  syncBusinessCheck(db, "business_drafts");
 }
 
 function isDoNotContact(db: DatabaseSync, contactId: unknown): boolean {
@@ -183,7 +193,7 @@ export function registerBusinessRoutes(app: Express, db: DatabaseSync): void {
 
     app.get(base, (req, res) => {
       const business = entity.business ?? req.query.business;
-      if (business !== undefined && business !== "tech" && business !== "rental") {
+      if (business !== undefined && !isBusinessKey(business)) {
         return res.status(400).json({ error: "invalid_business" });
       }
       const status = req.query.status;

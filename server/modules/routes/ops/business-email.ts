@@ -3,7 +3,10 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import nodemailer from "nodemailer";
 import { decryptSecret } from "../../../oauth/helpers.ts";
-import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
+import { hasValidCsrfToken, shouldRequireCsrf, requireOwnerSession } from "../../../security/auth.ts";
+import { BUSINESS_SQL_LIST, syncBusinessCheck } from "../../businesses.ts";
+import { factsFromContent, routeApproval } from "../../approval-policy.ts";
+import { smtpSecurityOptions } from "./business-mailboxes.ts";
 
 type Row = Record<string, string | number | null>;
 export type EmailApprovalStatus = "pending" | "sending" | "sent" | "denied" | "failed" | "unknown";
@@ -33,7 +36,7 @@ const isEmail = (email: string) =>
 export function ensureBusinessEmailSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS business_email_approvals (
     id TEXT PRIMARY KEY, draft_id TEXT NOT NULL, task_id TEXT NOT NULL, agent_id TEXT NOT NULL,
-    business TEXT NOT NULL CHECK(business IN ('tech','rental')),
+    business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
     sender TEXT NOT NULL, recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('pending','sending','sent','denied','failed','unknown')),
     snapshot_sha256 TEXT NOT NULL, draft_sha256 TEXT NOT NULL, contact_sha256 TEXT NOT NULL, mailbox_sha256 TEXT NOT NULL,
@@ -46,6 +49,9 @@ export function ensureBusinessEmailSchema(db: DatabaseSync): void {
     // Legacy rows always refer to the single business account, migrated with its business as its stable id.
     db.exec("UPDATE business_email_approvals SET mailbox_id=business WHERE mailbox_id IS NULL");
   }
+  if (!columns.some((column) => column.name === "decided_by"))
+    db.exec("ALTER TABLE business_email_approvals ADD COLUMN decided_by TEXT");
+  syncBusinessCheck(db, "business_email_approvals");
 }
 
 function publicApproval(row: Row): EmailApproval {
@@ -108,6 +114,8 @@ function snapshot(db: DatabaseSync, draftId: string, mailboxId?: string | null) 
     smtp_port: mailbox.smtp_port,
     password_enc: mailbox.password_enc,
     updated_at: mailbox.updated_at,
+    // Only part of the identity when it differs from the original behaviour, so earlier approvals stay valid.
+    ...(mailbox.smtp_security === "starttls" ? { smtp_security: "starttls" } : {}),
   };
   const content = { business: String(draft.business), sender, recipient, subject, body };
   return {
@@ -193,6 +201,118 @@ function failure(error: unknown): { status: "failed" | "unknown"; error: string 
   return { status: "unknown", error: "email_delivery_unknown" };
 }
 
+export type EmailDecisionResult = { status: number; body: { ok?: boolean; error?: string; item?: EmailApproval } };
+
+/** Server-internal execution; callers enforce policy before invoking this exact-content decision. */
+export async function decideBusinessEmail(
+  db: DatabaseSync,
+  id: string,
+  approve: boolean,
+  { decidedBy = "owner" }: { decidedBy?: string } = {},
+): Promise<EmailDecisionResult> {
+  const row = db.prepare("SELECT * FROM business_email_approvals WHERE id=?").get(id) as Row | undefined;
+  if (!row) return { status: 404, body: { error: "email_approval_not_found" } };
+  if (
+    decidedBy.startsWith("vp:") &&
+    routeApproval("business_email", String(row.business), factsFromContent(`${row.subject}\n${row.body}`)) !== "vp"
+  )
+    return { status: 403, body: { error: "owner_approval_required" } };
+  if (row.status !== "pending")
+    return { status: 409, body: { error: "email_approval_not_pending", item: publicApproval(row) } };
+  const result = () => publicApproval(db.prepare("SELECT * FROM business_email_approvals WHERE id=?").get(id) as Row);
+  if (!approve) {
+    db.prepare(
+      "UPDATE business_email_approvals SET status='denied',decided_at=?,decided_by=? WHERE id=? AND status='pending'",
+    ).run(Date.now(), decidedBy, id);
+    return { status: 200, body: { ok: true, item: result() } };
+  }
+  let current: ReturnType<typeof snapshot>;
+  try {
+    current = snapshot(db, String(row.draft_id), row.mailbox_id as string | null);
+    if (
+      ["snapshot_sha256", "draft_sha256", "contact_sha256", "mailbox_sha256"].some(
+        (key) => current[key as keyof typeof current] !== row[key],
+      )
+    )
+      throw new Error("email_snapshot_changed");
+  } catch {
+    db.prepare(
+      "UPDATE business_email_approvals SET status='failed',error_code='email_approval_invalidated',decided_at=? WHERE id=? AND status='pending'",
+    ).run(Date.now(), id);
+    return { status: 409, body: { ok: false, error: "email_approval_invalidated", item: result() } };
+  }
+  // Claim before any await. Only one process can transition the persisted pending row.
+  const claim = db
+    .prepare(
+      "UPDATE business_email_approvals SET status='sending',decided_at=?,decided_by=? WHERE id=? AND status='pending'",
+    )
+    .run(Date.now(), decidedBy, id);
+  if (!claim.changes) return { status: 409, body: { error: "email_approval_not_pending", item: result() } };
+  let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
+  try {
+    let password: string;
+    try {
+      password = decryptSecret(String(current.mailbox.password_enc));
+    } catch {
+      db.prepare(
+        "UPDATE business_email_approvals SET status='failed',error_code='mailbox_credential_store_unavailable' WHERE id=? AND status='sending'",
+      ).run(id);
+      return { status: 200, body: { ok: false, error: "mailbox_credential_store_unavailable", item: result() } };
+    }
+    transport = nodemailer.createTransport({
+      host: String(current.mailbox.smtp_host),
+      port: Number(current.mailbox.smtp_port),
+      ...smtpSecurityOptions(current.mailbox.smtp_security),
+      auth: { user: String(current.mailbox.username), pass: password },
+      tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      logger: false,
+      debug: false,
+    });
+    const sent = await transport.sendMail({
+      from: { address: String(row.sender), name: "" },
+      to: { address: String(row.recipient), name: "" },
+      envelope: { from: String(row.sender), to: [String(row.recipient)] },
+      subject: String(row.subject),
+      text: String(row.body),
+      messageId: String(row.message_id),
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+    const accepted =
+      Array.isArray(sent.accepted) &&
+      sent.accepted.some(
+        (email: unknown) =>
+          normalizeEmail(typeof email === "object" && email !== null && "address" in email ? email.address : email) ===
+          row.recipient,
+      );
+    const status = accepted ? "sent" : "unknown";
+    db.prepare(
+      "UPDATE business_email_approvals SET status=?,sent_at=?,error_code=? WHERE id=? AND status='sending'",
+    ).run(status, accepted ? Date.now() : null, accepted ? null : "email_delivery_unknown", id);
+    return {
+      status: 200,
+      body: { ok: accepted, ...(!accepted ? { error: "email_delivery_unknown" } : {}), item: result() },
+    };
+  } catch (error) {
+    const failed = failure(error);
+    db.prepare("UPDATE business_email_approvals SET status=?,error_code=? WHERE id=? AND status='sending'").run(
+      failed.status,
+      failed.error,
+      id,
+    );
+    return { status: 200, body: { ok: false, error: failed.error, item: result() } };
+  } finally {
+    try {
+      transport?.close();
+    } catch {
+      /* Cleanup must not change an already recorded SMTP result. */
+    }
+  }
+}
+
 export function registerBusinessEmailRoutes(app: Express, db: DatabaseSync): void {
   ensureBusinessEmailSchema(db);
   // A crash after SMTP acceptance cannot be distinguished from a crash before acceptance. Never retry it.
@@ -211,98 +331,8 @@ export function registerBusinessEmailRoutes(app: Express, db: DatabaseSync): voi
     if (typeof req.body?.approve !== "boolean" || Object.keys(req.body).some((key) => key !== "approve")) {
       return res.status(400).json({ error: "approve_boolean_required" });
     }
-    const id = String(req.params.id);
-    const row = db.prepare("SELECT * FROM business_email_approvals WHERE id=?").get(id) as Row | undefined;
-    if (!row) return res.status(404).json({ error: "email_approval_not_found" });
-    if (row.status !== "pending")
-      return res.status(409).json({ error: "email_approval_not_pending", item: publicApproval(row) });
-    const result = () => publicApproval(db.prepare("SELECT * FROM business_email_approvals WHERE id=?").get(id) as Row);
-    if (!req.body.approve) {
-      db.prepare(
-        "UPDATE business_email_approvals SET status='denied',decided_at=? WHERE id=? AND status='pending'",
-      ).run(Date.now(), id);
-      return res.json({ ok: true, item: result() });
-    }
-    let current: ReturnType<typeof snapshot>;
-    try {
-      current = snapshot(db, String(row.draft_id), row.mailbox_id as string | null);
-      if (
-        ["snapshot_sha256", "draft_sha256", "contact_sha256", "mailbox_sha256"].some(
-          (key) => current[key as keyof typeof current] !== row[key],
-        )
-      )
-        throw new Error("email_snapshot_changed");
-    } catch {
-      db.prepare(
-        "UPDATE business_email_approvals SET status='failed',error_code='email_approval_invalidated',decided_at=? WHERE id=? AND status='pending'",
-      ).run(Date.now(), id);
-      return res.status(409).json({ ok: false, error: "email_approval_invalidated", item: result() });
-    }
-    // Claim before any await. Only one process can transition the persisted pending row.
-    const claim = db
-      .prepare("UPDATE business_email_approvals SET status='sending',decided_at=? WHERE id=? AND status='pending'")
-      .run(Date.now(), id);
-    if (!claim.changes) return res.status(409).json({ error: "email_approval_not_pending", item: result() });
-    let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
-    try {
-      let password: string;
-      try {
-        password = decryptSecret(String(current.mailbox.password_enc));
-      } catch {
-        db.prepare(
-          "UPDATE business_email_approvals SET status='failed',error_code='mailbox_credential_store_unavailable' WHERE id=? AND status='sending'",
-        ).run(id);
-        return res.json({ ok: false, error: "mailbox_credential_store_unavailable", item: result() });
-      }
-      transport = nodemailer.createTransport({
-        host: String(current.mailbox.smtp_host),
-        port: Number(current.mailbox.smtp_port),
-        secure: true,
-        auth: { user: String(current.mailbox.username), pass: password },
-        tls: { rejectUnauthorized: true, minVersion: "TLSv1.2" },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 30000,
-        logger: false,
-        debug: false,
-      });
-      const sent = await transport.sendMail({
-        from: { address: String(row.sender), name: "" },
-        to: { address: String(row.recipient), name: "" },
-        envelope: { from: String(row.sender), to: [String(row.recipient)] },
-        subject: String(row.subject),
-        text: String(row.body),
-        messageId: String(row.message_id),
-        disableFileAccess: true,
-        disableUrlAccess: true,
-      });
-      const accepted =
-        Array.isArray(sent.accepted) &&
-        sent.accepted.some(
-          (email: unknown) =>
-            normalizeEmail(
-              typeof email === "object" && email !== null && "address" in email ? email.address : email,
-            ) === row.recipient,
-        );
-      const status = accepted ? "sent" : "unknown";
-      db.prepare(
-        "UPDATE business_email_approvals SET status=?,sent_at=?,error_code=? WHERE id=? AND status='sending'",
-      ).run(status, accepted ? Date.now() : null, accepted ? null : "email_delivery_unknown", id);
-      return res.json({ ok: accepted, ...(!accepted ? { error: "email_delivery_unknown" } : {}), item: result() });
-    } catch (error) {
-      const failed = failure(error);
-      db.prepare("UPDATE business_email_approvals SET status=?,error_code=? WHERE id=? AND status='sending'").run(
-        failed.status,
-        failed.error,
-        id,
-      );
-      return res.json({ ok: false, error: failed.error, item: result() });
-    } finally {
-      try {
-        transport?.close();
-      } catch {
-        /* Cleanup must not change an already recorded SMTP result. */
-      }
-    }
+    if (!requireOwnerSession(req, res)) return;
+    const result = await decideBusinessEmail(db, String(req.params.id), req.body.approve, { decidedBy: "owner" });
+    return res.status(result.status).json(result.body);
   });
 }

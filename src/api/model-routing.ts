@@ -24,6 +24,8 @@ export type ModelUpgradeRequest = {
   task_id: string;
   agent_id: string;
   requested_model: string;
+  requested_provider?: string | null;
+  decided_by?: string | null;
   requested_reasoning_level: string | null;
   reason: string;
   status: "pending" | "approved" | "denied";
@@ -55,8 +57,9 @@ export function requestModelUpgrade(
   taskId: string,
   reason: string,
   model?: string,
+  provider?: "codex" | "claude",
 ): Promise<{ ok: true; request: ModelUpgradeRequest }> {
-  return post(`/api/tasks/${encodeURIComponent(taskId)}/model-upgrades`, { reason, model });
+  return post(`/api/tasks/${encodeURIComponent(taskId)}/model-upgrades`, { reason, model, provider });
 }
 
 export function decideModelUpgrade(

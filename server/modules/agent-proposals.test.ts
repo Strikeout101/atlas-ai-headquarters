@@ -1,3 +1,5 @@
+import { SESSION_COOKIE_NAME } from "../config/runtime.ts";
+import { createSessionToken } from "../security/login-sessions.ts";
 import express from "express";
 import request from "supertest";
 import { DatabaseSync } from "node:sqlite";
@@ -201,10 +203,11 @@ describe("agent autonomy: owner decisions", () => {
     ).run();
   }
 
-  it("shows pending suggestions on the approvals list with the project name", () => {
+  it("routes pending suggestions to VPs with project context and keeps them off the owner queue", () => {
     const db = harness();
     seed(db);
-    expect(listPendingApprovals(db)).toEqual([
+    expect(listPendingApprovals(db)).toEqual([]);
+    expect(listPendingApprovals(db, 100, "all")).toEqual([
       expect.objectContaining({
         kind: "task_proposal",
         id: "s1",
@@ -225,6 +228,7 @@ describe("agent autonomy: owner decisions", () => {
     const res = await request(server)
       .post("/api/agent-proposals/s1/decide")
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ approve: true })
       .expect(200);
     expect(res.body).toMatchObject({ ok: true, status: "approved" });
@@ -240,6 +244,7 @@ describe("agent autonomy: owner decisions", () => {
     await request(server)
       .post("/api/agent-proposals/s1/decide")
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ approve: true })
       .expect(409);
     expect((db.prepare("SELECT COUNT(*) AS n FROM tasks").get() as { n: number }).n).toBe(2);
@@ -251,6 +256,7 @@ describe("agent autonomy: owner decisions", () => {
     await request(app(db))
       .post("/api/agent-proposals/s1/decide")
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ approve: false })
       .expect(200, { ok: true, status: "dismissed", id: "s1" });
     expect(db.prepare("SELECT status FROM agent_task_proposals WHERE id = 's1'").get()).toEqual({

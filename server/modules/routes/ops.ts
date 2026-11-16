@@ -1,3 +1,6 @@
+import { registerAutonomyRoutes } from "./ops/autonomy.ts";
+import { registerOrgRequestRoutes } from "./ops/org-requests.ts";
+import { registerVpReviewRoutes } from "./ops/vp-reviews.ts";
 import type { RuntimeContext, RouteOpsExports } from "../../types/runtime-context.ts";
 import { INBOX_WEBHOOK_SECRET, PKG_VERSION } from "../../config/runtime.ts";
 
@@ -234,6 +237,9 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
     recordTaskCreationAudit: (input) => __ctx.recordTaskCreationAudit(input as any),
   });
   registerApprovalRoutes(app, db);
+  registerVpReviewRoutes(app, db);
+  registerOrgRequestRoutes(app, db, broadcast);
+  registerAutonomyRoutes(app, db, broadcast);
   registerControlRoutes(app, db, {
     nowMs,
     broadcast,

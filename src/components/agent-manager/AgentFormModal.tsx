@@ -299,6 +299,7 @@ export default function AgentFormModal({
                   {tr("소속 부서", "Department")}
                 </label>
                 <select
+                  disabled={form.role === "vp"}
                   value={form.department_id}
                   onChange={(e) => setForm({ ...form, department_id: e.target.value })}
                   className={`${inputCls} cursor-pointer`}
@@ -331,6 +332,7 @@ export default function AgentFormModal({
                   return (
                     <button
                       key={r}
+                      disabled={form.role === "vp" || r === "vp"}
                       onClick={() => setForm({ ...form, role: r })}
                       className={`py-2 rounded-lg text-xs font-medium border transition-all ${
                         active ? ROLE_BADGE[r] : ""
@@ -356,6 +358,7 @@ export default function AgentFormModal({
                   return (
                     <button
                       key={p}
+                      disabled={form.role === "vp"}
                       onClick={() => setForm({ ...form, cli_provider: p })}
                       className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono border transition-all ${
                         active ? "bg-blue-500/15 text-blue-400 border-blue-500/30" : ""
@@ -370,6 +373,20 @@ export default function AgentFormModal({
                 })}
               </div>
             </div>
+            {form.cli_provider === "api" && (
+              <label className="block text-xs space-y-1.5">
+                <span>{tr("승인 후 CLI 대체 도구", "CLI fallback after approval")}</span>
+                <select
+                  value={form.cli_fallback_provider ?? "codex"}
+                  onChange={(e) => setForm({ ...form, cli_fallback_provider: e.target.value as "codex" | "claude" })}
+                  className={inputCls}
+                  style={inputStyle}
+                >
+                  <option value="codex">Codex</option>
+                  <option value="claude">Claude</option>
+                </select>
+              </label>
+            )}
             {/* 성격/프롬프트 */}
             <div>
               <label className="block text-xs mb-1.5 font-medium" style={{ color: "var(--th-text-secondary)" }}>

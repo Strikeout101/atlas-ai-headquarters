@@ -42,6 +42,20 @@ export function ensureControlStateSchema(db: Db): void {
       // Who started this work: the owner, or the agents on their own initiative.
       db.exec("ALTER TABLE tasks ADD COLUMN origin TEXT NOT NULL DEFAULT 'owner'");
     }
+    if (cols.some((c) => c.name === "source_task_id")) {
+      const installed = db
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='tasks_inherit_autonomy_origin'")
+        .get();
+      db.exec(`CREATE TRIGGER IF NOT EXISTS tasks_inherit_autonomy_origin AFTER INSERT ON tasks
+        WHEN NEW.source_task_id IS NOT NULL AND NEW.origin <> 'autonomy'
+          AND EXISTS (SELECT 1 FROM tasks WHERE id=NEW.source_task_id AND origin='autonomy')
+        BEGIN UPDATE tasks SET origin='autonomy' WHERE id=NEW.id; END`);
+      if (!installed)
+        db.exec(`WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM tasks WHERE origin='autonomy'
+        UNION SELECT t.id FROM tasks t JOIN descendants d ON t.source_task_id=d.id
+      ) UPDATE tasks SET origin='autonomy' WHERE id IN (SELECT id FROM descendants) AND origin<>'autonomy'`);
+    }
   } catch {
     /* tasks table not created yet in isolated tests */
   }

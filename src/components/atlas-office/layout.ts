@@ -209,7 +209,12 @@ export const ELEVATOR = { x: 9.3, z: FLOOR.minZ, width: 2.0 } as const;
 export const ELEVATOR_ARRIVAL = { x: ELEVATOR.x, z: -4.3, yaw: Math.PI } as const;
 
 function deskObstacles(floor: FloorId): FloorRect[] {
-  return DESK_INDICES_BY_FLOOR[floor].map((i) => ({ x: DESKS[i][0], z: DESKS[i][1], width: DESK_WIDTH, depth: DESK_DEPTH }));
+  return DESK_INDICES_BY_FLOOR[floor].map((i) => ({
+    x: DESKS[i][0],
+    z: DESKS[i][1],
+    width: DESK_WIDTH,
+    depth: DESK_DEPTH,
+  }));
 }
 export const OBSTACLES_BY_FLOOR: Record<FloorId, FloorRect[]> = {
   director: [...Object.values(FURNITURE_BY_FLOOR.director), ...deskObstacles("director"), ...GLASS_WALLS],
@@ -319,7 +324,9 @@ export function findInteraction(
     return Math.hypot(x - sx, z - sz) < DESK_INTERACT_RADIUS;
   });
   if (deskIndex !== undefined) return { kind: "desk", deskIndex };
-  const zone = INTERACTION_ZONES.slice(2).find((candidate) => (upstairs || !DIRECTOR_ONLY_ZONES.has(candidate.id)) && inZone(candidate));
+  const zone = INTERACTION_ZONES.slice(2).find(
+    (candidate) => (upstairs || !DIRECTOR_ONLY_ZONES.has(candidate.id)) && inZone(candidate),
+  );
   if (zone?.id === "elevator" && !upstairs) return { kind: "zone", zone: { ...zone, label: "take the elevator up" } };
   return zone ? { kind: "zone", zone } : null;
 }
@@ -452,7 +459,7 @@ export function hotDeskSpot(index: number): FloorPoint {
   return [x + [0, 0.3, -0.3][round], z];
 }
 
-const ROLE_ORDER: Record<AgentRole, number> = { team_leader: 0, senior: 1, junior: 2, intern: 3 };
+const ROLE_ORDER: Record<AgentRole, number> = { vp: -1, team_leader: 0, senior: 1, junior: 2, intern: 3 };
 
 export interface DepartmentPod {
   departmentId: string | null;
@@ -502,14 +509,16 @@ export function assignDeskSeats(agents: Agent[], departments: Department[]): Des
   let taken = 0;
   DESK_FLOORS.forEach((floor) => {
     const floorDesks = DESK_INDICES_BY_FLOOR[floor];
-    const layoutOrder = byPriority.slice(taken, taken + floorDesks.length).sort(
-      (a, b) =>
-        departmentRank(a) - departmentRank(b) ||
-        (a.department_id ?? "").localeCompare(b.department_id ?? "") ||
-        (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9) ||
-        a.name.localeCompare(b.name) ||
-        a.id.localeCompare(b.id),
-    );
+    const layoutOrder = byPriority
+      .slice(taken, taken + floorDesks.length)
+      .sort(
+        (a, b) =>
+          departmentRank(a) - departmentRank(b) ||
+          (a.department_id ?? "").localeCompare(b.department_id ?? "") ||
+          (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9) ||
+          a.name.localeCompare(b.name) ||
+          a.id.localeCompare(b.id),
+      );
     taken += floorDesks.length;
     const floorStart = pods.length;
     layoutOrder.forEach((agent, slot) => {

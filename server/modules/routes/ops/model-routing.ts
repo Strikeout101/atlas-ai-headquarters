@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import type { DatabaseSync } from "node:sqlite";
-import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
+import { hasValidCsrfToken, shouldRequireCsrf, requireOwnerSession } from "../../../security/auth.ts";
 import {
   availableModels,
   createModelUpgradeRequest,
@@ -121,15 +121,16 @@ export function registerModelRoutingRoutes(app: Express, db: Db, runDirector: Di
         String(req.body?.reason ?? ""),
         req.body?.model,
         req.body?.reasoning_level,
+        req.body?.provider,
       );
-      const decision = await decideModelUpgrade(db, String(request.id), null, "", runDirector);
-      res.status(201).json({ ok: true, request: decision });
+      res.status(201).json({ ok: true, request });
     } catch (err) {
       failure(res, err);
     }
   });
 
   app.post("/api/model-upgrades/:id/decide", async (req, res) => {
+    if (!requireOwnerSession(req, res)) return;
     if (!csrf(req, res)) return;
     if (typeof req.body?.approve !== "boolean") return res.status(400).json({ error: "approve_boolean_required" });
     try {

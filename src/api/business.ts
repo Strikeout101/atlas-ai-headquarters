@@ -1,6 +1,25 @@
 import { del, patch, post, request } from "./core";
 
-export type BusinessKind = "tech" | "rental";
+/** The businesses ATLAS works for. Mirrors `server/modules/businesses.ts`. */
+export const BUSINESS_KINDS = ["tech", "rental", "ventures"] as const;
+export type BusinessKind = (typeof BUSINESS_KINDS)[number];
+export const BUSINESS_NAMES: Record<BusinessKind, string> = {
+  tech: "Tech Services",
+  rental: "Events and Rentals",
+  ventures: "Ventures",
+};
+/** Sentence-case names used in Settings headings. */
+export const BUSINESS_SETTINGS_NAMES: Record<BusinessKind, string> = {
+  tech: "Tech services",
+  rental: "Events and rentals",
+  ventures: "Ventures",
+};
+/** One-word names for labels such as "Tech mailboxes". */
+export const BUSINESS_SHORT_NAMES: Record<BusinessKind, string> = {
+  tech: "Tech",
+  rental: "Rental",
+  ventures: "Ventures",
+};
 export type DraftChannel = "email" | "social" | "sms";
 export type DraftPurpose = "outreach" | "promotion" | "follow_up" | "checkin" | "checkout" | "general";
 

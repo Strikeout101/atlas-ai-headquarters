@@ -171,8 +171,9 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
     }
 
     const roleLabel =
-      { team_leader: "Team Leader", senior: "Senior", junior: "Junior", intern: "Intern" }[execAgent.role] ||
-      execAgent.role;
+      { vp: "Vice President", team_leader: "Team Leader", senior: "Senior", junior: "Junior", intern: "Intern" }[
+        execAgent.role
+      ] || execAgent.role;
     const deptConstraint = getDeptRoleConstraint(targetDeptId, targetDeptName);
     const deptPromptRaw = getDepartmentPrompt(db as any, targetDeptId);
     const deptPrompt = typeof deptPromptRaw === "string" ? deptPromptRaw.trim() : "";

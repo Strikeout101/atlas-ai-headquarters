@@ -41,6 +41,67 @@ function harness() {
 }
 
 describe("task-scoped agent tools", () => {
+  it("lets leaders request hires for their own department and inspect only their requests", async () => {
+    const { app, db, token } = harness();
+    db.exec(
+      "INSERT INTO departments(id,name,name_ko,icon,color) VALUES ('research','Research','','','#aaa'); UPDATE agents SET role='team_leader',department_id='research' WHERE id='worker'",
+    );
+    await request(app)
+      .post("/api/agent-tools")
+      .set("x-agent-task-token", token)
+      .send({ operation: "org.request_hire", payload: { name: "Researcher", department_id: "research" } })
+      .expect(400);
+    const created = await request(app)
+      .post("/api/agent-tools")
+      .set("x-agent-task-token", token)
+      .send({
+        operation: "org.request_hire",
+        payload: {
+          name: "Researcher",
+          department_id: "research",
+          reason: "Research backlog exceeds available capacity",
+        },
+      })
+      .expect(201);
+    expect(created.body.request.status).toBe("pending");
+    expect(db.prepare("SELECT 1 FROM agents WHERE name='Researcher'").get()).toBeUndefined();
+    const status = await request(app)
+      .post("/api/agent-tools")
+      .set("x-agent-task-token", token)
+      .send({ operation: "org.request_status", request_id: created.body.request.id })
+      .expect(200);
+    expect(status.body.request.status).toBe("pending");
+    db.prepare("UPDATE org_requests SET requested_by='other' WHERE id=?").run(created.body.request.id);
+    await request(app)
+      .post("/api/agent-tools")
+      .set("x-agent-task-token", token)
+      .send({ operation: "org.request_status", request_id: created.body.request.id })
+      .expect(404);
+  });
+
+  it("queues a cross-provider request for VP review without asking one director to approve it", async () => {
+    const { app, db, token } = harness();
+    db.exec("UPDATE agents SET cli_provider='api',api_model='qwen-local' WHERE id='worker'");
+    db.prepare("INSERT INTO settings (key,value) VALUES ('providerModelConfig',?)").run(
+      JSON.stringify({ codex: { model: "strong" } }),
+    );
+    const response = await request(app)
+      .post("/api/agent-tools")
+      .set("x-agent-task-token", token)
+      .send({
+        operation: "model.request_upgrade",
+        reason: "Local model cannot resolve the type error",
+        provider: "codex",
+        model: "strong",
+      })
+      .expect(201);
+    expect(response.body.request).toMatchObject({
+      status: "pending",
+      requested_provider: "codex",
+      requested_model: "strong",
+    });
+    expect(db.prepare("SELECT * FROM task_model_routes").all()).toEqual([]);
+  });
   it("lists social planning context without credentials and requires verification for media", async () => {
     const { app, db, token } = harness();
     db.prepare(

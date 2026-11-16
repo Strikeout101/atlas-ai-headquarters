@@ -131,6 +131,7 @@ export default function ManualAssignmentSelector({
                   .filter((agent) => agentFilterDept === "all" || agent.department_id === agentFilterDept)
                   .sort((a, b) => {
                     const roleOrder: Record<string, number> = {
+                      vp: -1,
                       team_leader: 0,
                       senior: 1,
                       junior: 2,

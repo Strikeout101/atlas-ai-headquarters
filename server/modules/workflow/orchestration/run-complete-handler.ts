@@ -1,19 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  consumeModelUpgradeMarker,
-  createModelUpgradeRequest,
-  decideModelUpgrade,
-  getCurrentTaskModelRoute,
-} from "../../model-routing.ts";
+import { consumeModelUpgradeMarker, createModelUpgradeRequest, getCurrentTaskModelRoute } from "../../model-routing.ts";
 import { buildContextRolloverCheckpoint } from "../agents/context-rollover-checkpoint.ts";
 import {
-  approveEscalatedContextRollover,
   holdContextRollover,
   markContextRolloverComplete,
   recordContextRollover,
 } from "../agents/context-rollover-store.ts";
 import { summarizeTaskRunFailure } from "../agents/run-failure-summary.ts";
+import { recordAutonomyTaskFailure } from "../../autonomy-engine.ts";
 
 type CreateRunCompleteHandlerDeps = Record<string, any>;
 
@@ -59,7 +54,6 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     prettyStreamJson,
     getWorktreeDiffSummary,
     hasVisibleDiffSummary,
-    runAgentOneShot,
     scheduleContextRolloverResume,
   } = deps;
 
@@ -151,13 +145,6 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       appendTaskLog(taskId, "system", `Model upgrade requested (${upgradeRequest.id}); worktree preserved for resume.`);
       broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
       notifyCeo(`Model upgrade requested for '${task.title}'. The task is pending with its work preserved.`, taskId);
-      if (String(upgradeRequest.status) === "pending")
-        void decideModelUpgrade(db, String(upgradeRequest.id), null, "", runAgentOneShot)
-          .then((decision) => {
-            appendTaskLog(taskId, "system", `Model upgrade decision: ${String(decision.status)}`);
-            broadcast("task_model_update", { task_id: taskId, request: decision });
-          })
-          .catch((error) => appendTaskLog(taskId, "system", `Model director decision deferred: ${String(error)}`));
       return;
     }
     let sshApproval: { id: string; status: string } | undefined;
@@ -281,16 +268,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
           notifyCeo(report, taskId);
           try {
             const request = createModelUpgradeRequest(db, taskId, report);
-            void decideModelUpgrade(db, String(request.id), null, "", runAgentOneShot)
-              .then((decision) => {
-                appendTaskLog(taskId, "system", `Context rollover model decision: ${String(decision.status)}`);
-                if (String(decision.status) === "approved" && approveEscalatedContextRollover(db, taskId, nowMs())) {
-                  scheduleContextRolloverResume(taskId);
-                }
-              })
-              .catch((error) =>
-                appendTaskLog(taskId, "error", `Context rollover director decision failed: ${String(error)}`),
-              );
+            appendTaskLog(taskId, "system", `Context rollover upgrade ${request.id} awaits VP review.`);
           } catch (error) {
             appendTaskLog(taskId, "system", `Context rollover requires director review: ${String(error)}`);
           }
@@ -317,6 +295,13 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       return;
     }
     if (failureKind && exitCode !== 0) {
+      if (failureKind === "provider_unavailable" || failureKind === "worker_interrupted")
+        recordAutonomyTaskFailure(
+          db,
+          taskId,
+          "Autonomous worker stopped unexpectedly or its provider became unavailable",
+          t,
+        );
       try {
         holdContextRollover(db, taskId, t);
       } catch {
@@ -346,6 +331,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     const logKind = finalExitCode === 0 ? "completed" : "failed";
     appendTaskLog(taskId, "system", `RUN ${logKind} (exit code: ${finalExitCode})`);
     if (finalExitCode !== 0) {
+      recordAutonomyTaskFailure(db, taskId, `Autonomous run failed (exit code ${finalExitCode})`, t);
       try {
         const logFile = path.join(logsDir, `${taskId}.log`);
         if (fs.existsSync(logFile)) {

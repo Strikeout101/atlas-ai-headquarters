@@ -7,7 +7,10 @@ import { socialApi } from "../../api/business-social";
 import BusinessSettingsTab from "./BusinessSettingsTab";
 import BusinessMailboxes from "./BusinessMailboxes";
 
-vi.mock("../../api/business", () => ({ businessApi: { profiles: { list: vi.fn(), update: vi.fn() } } }));
+vi.mock("../../api/business", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/business")>()),
+  businessApi: { profiles: { list: vi.fn(), update: vi.fn() } },
+}));
 vi.mock("../../api/business-mailboxes", () => ({
   mailboxApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), save: vi.fn(), test: vi.fn() },
 }));
@@ -35,6 +38,8 @@ const mailbox = {
   imap_port: 993,
   smtp_host: "mail.example.com",
   smtp_port: 465,
+  imap_security: "tls" as const,
+  smtp_security: "tls" as const,
   has_password: true,
   updated_at: 1,
   last_test_at: null,
@@ -96,6 +101,44 @@ describe("business settings", () => {
     );
     expect(mailboxApi.update).not.toHaveBeenCalled();
     expect(screen.getByText("Default", { exact: true }).closest("summary")).toHaveTextContent("info@example.com");
+  });
+  it("adds a mailbox for the ventures business and lets SMTP use STARTTLS", async () => {
+    const user = userEvent.setup();
+    render(<BusinessMailboxes />);
+    await user.click(screen.getByText("Mailcow connections", { exact: true }));
+    const ventures = await screen.findByRole("region", { name: "Ventures mailboxes" });
+    expect(within(ventures).getByRole("heading", { name: /Ventures/ })).toBeInTheDocument();
+    await user.click(within(ventures).getByRole("button", { name: "Add mailbox" }));
+    const form = within(ventures.querySelector("#mailbox-new-ventures-email")!.closest("form")!);
+    await user.type(form.getByLabelText("Mailbox address", { exact: true }), "office@example.com");
+    await user.clear(form.getByLabelText("IMAP hostname"));
+    await user.type(form.getByLabelText("IMAP hostname"), "mail.example.com");
+    await user.clear(form.getByLabelText("SMTP hostname"));
+    await user.type(form.getByLabelText("SMTP hostname"), "mail.example.com");
+    expect(form.getByLabelText("IMAP encryption")).toHaveValue("tls");
+    await user.selectOptions(form.getByLabelText("SMTP encryption"), "starttls");
+    await user.clear(form.getByLabelText("SMTP port"));
+    await user.type(form.getByLabelText("SMTP port"), "587");
+    vi.mocked(mailboxApi.create).mockResolvedValue({
+      ...mailbox,
+      id: "office",
+      business: "ventures",
+      email: "office@example.com",
+      smtp_port: 587,
+      smtp_security: "starttls",
+      has_password: false,
+    });
+    await user.click(form.getByRole("button", { name: "Add mailbox" }));
+    expect(mailboxApi.create).toHaveBeenCalledWith(
+      "ventures",
+      expect.objectContaining({
+        email: "office@example.com",
+        imap_security: "tls",
+        smtp_security: "starttls",
+        smtp_port: 587,
+      }),
+    );
+    expect(await screen.findByText("office@example.com", { selector: "summary", exact: false })).toBeInTheDocument();
   });
   it("saves owner profile edits and retains them when a save fails", async () => {
     const user = userEvent.setup();

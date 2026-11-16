@@ -16,6 +16,7 @@ export interface FormData {
   department_id: string;
   role: import("../../types").AgentRole;
   cli_provider: import("../../types").CliProvider;
+  cli_fallback_provider?: "codex" | "claude";
   avatar_emoji: string;
   sprite_number: number | null;
   personality: string;

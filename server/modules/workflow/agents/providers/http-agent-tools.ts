@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import type { DecryptedOAuthToken } from "./types.ts";
 import { createStreamTools } from "./stream-tools.ts";
-import { assertRunsAllowed } from "../../../control-state.ts";
+import { autonomyTaskUsageBlockReason } from "../../../autonomy-engine.ts";
+import { assertRunsAllowed, automaticStartBlockReason } from "../../../control-state.ts";
 
 type DbLike = {
   prepare: (sql: string) => {
@@ -331,6 +332,9 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
     onComplete?: (exitCode: number) => void,
   ): void {
     assertRunsAllowed();
+    const autonomyBlock =
+      automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
+    if (autonomyBlock) throw new Error(autonomyBlock);
     const logStream = fs.createWriteStream(logPath, { flags: "a" });
     const { safeWrite, safeEnd } = createSafeLogStreamOps(logStream);
     safeWrite(`\n===== task run start ${new Date().toISOString()} | provider=${agent} =====\n`);

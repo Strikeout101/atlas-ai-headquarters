@@ -25,7 +25,12 @@ afterEach(() => {
 describe("business records", () => {
   it("persists owner profiles without changing records or accepting unsafe fields", async () => {
     const { app, db } = harness();
-    expect((await request(app).get("/api/business/profiles").expect(200)).body.items).toHaveLength(2);
+    const initialProfiles = (await request(app).get("/api/business/profiles").expect(200)).body.items;
+    expect(initialProfiles.map((profile: { business: string }) => profile.business)).toEqual([
+      "rental",
+      "tech",
+      "ventures",
+    ]);
     await request(app)
       .patch("/api/business/profiles/tech")
       .send({

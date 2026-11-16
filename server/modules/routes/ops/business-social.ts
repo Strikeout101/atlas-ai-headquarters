@@ -3,8 +3,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Express } from "express";
 import { decryptSecret, encryptSecret } from "../../../oauth/helpers.ts";
 import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
+import { BUSINESS_SQL_LIST, isBusinessKey, syncBusinessCheck, type BusinessKey } from "../../businesses.ts";
 
-type Business = "tech" | "rental";
+type Business = BusinessKey;
 type Platform = "instagram";
 type SocialRow = {
   id: string;
@@ -21,12 +22,13 @@ type SocialRow = {
 
 export function ensureBusinessSocialSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS business_social_accounts (
-    id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN ('tech','rental')),
+    id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
     platform TEXT NOT NULL CHECK(platform = 'instagram'),
     username TEXT NOT NULL, token_enc TEXT NOT NULL DEFAULT '', provider_user_id TEXT, display_name TEXT,
     last_test_at INTEGER, last_test_ok INTEGER CHECK(last_test_ok IN (0,1)), updated_at INTEGER NOT NULL,
     UNIQUE(business,platform,username)
   )`);
+  syncBusinessCheck(db, "business_social_accounts");
 }
 
 function safeAccount(row: SocialRow) {
@@ -224,8 +226,7 @@ export function registerBusinessSocialRoutes(app: Express, db: DatabaseSync): vo
       Object.keys(body).some((key) => !["business", "platform", "username", "access_token"].includes(key))
     )
       return res.status(400).json({ error: "invalid_social_account_fields" });
-    if (body.business !== "tech" && body.business !== "rental")
-      return res.status(400).json({ error: "invalid_business" });
+    if (!isBusinessKey(body.business)) return res.status(400).json({ error: "invalid_business" });
     if (body.platform !== "instagram") return res.status(400).json({ error: "invalid_social_platform" });
     const handle = username(body.username);
     if (!handle) return res.status(400).json({ error: "invalid_social_username" });

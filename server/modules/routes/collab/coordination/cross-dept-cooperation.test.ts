@@ -1,3 +1,4 @@
+import { ensureAutonomyEngineSchema } from "../../../autonomy-engine.ts";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyBaseSchema } from "../../../bootstrap/schema/base-schema.ts";
@@ -7,6 +8,8 @@ import { createCrossDeptCooperationTools } from "./cross-dept-cooperation.ts";
 type ProviderCase = {
   provider: "api" | "copilot" | "antigravity";
   launchKind: "api" | "http";
+  origin?: "autonomy";
+  cap?: number;
 };
 
 type SeededAgents = {
@@ -84,104 +87,134 @@ describe("createCrossDeptCooperationTools", () => {
     { provider: "api", launchKind: "api" },
     { provider: "copilot", launchKind: "http" },
     { provider: "antigravity", launchKind: "http" },
-  ])("routes $provider collaboration tasks through the $launchKind launcher", ({ provider, launchKind }) => {
-    db = new DatabaseSync(":memory:");
-    applyBaseSchema(db);
-    applyTaskSchemaMigrations(db);
+    { provider: "api", launchKind: "api", origin: "autonomy", cap: 1 },
+    { provider: "api", launchKind: "api", origin: "autonomy", cap: 0 },
+    { provider: "copilot", launchKind: "http", origin: "autonomy", cap: 0 },
+  ])(
+    "routes $provider collaboration tasks through the $launchKind launcher",
+    ({ provider, launchKind, origin, cap }) => {
+      db = new DatabaseSync(":memory:");
+      applyBaseSchema(db);
+      applyTaskSchemaMigrations(db);
 
-    const { teamLeader, crossLeader, execAgent } = seedCollaborationFixture(db, provider);
+      const { teamLeader, crossLeader, execAgent } = seedCollaborationFixture(db, provider);
+      if (origin) {
+        ensureAutonomyEngineSchema(db);
+        db.prepare("UPDATE tasks SET origin=? WHERE id='task-parent'").run(origin);
+        db.prepare("UPDATE autonomy_config SET daily_start_cap=?").run(cap ?? 1);
+        for (const providerName of ["codex", "claude"])
+          db.prepare("INSERT INTO cli_usage_cache(provider,data_json,updated_at) VALUES(?,?,?)").run(
+            providerName,
+            JSON.stringify({ windows: [{ utilization: 0.2 }], error: null }),
+            1717171717000,
+          );
+      }
 
-    const launchApiProviderAgent = vi.fn();
-    const launchHttpAgent = vi.fn();
-    const spawnCliAgent = vi.fn();
+      const launchApiProviderAgent = vi.fn();
+      const launchHttpAgent = vi.fn();
+      const spawnCliAgent = vi.fn();
 
-    const { startCrossDeptCooperation } = createCrossDeptCooperationTools({
-      db,
-      nowMs: () => 1_717_171_717_000,
-      appendTaskLog: vi.fn(),
-      broadcast: vi.fn(),
-      recordTaskCreationAudit: vi.fn(),
-      delegatedTaskToSubtask: new Map(),
-      crossDeptNextCallbacks: new Map(),
-      findTeamLeader: (deptId: string) => (deptId === "dev" ? crossLeader : null),
-      findBestSubordinate: (deptId: string) => (deptId === "dev" ? execAgent : null),
-      resolveLang: () => "en",
-      getDeptName: (deptId: string) => (deptId === "dev" ? "Development" : "Planning"),
-      getAgentDisplayName: (agent: { name?: string }) => agent.name ?? "",
-      sendAgentMessage: vi.fn(),
-      notifyCeo: vi.fn(),
-      l: (ko: unknown, en: unknown, ja: unknown, zh: unknown) => ({ ko, en, ja, zh }),
-      pickL: (messages: Record<string, unknown>, lang: string) =>
-        pickVariant(messages[lang] ?? messages.en ?? messages.ko),
-      startTaskExecutionForAgent: vi.fn(),
-      linkCrossDeptTaskToParentSubtask: vi.fn(() => null),
-      detectProjectPath: vi.fn(() => "/workspace/demo"),
-      resolveProjectPath: vi.fn((task: { project_path?: string | null }) => task.project_path ?? "/workspace/demo"),
-      logsDir: "/tmp",
-      getDeptRoleConstraint: vi.fn(() => ""),
-      getRecentConversationContext: vi.fn(() => ""),
-      buildAvailableSkillsPromptBlock: vi.fn(() => ""),
-      buildTaskExecutionPrompt: vi.fn((parts: unknown[]) =>
-        parts
-          .map((part) => String(part ?? "").trim())
-          .filter(Boolean)
-          .join("\n"),
-      ),
-      hasExplicitWarningFixRequest: vi.fn(() => false),
-      ensureTaskExecutionSession: vi.fn((taskId: string, agentId: string, currentProvider: string) => ({
-        sessionId: `session-${taskId}`,
-        agentId,
-        provider: currentProvider,
-      })),
-      getProviderModelConfig: vi.fn(() => ({})),
-      spawnCliAgent,
-      launchApiProviderAgent,
-      launchHttpAgent,
-      getNextHttpAgentPid: vi.fn(() => 4242),
-      handleSubtaskDelegationComplete: vi.fn(),
-      handleTaskRunComplete: vi.fn(),
-      startProgressTimer: vi.fn(),
-    });
+      const { startCrossDeptCooperation } = createCrossDeptCooperationTools({
+        db,
+        nowMs: () => 1_717_171_717_000,
+        appendTaskLog: vi.fn(),
+        broadcast: vi.fn(),
+        recordTaskCreationAudit: vi.fn(),
+        delegatedTaskToSubtask: new Map(),
+        crossDeptNextCallbacks: new Map(),
+        findTeamLeader: (deptId: string) => (deptId === "dev" ? crossLeader : null),
+        findBestSubordinate: (deptId: string) => (deptId === "dev" ? execAgent : null),
+        resolveLang: () => "en",
+        getDeptName: (deptId: string) => (deptId === "dev" ? "Development" : "Planning"),
+        getAgentDisplayName: (agent: { name?: string }) => agent.name ?? "",
+        sendAgentMessage: vi.fn(),
+        notifyCeo: vi.fn(),
+        l: (ko: unknown, en: unknown, ja: unknown, zh: unknown) => ({ ko, en, ja, zh }),
+        pickL: (messages: Record<string, unknown>, lang: string) =>
+          pickVariant(messages[lang] ?? messages.en ?? messages.ko),
+        startTaskExecutionForAgent: vi.fn(),
+        linkCrossDeptTaskToParentSubtask: vi.fn(() => null),
+        detectProjectPath: vi.fn(() => "/workspace/demo"),
+        resolveProjectPath: vi.fn((task: { project_path?: string | null }) => task.project_path ?? "/workspace/demo"),
+        logsDir: "/tmp",
+        getDeptRoleConstraint: vi.fn(() => ""),
+        getRecentConversationContext: vi.fn(() => ""),
+        buildAvailableSkillsPromptBlock: vi.fn(() => ""),
+        buildTaskExecutionPrompt: vi.fn((parts: unknown[]) =>
+          parts
+            .map((part) => String(part ?? "").trim())
+            .filter(Boolean)
+            .join("\n"),
+        ),
+        hasExplicitWarningFixRequest: vi.fn(() => false),
+        ensureTaskExecutionSession: vi.fn((taskId: string, agentId: string, currentProvider: string) => ({
+          sessionId: `session-${taskId}`,
+          agentId,
+          provider: currentProvider,
+        })),
+        getProviderModelConfig: vi.fn(() => ({})),
+        spawnCliAgent,
+        launchApiProviderAgent,
+        launchHttpAgent,
+        getNextHttpAgentPid: vi.fn(() => 4242),
+        handleSubtaskDelegationComplete: vi.fn(),
+        handleTaskRunComplete: vi.fn(),
+        startProgressTimer: vi.fn(),
+      });
 
-    startCrossDeptCooperation(["dev"], 0, {
-      teamLeader,
-      taskTitle: "Parent task",
-      ceoMessage: "Need development support",
-      leaderDeptId: "planning",
-      leaderDeptName: "Planning",
-      leaderName: "Planner",
-      lang: "en",
-      taskId: "task-parent",
-      projectId: "project-1",
-    });
+      startCrossDeptCooperation(["dev"], 0, {
+        teamLeader,
+        taskTitle: "Parent task",
+        ceoMessage: "Need development support",
+        leaderDeptId: "planning",
+        leaderDeptName: "Planning",
+        leaderName: "Planner",
+        lang: "en",
+        taskId: "task-parent",
+        projectId: "project-1",
+      });
 
-    vi.runAllTimers();
+      vi.runAllTimers();
 
-    const crossTask = db
-      .prepare("SELECT status, assigned_agent_id, source_task_id FROM tasks WHERE source_task_id = ?")
-      .get("task-parent") as
-      | {
-          status: string;
-          assigned_agent_id: string | null;
-          source_task_id: string | null;
-        }
-      | undefined;
+      const crossTask = db
+        .prepare("SELECT status, assigned_agent_id, source_task_id FROM tasks WHERE source_task_id = ?")
+        .get("task-parent") as
+        | {
+            status: string;
+            assigned_agent_id: string | null;
+            source_task_id: string | null;
+          }
+        | undefined;
 
-    expect(crossTask).toMatchObject({
-      status: "in_progress",
-      assigned_agent_id: "dev-worker",
-      source_task_id: "task-parent",
-    });
-    expect(spawnCliAgent).not.toHaveBeenCalled();
+      if (origin && cap === 0) {
+        expect(crossTask).toMatchObject({ status: "pending", source_task_id: "task-parent" });
+        expect(launchApiProviderAgent).not.toHaveBeenCalled();
+        expect(launchHttpAgent).not.toHaveBeenCalled();
+        expect(spawnCliAgent).not.toHaveBeenCalled();
+        return;
+      }
+      if (origin) {
+        expect(db.prepare("SELECT origin FROM tasks WHERE source_task_id='task-parent'").get()).toMatchObject({
+          origin: "autonomy",
+        });
+        expect(db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations").get()).toMatchObject({ n: 1 });
+      }
+      expect(crossTask).toMatchObject({
+        status: "in_progress",
+        assigned_agent_id: "dev-worker",
+        source_task_id: "task-parent",
+      });
+      expect(spawnCliAgent).not.toHaveBeenCalled();
 
-    if (launchKind === "api") {
-      expect(launchApiProviderAgent).toHaveBeenCalledTimes(1);
-      expect(launchHttpAgent).not.toHaveBeenCalled();
-    } else {
-      expect(launchHttpAgent).toHaveBeenCalledTimes(1);
-      expect(launchApiProviderAgent).not.toHaveBeenCalled();
-    }
-  });
+      if (launchKind === "api") {
+        expect(launchApiProviderAgent).toHaveBeenCalledTimes(1);
+        expect(launchHttpAgent).not.toHaveBeenCalled();
+      } else {
+        expect(launchHttpAgent).toHaveBeenCalledTimes(1);
+        expect(launchApiProviderAgent).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it.each<ProviderCase>([
     { provider: "api", launchKind: "api" },

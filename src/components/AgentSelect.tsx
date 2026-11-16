@@ -15,6 +15,7 @@ interface AgentSelectProps {
 }
 
 const ROLE_LABELS: Record<string, LangText> = {
+  vp: { ko: "부사장", en: "VP", ja: "副社長", zh: "副总裁" },
   team_leader: { ko: "팀장", en: "Team Leader", ja: "チームリーダー", zh: "组长" },
   senior: { ko: "시니어", en: "Senior", ja: "シニア", zh: "高级" },
   junior: { ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" },

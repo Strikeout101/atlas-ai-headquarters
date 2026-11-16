@@ -1,3 +1,5 @@
+import { SESSION_COOKIE_NAME } from "../config/runtime.ts";
+import { createSessionToken } from "../security/login-sessions.ts";
 import express from "express";
 import request from "supertest";
 import { DatabaseSync } from "node:sqlite";
@@ -43,6 +45,7 @@ describe("SSH command approvals", () => {
     await request(app)
       .post(`/api/homelab/approvals/${approval.id}/decide`)
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ approve: true })
       .expect(200);
     expect(consumeSshApproval(db, approval.id, "host-1", "task-1", "worker", "rm -rf /tmp/x")).toBe(false);
@@ -66,6 +69,7 @@ describe("SSH command approvals", () => {
     await request(app)
       .put("/api/homelab/approval-policy")
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ auto_approve_read_only: false })
       .expect(200);
     expect(createSshApprovalRequest(db, "host-1", "task-1", "worker", "uptime")).toMatchObject({ status: "pending" });

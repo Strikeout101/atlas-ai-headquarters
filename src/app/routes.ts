@@ -11,6 +11,7 @@ import {
   ListChecks,
   Server,
   Settings,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 import type { View } from "./types";
@@ -22,13 +23,16 @@ import type { View } from "./types";
 export const VIEW_PATHS: Record<View, string> = {
   dashboard: "/",
   tasks: "/work",
+  autonomy: "/autonomy",
   tech: "/tech",
   events: "/events",
+  ventures: "/ventures",
   outreach: "/outreach",
   homelab: "/homelab",
   agents: "/team",
   skills: "/team/library",
   model_director: "/team/models",
+  vp_decisions: "/team/vp-decisions",
   office: "/office",
   settings: "/settings",
 };
@@ -87,7 +91,7 @@ export interface NavItem {
 }
 
 /** The Team area: one sidebar item, three tabs. */
-export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director"];
+export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director", "vp_decisions"];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -105,6 +109,13 @@ export const NAV_ITEMS: NavItem[] = [
     keywords: "tasks board projects kanban",
   },
   {
+    view: "autonomy",
+    icon: ListChecks,
+    section: "primary",
+    label: { ko: "자율 운영", en: "Autonomy", ja: "自律運用", zh: "自主运行" },
+    keywords: "goals opportunities schedules research ledger digest limits",
+  },
+  {
     view: "tech",
     icon: Laptop,
     section: "workspaces",
@@ -117,6 +128,13 @@ export const NAV_ITEMS: NavItem[] = [
     section: "workspaces",
     label: { ko: "이벤트 및 렌탈", en: "Events and Rentals", ja: "イベント・レンタル", zh: "活动与租赁" },
     keywords: "business rentals quotes party bounce events calendar primrose",
+  },
+  {
+    view: "ventures",
+    icon: Store,
+    section: "workspaces",
+    label: { ko: "벤처", en: "Ventures", ja: "ベンチャー", zh: "创业项目" },
+    keywords: "business ai etsy shop digital products game assets itch dashboards online store",
   },
   {
     view: "outreach",
@@ -138,7 +156,7 @@ export const NAV_ITEMS: NavItem[] = [
     section: "system",
     label: { ko: "팀", en: "Team", ja: "チーム", zh: "团队" },
     keywords: "agents staff employees departments hire",
-    activeFor: ["skills", "model_director"],
+    activeFor: ["skills", "model_director", "vp_decisions"],
   },
   {
     view: "skills",
@@ -162,6 +180,14 @@ export const NAV_ITEMS: NavItem[] = [
     section: "system",
     label: { ko: "오피스", en: "Office", ja: "オフィス", zh: "办公室" },
     keywords: "map pixel office rooms",
+  },
+  {
+    view: "vp_decisions",
+    icon: Bot,
+    section: "system",
+    inSidebar: false,
+    label: { ko: "VP 결정", en: "VP decisions", ja: "VPの決定", zh: "VP决策" },
+    keywords: "vice president reviews approvals audit denials escalations",
   },
   {
     view: "settings",

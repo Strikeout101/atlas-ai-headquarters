@@ -1,13 +1,15 @@
+import { createOrgRequest, ORG_REQUEST_KINDS, type OrgRequestKind } from "../../org-requests.ts";
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { PORT, SESSION_AUTH_TOKEN } from "../../../config/runtime.ts";
 import { isDirectLocalRequest } from "../../../security/auth.ts";
 import { verifyAgentTaskToken } from "../../../security/agent-task-token.ts";
-import { createModelUpgradeRequest, decideModelUpgrade } from "../../model-routing.ts";
+import { createModelUpgradeRequest, type decideModelUpgrade } from "../../model-routing.ts";
 import { createSshApprovalRequest, getSshApprovalStatus } from "../../ssh-approvals.ts";
 import { SSH_AGENT_ACCESS_SQL } from "../../ssh-access.ts";
 import { requestEmailApproval, getEmailApprovalStatus } from "./business-email.ts";
 import { listAgentMailboxes } from "./business-mailboxes.ts";
+import { isBusinessKey } from "../../businesses.ts";
 import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
 
 const BUSINESS_RESOURCES = new Set(["contacts", "tickets", "quotes", "drafts"]);
@@ -30,7 +32,7 @@ async function localApi(method: string, pathname: string, payload?: unknown) {
 }
 
 /** Task-scoped local tool gateway. The worker never receives the global API token. */
-export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirector: DirectorRun): void {
+export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDirector: DirectorRun): void {
   app.post("/api/agent-tools", async (req, res) => {
     if (!isDirectLocalRequest(req)) return res.status(403).json({ error: "local_only" });
     const token = req.header("x-agent-task-token") ?? "";
@@ -46,6 +48,27 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
       req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
     const operation = body.operation;
     try {
+      if (operation === "org.request_status") {
+        const request = db
+          .prepare("SELECT * FROM org_requests WHERE id=? AND requested_by=?")
+          .get(typeof body.request_id === "string" ? body.request_id : "", claims.agentId);
+        return request ? res.json({ ok: true, request }) : res.status(404).json({ error: "org_request_not_found" });
+      }
+      if (operation === "org.request_hire" || operation === "org.request_department") {
+        const kind = operation === "org.request_hire" ? "hire_agent" : body.kind;
+        if (!ORG_REQUEST_KINDS.includes(kind as OrgRequestKind))
+          return res.status(400).json({ error: "org_invalid_kind" });
+        const payload =
+          body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
+            ? (body.payload as Record<string, unknown>)
+            : body;
+        try {
+          const request = createOrgRequest(db, kind as OrgRequestKind, claims.agentId, payload);
+          return res.status(201).json({ ok: true, request });
+        } catch (error) {
+          return res.status(400).json({ error: error instanceof Error ? error.message : "org_request_failed" });
+        }
+      }
       if (operation === "business.social.accounts") {
         return res.json({ ok: true, items: listSocialAccountsForAgent(db) });
       }
@@ -110,7 +133,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
           return res.status(400).json({ error: "business_id_required" });
         const query = new URLSearchParams();
         if (action === "list") {
-          if (body.business === "tech" || body.business === "rental") query.set("business", body.business);
+          if (isBusinessKey(body.business)) query.set("business", body.business);
           if (typeof body.status === "string" && body.status.length <= 40) query.set("status", body.status);
         }
         const path = `${base}${id ? `/${encodeURIComponent(id)}` : ""}${query.size ? `?${query}` : ""}`;
@@ -157,9 +180,15 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
       if (operation === "model.request_upgrade") {
         const reason = typeof body.reason === "string" ? body.reason : "";
         const model = typeof body.model === "string" ? body.model : null;
-        const request = createModelUpgradeRequest(db, claims.taskId, reason, model);
-        const decision = await decideModelUpgrade(db, String(request.id), null, "", runDirector);
-        return res.status(201).json({ ok: true, request: decision });
+        const request = createModelUpgradeRequest(
+          db,
+          claims.taskId,
+          reason,
+          model,
+          typeof body.reasoning_level === "string" ? body.reasoning_level : null,
+          typeof body.provider === "string" ? body.provider : null,
+        );
+        return res.status(201).json({ ok: true, request });
       }
       return res.status(400).json({ error: "unknown_agent_operation" });
     } catch (error) {
@@ -178,6 +207,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, runDirec
         "invalid_reason",
         "no_model_upgrade_available",
         "requested_model_not_available",
+        "invalid_upgrade_provider",
         "task_or_agent_not_found",
         "invalid_ssh_command",
         "ssh_target_unavailable",

@@ -15,6 +15,7 @@ export const PROVIDER_ORDER: SkillHistoryProvider[] = [
 export const HISTORY_PREVIEW_COUNT = 3;
 
 const ROLE_ORDER: Record<AgentRole, number> = {
+  vp: -1,
   team_leader: 0,
   senior: 1,
   junior: 2,

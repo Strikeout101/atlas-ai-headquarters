@@ -4,6 +4,7 @@ import type { View } from "../../app/types";
 
 const TABS: Array<{ view: View; icon: LucideIcon; label: { ko: string; en: string; ja: string; zh: string } }> = [
   { view: "agents", icon: Bot, label: { ko: "에이전트", en: "Agents", ja: "エージェント", zh: "代理" } },
+  { view: "vp_decisions", icon: Bot, label: { ko: "VP 결정", en: "VP decisions", ja: "VPの決定", zh: "VP决策" } },
   { view: "skills", icon: BookOpen, label: { ko: "문서고", en: "Library", ja: "ライブラリ", zh: "文档库" } },
   {
     view: "model_director",
@@ -16,7 +17,11 @@ const TABS: Array<{ view: View; icon: LucideIcon; label: { ko: string; en: strin
 export default function TeamTabs({ current, onChange }: { current: View; onChange: (view: View) => void }) {
   const { t } = useI18n();
   return (
-    <div role="tablist" aria-label={t({ ko: "팀", en: "Team", ja: "チーム", zh: "团队" })} className="ax-tabs mb-4">
+    <div
+      role="tablist"
+      aria-label={t({ ko: "팀", en: "Team", ja: "チーム", zh: "团队" })}
+      className="ax-tabs mb-4 flex-wrap"
+    >
       {TABS.map(({ view, icon: Icon, label }) => (
         <button
           key={view}

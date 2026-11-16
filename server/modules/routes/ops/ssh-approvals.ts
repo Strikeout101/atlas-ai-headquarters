@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
-import { hasValidCsrfToken, shouldRequireCsrf } from "../../../security/auth.ts";
+import { hasValidCsrfToken, shouldRequireCsrf, requireOwnerSession } from "../../../security/auth.ts";
 import {
   ensureSshApprovalSchema,
   isReadOnlyAutoApprovalEnabled,
@@ -20,6 +20,7 @@ export function registerSshApprovalRoutes(app: Express, db: DatabaseSync): void 
   app.post("/api/homelab/approvals/:id/decide", (req, res) => {
     if (shouldRequireCsrf(req) && !hasValidCsrfToken(req))
       return res.status(403).json({ error: "csrf_token_required" });
+    if (!requireOwnerSession(req, res)) return;
     if (typeof req.body?.approve !== "boolean") return res.status(400).json({ error: "approve_boolean_required" });
     const status = req.body.approve ? "approved" : "denied";
     const result = db
@@ -34,6 +35,7 @@ export function registerSshApprovalRoutes(app: Express, db: DatabaseSync): void 
     return res.json({ ok: true, auto_approve_read_only: isReadOnlyAutoApprovalEnabled(db) });
   });
   app.put("/api/homelab/approval-policy", (req, res) => {
+    if (!requireOwnerSession(req, res)) return;
     if (shouldRequireCsrf(req) && !hasValidCsrfToken(req))
       return res.status(403).json({ error: "csrf_token_required" });
     if (typeof req.body?.auto_approve_read_only !== "boolean")

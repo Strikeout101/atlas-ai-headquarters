@@ -25,6 +25,8 @@ import CommandPalette, { type CommandItem } from "../components/command/CommandP
 import TodayView from "../components/today/TodayView";
 import TaskDrawer from "../components/work/TaskDrawer";
 import TeamTabs from "../components/team/TeamTabs";
+import AutonomyWorkspace from "../components/autonomy/AutonomyWorkspace";
+import VpDecisions from "../components/team/VpDecisions";
 import { SETTINGS_TAB_EVENT, type SettingsTab } from "../components/settings/types";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { NAV_ITEMS, TEAM_VIEWS } from "./routes";
@@ -769,6 +771,8 @@ export default function AppMainLayout({
               </TodayView>
             )}
 
+            {view === "autonomy" && <AutonomyWorkspace departments={departments} />}
+
             {view === "tasks" && (
               <TaskBoard
                 tasks={tasks}
@@ -809,18 +813,29 @@ export default function AppMainLayout({
                 description="Upcoming events by date, rental quotes and customers. Draft messages to customers in Outreach."
               />
             )}
+            {view === "ventures" && (
+              <BusinessWorkspace
+                key="ventures"
+                business="ventures"
+                sections={["contacts", "drafts"]}
+                eyebrow="AI-run ventures"
+                title="Ventures"
+                description="Online products and services the agents run themselves: Etsy listings, game assets, custom dashboards. Customers and message drafts for those ventures live here."
+              />
+            )}
             {view === "outreach" && (
               <BusinessWorkspace
                 key="outreach"
                 sections={["drafts", "contacts"]}
-                eyebrow="Both businesses"
+                eyebrow="All businesses"
                 title="Outreach"
-                description="Email, social and SMS drafts for both businesses. Nothing is sent from here: mark a draft ready when it is good to go. Contacts marked do-not-contact can't receive ready drafts."
+                description="Email, social and SMS drafts for every business. Nothing is sent from here: mark a draft ready when it is good to go. Contacts marked do-not-contact can't receive ready drafts."
               />
             )}
             {view === "homelab" && <HomelabWorkspace agents={agents} />}
             {TEAM_VIEWS.includes(view) && <TeamTabs current={view} onChange={setView} />}
             {view === "model_director" && <ModelDirectorWorkspace />}
+            {view === "vp_decisions" && <VpDecisions />}
 
             {view === "agents" && (
               <AgentManager agents={agents} departments={departments} onAgentsChange={onAgentsChange} />

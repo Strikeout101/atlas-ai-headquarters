@@ -127,6 +127,9 @@ export function useRealtimeSync({
       on("departments_changed", () => {
         scheduleLiveSync(60);
       }),
+      on("agents_changed", () => {
+        scheduleLiveSync(60);
+      }),
       on("new_message", (payload: unknown) => {
         const msg = payload as Message;
         setMessages((prev) => {

@@ -30,6 +30,31 @@ function renderRow(item: PendingApproval) {
 }
 
 describe("ApprovalRow", () => {
+  it("shows both VP reasons and the exact organization change for owner escalation", async () => {
+    const item: PendingApproval = {
+      kind: "org_request",
+      id: "org-1",
+      created_at: Date.now(),
+      task_id: null,
+      task_title: null,
+      agent_id: "atlas-vp-codex",
+      agent_name: "Codex VP",
+      org_kind: "dissolve_department",
+      payload: { department_id: "qa", agents_action: "reassign", reassign_department_id: "dev" },
+      reason: "Consolidate testing",
+      vp_review: {
+        status: "escalated",
+        reason: "Codex: approve: Coverage retained\nClaude: escalate: Default department needs owner",
+        reviews: [],
+      },
+    };
+    const { onDecide } = renderRow(item);
+    expect(screen.getByText(/Coverage retained/)).toHaveTextContent("Default department needs owner");
+    expect(screen.getByText(/reassign department/i)).toBeInTheDocument();
+    expect(screen.getByText("dev", { exact: true })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Deny" }));
+    expect(onDecide).toHaveBeenCalledWith(item, false);
+  });
   it("shows the exact email envelope and body before offering approve and send", async () => {
     const email: PendingApproval = {
       kind: "business_email",

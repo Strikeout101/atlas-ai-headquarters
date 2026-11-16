@@ -25,6 +25,7 @@ test.describe("ATLAS shell", () => {
       "Work",
       "Tech Services",
       "Events and Rentals",
+      "Ventures",
       "Outreach",
       "Homelab",
       "Team",

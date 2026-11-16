@@ -51,6 +51,7 @@ const REPORT_STATUS_PRIORITY: Record<string, number> = {
 };
 
 const REPORT_ROLE_PRIORITY: Record<string, number> = {
+  vp: -1,
   team_leader: 0,
   senior: 1,
   junior: 2,
@@ -121,7 +122,7 @@ export function createReportRoutingTools(deps: ReportRoutingDeps) {
         .prepare(
           `
       SELECT * FROM agents
-      WHERE status != 'offline'
+      WHERE status != 'offline' AND role != 'vp'
         AND cli_provider = 'claude'
         AND department_id IN (${placeholders})
     `,
@@ -136,7 +137,7 @@ export function createReportRoutingTools(deps: ReportRoutingDeps) {
         .prepare(
           `
       SELECT * FROM agents
-      WHERE status != 'offline'
+      WHERE status != 'offline' AND role != 'vp'
     `,
         )
         .all() as unknown as AgentRow[],

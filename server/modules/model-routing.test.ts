@@ -4,8 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  consumeModelUpgradeMarker, createModelUpgradeRequest, decideModelUpgrade,
-  ensureModelRoutingSchema, getTaskModelRoute, routeTaskModel,
+  consumeModelUpgradeMarker,
+  createModelUpgradeRequest,
+  decideModelUpgrade,
+  ensureModelRoutingSchema,
+  getTaskModelRoute,
+  routeTaskModel,
 } from "./model-routing.ts";
 
 const dbs: DatabaseSync[] = [];
@@ -38,8 +42,17 @@ describe("model director routing", () => {
     const db = database();
     const run = vi.fn(async () => ({ text: '{"model":"strong","reason":"Complex debugging"}' }));
     const route = await routeTaskModel(db, "task-1", run);
-    expect(route).toMatchObject({ agent_id: "worker", model: "strong", source: "director", director_agent_id: "director" });
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ id: "director" }), expect.any(String), { noTools: true, rawOutput: true, timeoutMs: 60_000 });
+    expect(route).toMatchObject({
+      agent_id: "worker",
+      model: "strong",
+      source: "director",
+      director_agent_id: "director",
+    });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ id: "director" }), expect.any(String), {
+      noTools: true,
+      rawOutput: true,
+      timeoutMs: 60_000,
+    });
     await routeTaskModel(db, "task-1", run);
     expect(run).toHaveBeenCalledTimes(1);
   });
@@ -50,11 +63,22 @@ describe("model director routing", () => {
     expect(route).toMatchObject({ model: "small", source: "default" });
   });
 
-  it("lets the director approve or deny a worker upgrade", async () => {
+  it("requires explicit VP or owner approval for a worker upgrade", async () => {
     const db = database();
     await routeTaskModel(db, "task-1", async () => ({ text: '{"model":"small"}' }));
     const approved = createModelUpgradeRequest(db, "task-1", "The smaller model cannot resolve the bug", "strong");
-    const result = await decideModelUpgrade(db, String(approved.id), null, "", async () => ({ text: '{"approve":true,"reason":"Needs deeper reasoning"}' }));
+    const run = vi.fn(async () => ({ text: '{"approve":true}' }));
+    expect((await decideModelUpgrade(db, String(approved.id), null, "", run)).status).toBe("pending");
+    expect(run).not.toHaveBeenCalled();
+    const result = await decideModelUpgrade(
+      db,
+      String(approved.id),
+      true,
+      "Needs deeper reasoning",
+      undefined,
+      "vp:codex,claude",
+    );
+    expect(result.decided_by).toBe("vp:codex,claude");
     expect(result.status).toBe("approved");
     expect(getTaskModelRoute(db, "task-1")?.model).toBe("strong");
 
@@ -62,6 +86,46 @@ describe("model director routing", () => {
     const rejection = await decideModelUpgrade(db, String(denied.id), false, "Keep the current model");
     expect(rejection.status).toBe("denied");
     expect(getTaskModelRoute(db, "task-1")?.model).toBe("strong");
+  });
+
+  it("keeps a local worker on its local model until the fallback provider upgrade is approved", async () => {
+    const db = database();
+    db.exec("ALTER TABLE agents ADD COLUMN cli_fallback_provider TEXT");
+    db.exec(
+      "UPDATE agents SET cli_provider='api',api_model='qwen-local',cli_fallback_provider='claude' WHERE id='worker'",
+    );
+    db.prepare("UPDATE settings SET value=? WHERE key='providerModelConfig'").run("{}");
+    db.prepare("INSERT INTO settings VALUES ('providerModelConfig',?)").run(
+      JSON.stringify({ claude: { model: "sonnet" } }),
+    );
+    const run = vi.fn(async () => ({ text: "{}" }));
+    const local = await routeTaskModel(db, "task-1", run);
+    expect(local).toMatchObject({ provider: "api", model: "qwen-local" });
+    const request = createModelUpgradeRequest(db, "task-1", "Local model cannot solve the dependency conflict");
+    expect(request).toMatchObject({ requested_provider: "claude", requested_model: "sonnet", status: "pending" });
+    expect(getTaskModelRoute(db, "task-1")?.provider).toBe("api");
+    await decideModelUpgrade(db, String(request.id), true, "Both VPs approved", undefined, "vp:one,two");
+    expect(await routeTaskModel(db, "task-1", run)).toMatchObject({
+      provider: "claude",
+      model: "sonnet",
+      source: "upgrade",
+    });
+    expect(db.prepare("SELECT cli_provider FROM agents WHERE id='worker'").get()).toMatchObject({
+      cli_provider: "api",
+    });
+    await expect(decideModelUpgrade(db, String(request.id), true, "duplicate")).rejects.toThrow(
+      "request_already_decided",
+    );
+  });
+
+  it("rejects unconfigured cross-provider targets and lets denial close a stale request", async () => {
+    const db = database();
+    expect(() => createModelUpgradeRequest(db, "task-1", "Need a more powerful model", null, null, "gemini")).toThrow(
+      "invalid_upgrade_provider",
+    );
+    const req = createModelUpgradeRequest(db, "task-1", "Need a more powerful model", "strong");
+    db.prepare("UPDATE settings SET value='{}' WHERE key='modelRoutingCandidates'").run();
+    expect((await decideModelUpgrade(db, String(req.id), false, "No upgrade necessary")).status).toBe("denied");
   });
 
   it("accepts a request marker from the worktree and removes only that marker", () => {

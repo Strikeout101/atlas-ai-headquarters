@@ -14,6 +14,7 @@ interface LanguagePolicyDeps {
 }
 
 const ROLE_LABEL: Record<string, string> = {
+  vp: "부사장",
   team_leader: "팀장",
   senior: "시니어",
   junior: "주니어",
@@ -21,6 +22,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const ROLE_LABEL_L10N: Record<string, Record<Lang, string>> = {
+  vp: { ko: "부사장", en: "Vice President", ja: "副社長", zh: "副总裁" },
   team_leader: { ko: "팀장", en: "Team Lead", ja: "チームリーダー", zh: "组长" },
   senior: { ko: "시니어", en: "Senior", ja: "シニア", zh: "高级" },
   junior: { ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" },

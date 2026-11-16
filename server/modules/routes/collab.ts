@@ -614,7 +614,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
       const placeholders = candidateAgentIds.map(() => "?").join(",");
       const agents = db
         .prepare(
-          `SELECT * FROM agents WHERE id IN (${placeholders}) AND department_id = ? AND id != ? AND role != 'team_leader' ORDER BY
+          `SELECT * FROM agents WHERE id IN (${placeholders}) AND department_id = ? AND id != ? AND role NOT IN ('vp','team_leader') ORDER BY
          CASE status WHEN 'idle' THEN 0 WHEN 'break' THEN 1 WHEN 'working' THEN 2 ELSE 3 END,
          CASE role WHEN 'senior' THEN 0 WHEN 'junior' THEN 1 WHEN 'intern' THEN 2 ELSE 3 END`,
         )
@@ -624,7 +624,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     // 기존 로직: 부서 전체에서 선택
     const agents = db
       .prepare(
-        `SELECT * FROM agents WHERE department_id = ? AND id != ? AND role != 'team_leader' ORDER BY
+        `SELECT * FROM agents WHERE department_id = ? AND id != ? AND role NOT IN ('vp','team_leader') ORDER BY
        CASE status WHEN 'idle' THEN 0 WHEN 'break' THEN 1 WHEN 'working' THEN 2 ELSE 3 END,
        CASE role WHEN 'senior' THEN 0 WHEN 'junior' THEN 1 WHEN 'intern' THEN 2 ELSE 3 END`,
       )

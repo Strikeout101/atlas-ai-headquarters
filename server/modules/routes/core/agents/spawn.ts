@@ -165,7 +165,9 @@ export function registerAgentSpawnRoute(ctx: RuntimeContext): void {
     const executionSession = ensureTaskExecutionSession(taskId, agent.id, provider);
     const availableSkillsPromptBlock = buildAvailableSkillsPromptBlock(provider);
     const roleLabel =
-      { team_leader: "Team Leader", senior: "Senior", junior: "Junior", intern: "Intern" }[agent.role] || agent.role;
+      { vp: "Vice President", team_leader: "Team Leader", senior: "Senior", junior: "Junior", intern: "Intern" }[
+        agent.role
+      ] || agent.role;
     const deptConstraint = agent.department_id
       ? getDeptRoleConstraint(agent.department_id, agent.department_name || agent.department_id)
       : "";

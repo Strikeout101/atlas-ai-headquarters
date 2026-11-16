@@ -4,7 +4,8 @@ import type { Agent, Task } from "../../types";
 import { localeName, useI18n } from "../../i18n";
 import type { DecisionInboxItem } from "../chat/decision-inbox";
 import type { PendingApproval } from "../../api";
-import type { CommunicationDraft } from "../../api/business";
+import { BUSINESS_NAMES, type CommunicationDraft } from "../../api/business";
+import AutonomyDigest from "../autonomy/AutonomyDigest";
 import ApprovalRow from "./ApprovalRow";
 import AgentAvatar from "../AgentAvatar";
 import { timeAgo, useNow } from "../dashboard/model";
@@ -261,7 +262,7 @@ export default function TodayView({
                         {t({ ko: "초안 검토", en: "Draft ready", ja: "下書き確認", zh: "草稿待审" })}
                       </span>
                       <span>
-                        {draft.business === "tech" ? "Tech Services" : "Events and Rentals"} · {draft.channel}
+                        {BUSINESS_NAMES[draft.business]} · {draft.channel}
                       </span>
                       <span>· {timeAgo(draft.updated_at, localeTag)}</span>
                     </div>
@@ -427,6 +428,7 @@ export default function TodayView({
         </Panel>
       </div>
 
+      <AutonomyDigest />
       {children && (
         <div className="space-y-3">
           <h3 className="text-[13px] font-semibold" style={{ color: "var(--th-text-muted)" }}>

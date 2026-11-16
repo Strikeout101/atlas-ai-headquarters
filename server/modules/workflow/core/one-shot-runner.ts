@@ -1,3 +1,4 @@
+import { agentEnvironment } from "../../../security/agent-environment.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -211,7 +212,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
         const args = buildAgentArgs(provider, model, reasoningLevel, { noTools });
 
         await new Promise<void>((resolve, reject) => {
-          const cleanEnv = { ...process.env };
+          const cleanEnv = agentEnvironment();
           delete cleanEnv.CLAUDECODE;
           delete cleanEnv.CLAUDE_CODE;
           cleanEnv.PATH = withCliPathFallback(String(cleanEnv.PATH ?? process.env.PATH ?? ""));

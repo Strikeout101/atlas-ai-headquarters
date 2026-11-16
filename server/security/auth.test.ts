@@ -26,11 +26,19 @@ import {
   isTrustedOrigin,
   issueSessionCookie,
   parseCookies,
+  requireOwnerSession,
   safeSecretEquals,
   shouldRequireCsrf,
   shouldUseSecureCookie,
 } from "./auth.ts";
-import { createSessionToken, revokeAllSessions, verifySessionToken } from "./login-sessions.ts";
+import {
+  __resetLoginStoreForTests,
+  createSessionToken,
+  revokeAllSessions,
+  verifySessionToken,
+  setLoginPassword,
+} from "./login-sessions.ts";
+import { agentEnvironment } from "./agent-environment.ts";
 
 function mockRequest(headers: Record<string, string | undefined>): Request {
   return {
@@ -235,6 +243,66 @@ describe("isDirectLocalRequest", () => {
 });
 
 describe("installSecurityMiddleware", () => {
+  it("does not grant owner authority to an agent through local bootstrap, even without its task header", async () => {
+    const app = express();
+    installSecurityMiddleware(app);
+    app.post("/api/test/decide", (req, res) => {
+      if (!requireOwnerSession(req, res)) return;
+      res.json({ ok: true });
+    });
+    const agent = request.agent(app);
+    const bootstrap = await agent.get("/api/auth/session").expect(200);
+    expect(bootstrap.body.auth.method).toBe("local");
+    await agent.post("/api/test/decide").set("x-csrf-token", bootstrap.body.csrf_token).expect(403);
+    await agent.get("/api/auth/session").set("x-agent-task-token", "worker-token").expect(403);
+    await agent.get("/api/auth/session").set("x-claw-agent-process", "1").expect(403);
+    const passwordCookie = `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`;
+    await request(app).post("/api/test/decide").set("Cookie", passwordCookie).expect(200);
+    await request(app)
+      .post("/api/test/decide")
+      .set("Cookie", passwordCookie)
+      .set("x-agent-task-token", "worker-token")
+      .expect(403);
+    await request(app).post("/api/test/decide").set("Authorization", `Bearer ${SESSION_AUTH_TOKEN}`).expect(403);
+  });
+
+  it("requires the existing password even on the local machine and upgrades password changes to owner sessions", async () => {
+    __resetLoginStoreForTests();
+    await setLoginPassword("original owner password");
+    const app = express();
+    installSecurityMiddleware(app);
+    const local = request.agent(app);
+    await local.get("/api/auth/session").expect(401);
+    await local.get("/api/auth/session").set("x-forwarded-for", "192.168.1.8").expect(401);
+    const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken("local")}`;
+    await local
+      .put("/api/auth/password")
+      .set("Cookie", cookie)
+      .set("x-csrf-token", getCsrfToken())
+      .send({ new_password: "attacker replacement password" })
+      .expect(403);
+    const changed = await local
+      .put("/api/auth/password")
+      .set("Cookie", cookie)
+      .set("x-csrf-token", getCsrfToken())
+      .send({ current_password: "original owner password", new_password: "new owner password" })
+      .expect(200);
+    expect(changed.body.auth.method).toBe("password");
+    __resetLoginStoreForTests();
+  });
+
+  it("strips owner credentials from agent and one-shot environments without mutating their parent", () => {
+    const parent = {
+      PATH: "tools",
+      API_AUTH_TOKEN: "owner",
+      SESSION_AUTH_TOKEN: "owner",
+      SESSION_SECRET: "signing",
+      OAUTH_ENCRYPTION_SECRET: "mail",
+      INBOX_WEBHOOK_SECRET: "inbox",
+    };
+    expect(agentEnvironment(parent)).toEqual({ PATH: "tools", CLAW_EMPIRE_AGENT_PROCESS: "1" });
+    expect(parent.API_AUTH_TOKEN).toBe("owner");
+  });
   it("does not issue a session to a remote client relayed by a local reverse proxy", async () => {
     const app = express();
     installSecurityMiddleware(app);

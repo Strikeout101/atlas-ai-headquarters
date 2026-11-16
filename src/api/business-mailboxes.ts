@@ -2,6 +2,9 @@ import { patch, post, request } from "./core";
 
 import type { BusinessKind } from "./business";
 
+/** `tls`: encrypted from the first byte. `starttls`: upgraded right after connecting. Mail never goes in the clear. */
+export type MailSecurity = "tls" | "starttls";
+
 export interface MailboxConfig {
   id: string;
   is_default: boolean;
@@ -12,6 +15,8 @@ export interface MailboxConfig {
   imap_port: number;
   smtp_host: string;
   smtp_port: number;
+  imap_security: MailSecurity;
+  smtp_security: MailSecurity;
   has_password: boolean;
   updated_at: number;
   last_test_at: number | null;
@@ -19,7 +24,7 @@ export interface MailboxConfig {
 }
 export type MailboxInput = Pick<
   MailboxConfig,
-  "email" | "username" | "imap_host" | "imap_port" | "smtp_host" | "smtp_port"
+  "email" | "username" | "imap_host" | "imap_port" | "smtp_host" | "smtp_port" | "imap_security" | "smtp_security"
 > & { password?: string; is_default?: boolean };
 export interface MailboxTestResult {
   ok: true;

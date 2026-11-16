@@ -9,6 +9,12 @@ import { startDiscordReceiver } from "../messenger/discord-receiver.ts";
 import { startTelegramReceiver } from "../messenger/telegram-receiver.ts";
 import { registerGracefulShutdownHandlers } from "./lifecycle/register-graceful-shutdown.ts";
 import { AUTONOMY_TICK_MS, runAutonomyTick } from "./agent-proposals.ts";
+import { runVpReviewTick, VP_REVIEW_TICK_MS } from "./vp-review.ts";
+import { executeVpApproval } from "./vp-execution.ts";
+import { isAutonomyAllowed } from "./control-state.ts";
+import { isPasswordConfigured } from "../security/login-sessions.ts";
+import { ensureAutonomyEngineSchema, runAutonomyEngineTick } from "./autonomy-engine.ts";
+import { runVpPlanningTick } from "./autonomy-planner.ts";
 import {
   getContextRollover,
   releaseStaleContextRolloverClaims,
@@ -58,6 +64,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     wsClients,
     logsDir,
   } = ctx as any;
+  ensureAutonomyEngineSchema(db);
 
   // ---------------------------------------------------------------------------
   // Production: serve React UI from dist/
@@ -461,7 +468,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     const defaultProv = dpRow?.value?.replace(/"/g, "") || "claude";
     const fallback = authenticated.includes(defaultProv) ? defaultProv : authenticated[0];
 
-    const agents = db.prepare("SELECT id, name, cli_provider FROM agents").all() as Array<{
+    const agents = db.prepare("SELECT id, name, cli_provider FROM agents WHERE role != 'vp'").all() as Array<{
       id: string;
       name: string;
       cli_provider: string | null;
@@ -516,6 +523,48 @@ export function startLifecycle(ctx: RuntimeContext): void {
   };
   setTimeout(autonomyTick, 2 * 60_000);
   setInterval(autonomyTick, AUTONOMY_TICK_MS);
+  let vpTickRunning = false;
+  let usageRefreshedAt = 0;
+  const vpTick = async () => {
+    if (vpTickRunning || !isAutonomyAllowed()) return;
+    // Disposable browser runtimes must never use real model subscriptions.
+    if (db.prepare("SELECT 1 FROM settings WHERE key='__e2eRuntimeId'").get()) return;
+    vpTickRunning = true;
+    try {
+      if (
+        isPasswordConfigured() &&
+        Date.now() - usageRefreshedAt > 5 * 60_000 &&
+        typeof (ctx as any).refreshCliUsageData === "function"
+      ) {
+        await (ctx as any).refreshCliUsageData();
+        usageRefreshedAt = Date.now();
+      }
+      await runVpReviewTick({
+        db,
+        runAgentOneShot,
+        broadcast,
+        execute: (item, approve, decidedBy, reason) =>
+          executeVpApproval(db, item, approve, decidedBy, reason, {
+            appendTaskLog,
+            broadcast,
+            recordTaskCreationAudit: (input) => (ctx as any).recordTaskCreationAudit(input),
+          }),
+      });
+      await runAutonomyEngineTick({
+        db,
+        startTask: (taskId, agent, departmentId, departmentName) =>
+          (ctx as any).startTaskExecutionForAgent(taskId, agent, departmentId, departmentName),
+        broadcast,
+      });
+      await runVpPlanningTick({ db, runAgentOneShot });
+    } catch (err) {
+      console.error("[vp-review] tick failed:", err);
+    } finally {
+      vpTickRunning = false;
+    }
+  };
+  setTimeout(vpTick, 2 * 60_000);
+  setInterval(vpTick, VP_REVIEW_TICK_MS);
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 

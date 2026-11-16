@@ -63,6 +63,31 @@
 }
 
 /* Primary action, usable anywhere */
+.autonomy-workspace button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    opacity 150ms,
+    transform 150ms;
+}
+.autonomy-workspace .ax-btn-secondary {
+  border: 1px solid var(--th-border);
+  background: var(--th-bg-surface);
+  color: var(--th-text-primary);
+}
+.autonomy-workspace button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.autonomy-workspace button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.autonomy-workspace button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 .ax-btn-primary {
   display: inline-flex;
   align-items: center;

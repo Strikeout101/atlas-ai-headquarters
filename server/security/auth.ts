@@ -25,6 +25,7 @@ import {
 import {
   getTrustedNetworkSummary,
   isDirectLocalRequest,
+  isLoopbackAddress,
   isTrustedNetworkRequest,
   isTrustedOriginForRequest,
   resolveClientAddress,
@@ -146,6 +147,21 @@ export function getRequestSession(req: Request): SessionClaims | null {
   return sessionFromCookie(req, cookieToken(req));
 }
 
+/** Local bootstrap and API tokens grant app access, never owner decision authority. */
+export function requireOwnerSession(req: Request, res: Response): boolean {
+  const session = getRequestSession(req);
+  const allowed =
+    !req.header("x-agent-task-token") &&
+    !req.header("x-claw-agent-process") &&
+    (session?.kind === "password" || (session?.kind === "network" && !isLoopbackAddress(req.socket.remoteAddress)));
+  if (allowed) return true;
+  res.status(403).json({
+    error: "owner_session_required",
+    message: "Sign in with your password in Settings > Security to approve this action.",
+  });
+  return false;
+}
+
 export function isAuthenticated(req: Request): boolean {
   return isApiTokenBearer(bearerToken(req)) || getRequestSession(req) !== null;
 }
@@ -175,7 +191,11 @@ export function clearSessionCookie(req: Request, res: Response): void {
 
 /** The automatic sign-in this request qualifies for, if any. */
 function automaticSessionKind(req: Request): SessionKind | null {
-  if (isDirectLocalRequest(req)) return "local";
+  // Loopback is shared with every CLI worker. After initial password setup it
+  // must never mint a fresh browser session or trust spoofed proxy headers.
+  if (isLoopbackAddress(req.socket.remoteAddress)) {
+    return !isPasswordConfigured() && isDirectLocalRequest(req) ? "local" : null;
+  }
   if (isTrustedNetworkRequest(req)) return "network";
   return null;
 }
@@ -236,7 +256,7 @@ function sessionPayload(kind: SessionKind) {
       method: kind,
       password_configured: isPasswordConfigured(),
       password_min_length: MIN_PASSWORD_LENGTH,
-      can_set_password_without_current: kind === "local",
+      can_set_password_without_current: !isPasswordConfigured() && kind === "local",
       trusted_networks: trust.networks,
       allowed_hosts: trust.allowedHosts,
     },
@@ -277,6 +297,8 @@ export function installSecurityMiddleware(app: Express): void {
   app.use(express.json({ limit: "12mb" }));
 
   app.get("/api/auth/session", (req, res) => {
+    if (req.header("x-agent-task-token") || req.header("x-claw-agent-process"))
+      return res.status(403).json({ error: "agent_session_forbidden" });
     if (isApiTokenBearer(bearerToken(req))) {
       issueSessionCookie(req, res, "token");
       return res.json(sessionPayload("token"));
@@ -329,13 +351,14 @@ export function installSecurityMiddleware(app: Express): void {
   });
 
   app.put("/api/auth/password", async (req, res) => {
+    if (req.header("x-agent-task-token") || req.header("x-claw-agent-process"))
+      return res.status(403).json({ error: "agent_session_forbidden" });
     if (shouldRequireCsrf(req) && !hasValidCsrfToken(req)) return res.status(403).json({ error: "csrf_invalid" });
     const nextPassword = req.body?.new_password;
     const problem = validateNewPassword(nextPassword);
     if (problem) return res.status(400).json({ error: problem, min_length: MIN_PASSWORD_LENGTH });
 
-    const session = getRequestSession(req);
-    if (isPasswordConfigured() && !isDirectLocalRequest(req)) {
+    if (isPasswordConfigured()) {
       const key = loginThrottleKey(req);
       if (loginLockRemainingMs(key) > 0) return res.status(429).json({ error: "too_many_attempts" });
       const current = typeof req.body?.current_password === "string" ? req.body.current_password : "";
@@ -348,7 +371,7 @@ export function installSecurityMiddleware(app: Express): void {
 
     await setLoginPassword(nextPassword as string);
     // Changing the password signs out every browser; keep this one signed in.
-    const kind: SessionKind = session?.kind ?? (isApiTokenBearer(bearerToken(req)) ? "token" : "password");
+    const kind: SessionKind = "password";
     issueSessionCookie(req, res, kind);
     return res.json(sessionPayload(kind));
   });

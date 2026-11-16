@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { businessApi, type CommunicationDraft } from "../api/business";
+import { BUSINESS_KINDS, businessApi, type CommunicationDraft } from "../api/business";
 
 const REFRESH_MS = 60_000;
 
@@ -9,9 +9,12 @@ export function useReadyDrafts(enabled: boolean) {
 
   const refresh = useCallback(async () => {
     try {
-      const [tech, rental] = await Promise.all([businessApi.drafts.list("tech"), businessApi.drafts.list("rental")]);
+      const lists = await Promise.all(BUSINESS_KINDS.map((kind) => businessApi.drafts.list(kind)));
       setItems(
-        [...tech, ...rental].filter((draft) => draft.status === "ready").sort((a, b) => b.updated_at - a.updated_at),
+        lists
+          .flat()
+          .filter((draft) => draft.status === "ready")
+          .sort((a, b) => b.updated_at - a.updated_at),
       );
     } catch {
       // Keep the last known list; Today still works without it.

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
+import { BUSINESS_KEYS, BUSINESS_SQL_LIST, isBusinessKey, syncBusinessCheck } from "../../businesses.ts";
 
 const FIELDS = {
   name: 160,
@@ -15,13 +16,15 @@ const FIELDS = {
 
 export function ensureBusinessProfilesSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS business_profiles (
-    business TEXT PRIMARY KEY CHECK (business IN ('tech','rental')),
+    business TEXT PRIMARY KEY CHECK (business IN (${BUSINESS_SQL_LIST})),
     name TEXT NOT NULL DEFAULT '', website TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '',
     service_area TEXT NOT NULL DEFAULT '', hours TEXT NOT NULL DEFAULT '', brand_voice TEXT NOT NULL DEFAULT '',
     social_profiles TEXT NOT NULL DEFAULT '', services TEXT NOT NULL DEFAULT '', workflow_notes TEXT NOT NULL DEFAULT '',
     updated_at INTEGER NOT NULL DEFAULT 0
-  );
-  INSERT OR IGNORE INTO business_profiles (business) VALUES ('tech'), ('rental');`);
+  )`);
+  syncBusinessCheck(db, "business_profiles");
+  const addProfile = db.prepare("INSERT OR IGNORE INTO business_profiles (business) VALUES (?)");
+  for (const business of BUSINESS_KEYS) addProfile.run(business);
 }
 
 export function registerBusinessProfileRoutes(app: Express, db: DatabaseSync): void {
@@ -31,7 +34,7 @@ export function registerBusinessProfileRoutes(app: Express, db: DatabaseSync): v
   });
   app.patch("/api/business/profiles/:business", (req, res) => {
     const business = req.params.business;
-    if (business !== "tech" && business !== "rental") return res.status(400).json({ error: "invalid_business" });
+    if (!isBusinessKey(business)) return res.status(400).json({ error: "invalid_business" });
     if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
       return res.status(400).json({ error: "invalid_body" });
     }

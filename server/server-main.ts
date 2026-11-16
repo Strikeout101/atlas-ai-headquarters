@@ -37,6 +37,7 @@ import {
   StorageBusyError,
 } from "./modules/bootstrap/message-idempotency.ts";
 import { createSecurityAuditTools } from "./modules/bootstrap/security-audit.ts";
+import { ensureVpAgents } from "./modules/bootstrap/schema/vp-agents.ts";
 import { applyBaseSchema } from "./modules/bootstrap/schema/base-schema.ts";
 import { initializeOAuthRuntime } from "./modules/bootstrap/schema/oauth-runtime.ts";
 import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schema-migrations.ts";
@@ -66,6 +67,7 @@ ensureModelRoutingSchema(db);
 ensureControlStateSchema(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
+ensureVpAgents(db);
 {
   // Office packs were removed (2026-11-16); this deletes whatever an older install still has. No-op afterwards.
   const cleanup = removeOfficePacks(db);

@@ -90,8 +90,73 @@ describe("business mailbox connection configuration", () => {
       updated_at: 123,
       last_test_at: 456,
       last_test_ok: 1,
+      imap_security: "tls",
+      smtp_security: "tls",
     });
     expect(network.connect).not.toHaveBeenCalled();
+  });
+
+  it("gives the ventures business its own mailbox and connects with STARTTLS when asked", async () => {
+    const { app } = harness();
+    const created = await request(app)
+      .post("/api/business/mailboxes")
+      .set("x-csrf-token", getCsrfToken())
+      .send({
+        business: "ventures",
+        email: "office@example.com",
+        imap_host: "mail.example.com",
+        smtp_host: "mail.example.com",
+        smtp_port: 587,
+        smtp_security: "starttls",
+        password: "private-test-password",
+      })
+      .expect(201);
+    expect(created.body.item).toMatchObject({
+      business: "ventures",
+      is_default: true,
+      imap_port: 993,
+      imap_security: "tls",
+      smtp_port: 587,
+      smtp_security: "starttls",
+      has_password: true,
+    });
+    expect(JSON.stringify(created.body)).not.toContain("private-test-password");
+
+    await request(app)
+      .post(`/api/business/mailboxes/accounts/${created.body.item.id}/test`)
+      .set("x-csrf-token", getCsrfToken())
+      .expect(200);
+    // IMAP stays on implicit TLS; SMTP upgrades with STARTTLS and refuses to continue in the clear.
+    expect(network.imapOptions).toHaveBeenCalledWith(expect.objectContaining({ port: 993, secure: true }));
+    expect(network.imapOptions.mock.calls[0][0]).not.toHaveProperty("doSTARTTLS");
+    expect(network.smtpOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ port: 587, secure: false, requireTLS: true }),
+    );
+
+    await request(app)
+      .patch(`/api/business/mailboxes/accounts/${created.body.item.id}`)
+      .set("x-csrf-token", getCsrfToken())
+      .send({ imap_port: 143, imap_security: "starttls" })
+      .expect(200);
+    network.imapOptions.mockClear();
+    await request(app)
+      .post(`/api/business/mailboxes/accounts/${created.body.item.id}/test`)
+      .set("x-csrf-token", getCsrfToken())
+      .expect(200);
+    expect(network.imapOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ port: 143, secure: false, doSTARTTLS: true }),
+    );
+
+    await request(app)
+      .patch(`/api/business/mailboxes/accounts/${created.body.item.id}`)
+      .set("x-csrf-token", getCsrfToken())
+      .send({ smtp_security: "none" })
+      .expect(400, { error: "invalid_mail_security" });
+    await request(app)
+      .post("/api/business/mailboxes")
+      .set("x-csrf-token", getCsrfToken())
+      .send({ ...input, business: "somewhere-else" })
+      .expect(400, { error: "invalid_business" });
   });
 
   it("supports several accounts, normalized address uniqueness, and atomic default changes with legacy callers", async () => {

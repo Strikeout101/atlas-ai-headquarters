@@ -500,7 +500,11 @@ export default function TaskDrawer({
               <ul className="mt-2 space-y-1 text-[12px]" style={{ color: "var(--th-text-secondary)" }}>
                 {upgradeHistory.slice(0, 5).map((req) => (
                   <li key={req.id}>
-                    <span className="font-mono">{req.requested_model}</span> · {req.status}
+                    <span className="font-mono">
+                      {req.requested_provider ? `${req.requested_provider}/` : ""}
+                      {req.requested_model}
+                    </span>{" "}
+                    · {req.status}
                     {req.decision_reason ? ` — ${req.decision_reason}` : ""}
                   </li>
                 ))}

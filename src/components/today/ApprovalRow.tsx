@@ -57,7 +57,9 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
       ? "Email to send"
       : isProposal
         ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
-        : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+        : item.kind === "org_request"
+          ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
+          : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
@@ -146,14 +148,45 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
               Approving sends this exact message once. No attachments or other recipients.
             </p>
           </div>
+        ) : item.kind === "org_request" ? (
+          <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <p>{item.org_kind.replaceAll("_", " ")}</p>
+            <p className="mt-1 break-words">{item.reason}</p>
+            <dl className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+              {Object.entries(item.payload)
+                .filter(([key]) => key !== "reason")
+                .map(([key, value]) => (
+                  <div key={key} className="contents">
+                    <dt className="break-words capitalize" style={{ color: "var(--th-text-muted)" }}>
+                      {key.replaceAll("_", " ").replace(/ id$/, " ")}
+                    </dt>
+                    <dd className="break-words">
+                      {typeof value === "object" ? JSON.stringify(value) : String(value).replaceAll("_", " ")}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
         ) : (
           <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
             <span className="font-mono" style={{ color: "var(--th-text-heading)" }}>
+              {item.requested_provider ? `${item.requested_provider} / ` : ""}
               {item.requested_model ?? "?"}
               {item.requested_reasoning_level ? ` · ${item.requested_reasoning_level}` : ""}
             </span>
             {item.reason ? ` — ${item.reason}` : ""}
           </p>
+        )}
+        {item.vp_review && (
+          <div
+            className="mt-3 border-l-2 pl-3 text-xs"
+            style={{ borderColor: "var(--ax-signal)", color: "var(--th-text-secondary)" }}
+          >
+            <p className="font-medium">
+              {t({ ko: "VP 검토", en: "VP review", ja: "VPレビュー", zh: "VP审核" })}: {item.vp_review.status}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words">{item.vp_review.reason}</p>
+          </div>
         )}
         {error && (
           <p role="alert" className="mt-1.5 text-[12px]" style={{ color: "var(--ax-danger)" }}>

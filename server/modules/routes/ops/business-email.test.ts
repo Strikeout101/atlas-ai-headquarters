@@ -8,11 +8,14 @@ const network = vi.hoisted(() => {
 });
 vi.mock("nodemailer", () => ({ default: { createTransport: network.createTransport } }));
 import { encryptSecret } from "../../../oauth/helpers.ts";
+import { SESSION_COOKIE_NAME } from "../../../config/runtime.ts";
+import { createSessionToken } from "../../../security/login-sessions.ts";
 import { getCsrfToken } from "../../../security/auth.ts";
 import { ensureBusinessSchema } from "./business.ts";
 import { ensureBusinessMailboxSchema } from "./business-mailboxes.ts";
 import {
   ensureBusinessEmailSchema,
+  decideBusinessEmail,
   getEmailApprovalStatus,
   listEmailApprovals,
   registerBusinessEmailRoutes,
@@ -42,6 +45,7 @@ function harness() {
     request(app)
       .post(`/api/business/email-approvals/${id}/decide`)
       .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`)
       .send({ approve });
   return { app, db, approve, create: () => requestEmailApproval(db, "draft", "task", "agent") };
 }
@@ -55,6 +59,42 @@ afterEach(() => {
 });
 
 describe("owner-approved business email", () => {
+  it("refuses worker self-approval through a local bootstrap cookie even when its task header is omitted", async () => {
+    const { app, db, create } = harness();
+    const approval = create();
+    await request(app)
+      .post(`/api/business/email-approvals/${approval.id}/decide`)
+      .set("x-csrf-token", getCsrfToken())
+      .set("Cookie", `${SESSION_COOKIE_NAME}=${createSessionToken("local")}`)
+      .send({ approve: true })
+      .expect(403);
+    expect(getEmailApprovalStatus(db, approval.id, "task", "agent")?.status).toBe("pending");
+    expect(network.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("shares the immutable send transition with server VP decisions and records who decided", async () => {
+    const { db, create } = harness();
+    db.exec(
+      "UPDATE business_mailboxes SET business='ventures'; UPDATE business_contacts SET business='ventures'; UPDATE business_drafts SET business='ventures'",
+    );
+    const approval = create();
+    const result = await decideBusinessEmail(db, approval.id, true, { decidedBy: "vp:codex,claude" });
+    expect(result.body.item?.status).toBe("sent");
+    expect(db.prepare("SELECT decided_by FROM business_email_approvals WHERE id=?").get(approval.id)).toEqual({
+      decided_by: "vp:codex,claude",
+    });
+    expect((await decideBusinessEmail(db, approval.id, true, { decidedBy: "vp:codex,claude" })).status).toBe(409);
+    expect(network.sendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the owner floor when the shared executor is called with a VP attribution", async () => {
+    const { db, create } = harness();
+    const approval = create();
+    expect((await decideBusinessEmail(db, approval.id, true, { decidedBy: "vp:codex,claude" })).body.error).toBe(
+      "owner_approval_required",
+    );
+    expect(network.sendMail).not.toHaveBeenCalled();
+  });
   it("binds explicit mailbox selection and preserves its sender when the business default changes", async () => {
     const { db, approve } = harness();
     db.exec(`INSERT INTO business_mailboxes(id,business,is_default,email,username,imap_host,imap_port,smtp_host,smtp_port,password_enc,updated_at)
