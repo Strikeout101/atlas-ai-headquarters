@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { BUSINESSES, BUSINESS_KEYS, isBusinessKey, syncBusinessCheck } from "./businesses.ts";
+import { businessPolicy } from "./business-policies.ts";
 import { ensureBusinessSchema } from "./routes/ops/business.ts";
 import { ensureBusinessProfilesSchema } from "./routes/ops/business-profiles.ts";
 import { ensureBusinessMailboxSchema } from "./routes/ops/business-mailboxes.ts";
@@ -112,9 +113,10 @@ const dump = (db: DatabaseSync) =>
 describe("business registry", () => {
   it("lists the three businesses and who approves their customer-facing work", () => {
     expect([...BUSINESS_KEYS]).toEqual(["tech", "rental", "ventures"]);
-    expect(BUSINESSES.tech.approval).toBe("owner");
-    expect(BUSINESSES.rental.approval).toBe("owner");
-    expect(BUSINESSES.ventures.approval).toBe("vp");
+    expect(businessPolicy("tech").customer_sends).toBe("owner");
+    expect(businessPolicy("rental").customer_sends).toBe("owner");
+    expect(businessPolicy("ventures").customer_sends).toBe("vp");
+    expect(BUSINESSES.rental.label).toBe("Events and rentals business");
     expect(isBusinessKey("ventures")).toBe(true);
     expect(isBusinessKey("stripe")).toBe(false);
     expect(isBusinessKey(undefined)).toBe(false);

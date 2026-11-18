@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { BUSINESSES, BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
+import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
+import { businessPolicy } from "./business-policies.ts";
 
 /**
  * Listing packages: everything needed to publish one product on a storefront, prepared by agents.
@@ -301,7 +302,7 @@ export function feeNeedsOwner(
 
 /** Who may approve this package right now. Fails closed to the owner. */
 export function listingApprover(db: DatabaseSync, listing: ListingPackage, now = Date.now()): "owner" | "vp" {
-  if (BUSINESSES[listing.business]?.approval !== "vp") return "owner";
+  if (businessPolicy(listing.business).customer_sends !== "vp") return "owner";
   return feeNeedsOwner(db, listing, now) ? "owner" : "vp";
 }
 

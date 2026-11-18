@@ -1,4 +1,5 @@
-import { BUSINESSES, isBusinessKey } from "./businesses.ts";
+import { isBusinessKey } from "./businesses.ts";
+import { businessPolicy, type GateLevel } from "./business-policies.ts";
 
 export const DEFAULT_DEPARTMENT_IDS = ["planning", "dev", "design", "qa", "devsecops", "operations"] as const;
 /** Actions a customer can see. Owner-approved businesses always route these to the owner. */
@@ -23,10 +24,13 @@ export function routeApproval(kind: string, business?: string | null, facts: App
     DEFAULT_DEPARTMENT_IDS.includes(facts.departmentId as (typeof DEFAULT_DEPARTMENT_IDS)[number])
   )
     return "owner";
-  const registered = isBusinessKey(business) ? BUSINESSES[business] : undefined;
-  if ((facts.customerFacing || CUSTOMER_FACING_KINDS.includes(kind)) && registered?.approval !== "vp") return "owner";
+  const policy = isBusinessKey(business) ? businessPolicy(business) : undefined;
+  const gate = (level: GateLevel | undefined) => (level === "owner" || !level ? "owner" : "vp");
+  if (kind === "record_change") return gate(policy?.record_changes);
+  if (kind === "code_push") return gate(policy?.code_pushes);
+  if ((facts.customerFacing || CUSTOMER_FACING_KINDS.includes(kind)) && policy?.customer_sends !== "vp") return "owner";
   if (["task_proposal", "model_upgrade", "org_request"].includes(kind)) return "vp";
-  if (CUSTOMER_FACING_KINDS.includes(kind) && registered?.approval === "vp") return "vp";
+  if (CUSTOMER_FACING_KINDS.includes(kind) && policy?.customer_sends === "vp") return "vp";
   return "owner";
 }
 

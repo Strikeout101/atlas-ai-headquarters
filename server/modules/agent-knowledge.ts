@@ -3,6 +3,7 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESSES, BUSINESS_KEYS, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { searchMemories, type AgentMemory } from "./agent-memory.ts";
+import { businessPolicy } from "./business-policies.ts";
 
 /**
  * What every agent should know before it starts: the project's goal, the business it is working for, a short map of
@@ -127,9 +128,16 @@ export function businessProfileText(db: Db, business: BusinessKey, maxChars = 26
     return value ? `${label}: ${value}` : "";
   };
   const text = [
-    `${String(row.name || BUSINESSES[business].label)} (business key "${business}"; customer-facing work approved by ${
-      BUSINESSES[business].approval === "vp" ? "the two VPs" : "the owner"
-    }; spending always needs the owner)`,
+    (() => {
+      const policy = businessPolicy(business);
+      const who = (level: string) =>
+        level === "owner" ? "the owner" : level === "vp" ? "both VPs" : "no one (applied directly)";
+      return `${String(row.name || BUSINESSES[business].label)} (business key "${business}"; customer-facing work approved by ${who(
+        policy.customer_sends,
+      )}; agent record changes approved by ${who(policy.record_changes)}; code pushes approved by ${who(
+        policy.code_pushes,
+      )}; spending always needs the owner)`;
+    })(),
     field("Website", "website"),
     field("Email", "email"),
     field("Service area", "service_area"),

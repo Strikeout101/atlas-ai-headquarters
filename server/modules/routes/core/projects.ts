@@ -250,6 +250,12 @@ export function registerProjectRoutes({
     if (body.business !== undefined && body.business !== null && body.business !== "" && !isBusinessKey(body.business))
       return res.status(400).json({ error: "invalid_business" });
     const business = isBusinessKey(body.business) ? body.business : null;
+    const githubAccountId =
+      typeof body.github_account_id === "string" && body.github_account_id.trim()
+        ? body.github_account_id.trim()
+        : null;
+    if (githubAccountId && !db.prepare("SELECT 1 FROM github_accounts WHERE id = ?").get(githubAccountId))
+      return res.status(400).json({ error: "github_account_not_found" });
     const assignmentMode = body.assignment_mode === "manual" ? "manual" : "auto";
     const validatedAgentIds = validateProjectAgentIds((body as Record<string, unknown>).agent_ids);
     if ("error" in validatedAgentIds) {
@@ -266,11 +272,12 @@ export function registerProjectRoutes({
       db.prepare(
         `
       INSERT INTO projects (
-        id, name, project_path, core_goal, assignment_mode, last_used_at, created_at, updated_at, github_repo, business
+        id, name, project_path, core_goal, assignment_mode, last_used_at, created_at, updated_at, github_repo, business,
+        github_account_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-      ).run(id, name, projectPath, coreGoal, assignmentMode, t, t, t, githubRepo, business);
+      ).run(id, name, projectPath, coreGoal, assignmentMode, t, t, t, githubRepo, business, githubAccountId);
 
       if (assignmentMode === "manual" && agentIds.length > 0) {
         const insertPA = db.prepare("INSERT INTO project_agents (project_id, agent_id, created_at) VALUES (?, ?, ?)");
@@ -351,6 +358,16 @@ export function registerProjectRoutes({
     if ("github_repo" in body) {
       const value = typeof body.github_repo === "string" ? body.github_repo.trim() || null : null;
       updates.push("github_repo = ?");
+      params.push(value);
+    }
+    if ("github_account_id" in body) {
+      const value =
+        typeof body.github_account_id === "string" && body.github_account_id.trim()
+          ? body.github_account_id.trim()
+          : null;
+      if (value && !db.prepare("SELECT 1 FROM github_accounts WHERE id = ?").get(value))
+        return res.status(400).json({ error: "github_account_not_found" });
+      updates.push("github_account_id = ?");
       params.push(value);
     }
     if ("business" in body) {

@@ -6,6 +6,9 @@ import {
   saveSquareSettings,
   saveSquareMappings,
   squareSettings,
+  listSquareConnections,
+  createSquareConnection,
+  deleteSquareConnection,
   syncSquarePayments,
   testSquareConnection,
   type SquareDeps,
@@ -26,7 +29,11 @@ function failure(res: Response, error: unknown): void {
       ? 409
       : code.startsWith("square_http_") || code === "square_pagination_incomplete"
         ? 502
-        : 400;
+        : code === "square_connection_not_found"
+          ? 404
+          : code === "square_connection_has_receipts" || code === "square_business_mapped_in_other_account"
+            ? 409
+            : 400;
   res.status(status).json({ error: code });
 }
 export function registerSquareRoutes(app: Express, db: DatabaseSync, deps: SquareDeps = {}): void {
@@ -60,6 +67,56 @@ export function registerSquareRoutes(app: Express, db: DatabaseSync, deps: Squar
     if (!owner(req, res)) return;
     try {
       res.json(await syncSquarePayments(db, deps));
+    } catch (error) {
+      failure(res, error);
+    }
+  });
+
+  // Several Square accounts (Primrose has its own). The routes above keep working for the first account.
+  const connectionId = (req: Request): number => {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) throw new Error("square_connection_not_found");
+    return id;
+  };
+  const handle = (res: Response, work: () => unknown | Promise<unknown>) =>
+    Promise.resolve()
+      .then(work)
+      .then((connection) => res.json({ ok: true, connection }))
+      .catch((error) => failure(res, error));
+  app.get("/api/square/connections", (_req, res) => res.json({ ok: true, connections: listSquareConnections(db) }));
+  app.post("/api/square/connections", (req, res) => {
+    if (!owner(req, res)) return;
+    try {
+      res.status(201).json({ ok: true, connection: createSquareConnection(db, req.body ?? {}, deps.now?.()) });
+    } catch (error) {
+      failure(res, error);
+    }
+  });
+  app.patch("/api/square/connections/:id", (req, res) => {
+    if (!owner(req, res)) return;
+    void handle(res, () => saveSquareSettings(db, req.body ?? {}, deps.now?.(), connectionId(req)));
+  });
+  app.put("/api/square/connections/:id/mappings", (req, res) => {
+    if (!owner(req, res)) return;
+    void handle(res, () => saveSquareMappings(db, req.body?.mappings, deps.now?.(), connectionId(req)));
+  });
+  app.post("/api/square/connections/:id/test", (req, res) => {
+    if (!owner(req, res)) return;
+    void handle(res, () => testSquareConnection(db, deps, connectionId(req)));
+  });
+  app.post("/api/square/connections/:id/sync", async (req, res) => {
+    if (!owner(req, res)) return;
+    try {
+      res.json(await syncSquarePayments(db, deps, connectionId(req)));
+    } catch (error) {
+      failure(res, error);
+    }
+  });
+  app.delete("/api/square/connections/:id", (req, res) => {
+    if (!owner(req, res)) return;
+    try {
+      deleteSquareConnection(db, connectionId(req));
+      res.json({ ok: true });
     } catch (error) {
       failure(res, error);
     }

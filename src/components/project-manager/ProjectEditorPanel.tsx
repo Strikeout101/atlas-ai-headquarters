@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { isApiRequestError, pickProjectPathNative, type ProjectDetailResponse } from "../../api";
 import { BUSINESS_KINDS, BUSINESS_NAMES } from "../../api/business";
+import ProjectGitHubAccountField from "./ProjectGitHubAccountField";
 import type { Agent, AssignmentMode, Department, Project } from "../../types";
 import type {
   FormFeedback,
@@ -26,6 +27,8 @@ interface ProjectEditorPanelProps {
   setCoreGoal: Dispatch<SetStateAction<string>>;
   business: Project["business"];
   setBusiness: Dispatch<SetStateAction<Project["business"]>>;
+  githubAccountId: string | null;
+  setGithubAccountId: Dispatch<SetStateAction<string | null>>;
   saving: boolean;
   canSave: boolean;
   pathToolsVisible: boolean;
@@ -79,6 +82,8 @@ export default function ProjectEditorPanel({
   setCoreGoal,
   business,
   setBusiness,
+  githubAccountId,
+  setGithubAccountId,
   saving,
   canSave,
   pathToolsVisible,
@@ -343,6 +348,14 @@ export default function ProjectEditorPanel({
           })}
         </span>
       </label>
+
+      <ProjectGitHubAccountField
+        t={t}
+        business={business}
+        value={githubAccountId}
+        onChange={setGithubAccountId}
+        disabled={!isCreating && !editingProjectId}
+      />
 
       <ManualAssignmentSelector
         t={t}

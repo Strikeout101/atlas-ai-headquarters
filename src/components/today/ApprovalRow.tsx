@@ -58,19 +58,28 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
       ? "Email to send"
       : isProposal
         ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
-        : item.kind === "listing_publish"
-          ? t({ ko: "게시할 상품", en: "Listing to publish", ja: "公開する出品", zh: "待发布的商品" })
-          : item.kind === "spend_request"
-            ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
-            : item.kind === "org_request"
-              ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
-              : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+        : item.kind === "record_change"
+          ? t({ ko: "기록 변경", en: "Record change", ja: "記録の変更", zh: "记录更改" })
+          : item.kind === "code_push"
+            ? t({ ko: "코드 푸시", en: "Code push", ja: "コードのプッシュ", zh: "代码推送" })
+            : item.kind === "listing_publish"
+              ? t({ ko: "게시할 상품", en: "Listing to publish", ja: "公開する出品", zh: "待发布的商品" })
+              : item.kind === "spend_request"
+                ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
+                : item.kind === "org_request"
+                  ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
+                  : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
       ? item.project_name
       : null;
-  const heading = isProposal || item.kind === "listing_publish" ? item.title : item.task_title;
+  const heading =
+    isProposal || item.kind === "listing_publish" || item.kind === "code_push"
+      ? item.title
+      : item.kind === "record_change"
+        ? item.summary
+        : item.task_title;
 
   return (
     <li className="flex items-start gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid var(--th-border)" }}>
@@ -151,6 +160,57 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             </pre>
             <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
               Approving sends this exact message once. No attachments or other recipients.
+            </p>
+          </div>
+        ) : item.kind === "record_change" ? (
+          <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <dl className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+              {Object.entries(item.payload).map(([key, value]) => (
+                <div key={key} className="contents">
+                  <dt className="break-words capitalize" style={{ color: "var(--th-text-muted)" }}>
+                    {key.replaceAll("_", " ")}
+                  </dt>
+                  <dd className="break-words">
+                    {item.current && key in item.current && item.current[key] !== value && (
+                      <span className="line-through opacity-60">{String(item.current[key] ?? "empty")} </span>
+                    )}
+                    {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {item.action === "delete" && (
+              <p className="mt-1 text-xs" style={{ color: "var(--ax-danger)" }}>
+                {t({
+                  ko: "승인하면 이 기록이 삭제됩니다.",
+                  en: "Approving deletes this record.",
+                  ja: "承認するとこの記録は削除されます。",
+                  zh: "批准后将删除此记录。",
+                })}
+              </p>
+            )}
+            <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {t({
+                ko: "이 사업은 에이전트의 기록 변경에 승인이 필요합니다. 승인하면 그대로 적용됩니다.",
+                en: "This business requires approval before agents change its records. Approving applies exactly this.",
+                ja: "この事業ではエージェントによる記録変更に承認が必要です。承認するとこの内容が適用されます。",
+                zh: "该业务要求代理更改记录前须经批准。批准后将按此内容执行。",
+              })}
+            </p>
+          </div>
+        ) : item.kind === "code_push" ? (
+          <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            <p className="break-words">
+              {item.project_name ?? item.project_id} → <span className="font-mono">{item.github_repo}</span> (
+              {item.branch})
+            </p>
+            <p className="mt-1 text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {t({
+                ko: `${item.account_label ?? "GitHub 계정"}으로 푸시하고 main으로의 PR을 엽니다. 병합은 하지 않습니다.`,
+                en: `Pushes with ${item.account_label ?? "the project's GitHub account"}${item.account_login ? ` (${item.account_login})` : ""} and opens a pull request to main. Nothing is merged.`,
+                ja: `${item.account_label ?? "GitHub アカウント"}でプッシュし、main へのプルリクエストを開きます。マージはしません。`,
+                zh: `使用 ${item.account_label ?? "GitHub 账户"} 推送并打开到 main 的拉取请求，不会合并。`,
+              })}
             </p>
           </div>
         ) : item.kind === "listing_publish" ? (

@@ -46,8 +46,8 @@ Last full review: 2026-11-17.
 - [x] **P1** (2026-11-17, committed together with agent knowledge and memory) Commit the phone layout and VPN launcher work Codex finished on 2026-11-16 (bottom tabs, menu drawer, Office hidden on phones, `start-atlas.bat` now runs `pnpm dev`). It is verified but uncommitted.
 - [ ] **P1** Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
 - [ ] **P2 YOU** Instagram: connect a token in Settings > Businesses and run Test. The account row exists but no token is stored.
-- [ ] **P2 YOU** Square: map the Primrose (Rental) location too. Only Tech and Ventures are mapped.
-- [ ] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17).
+- [] **P2 YOU** Square: map the Primrose (Rental) location too. Only Tech and Ventures are mapped. #Note from Strike: Prirose uses another square account so I need ot be able to enter a second API for square
+- [X] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17). 11/17
 - [ ] **P2** Register real projects (website repos) with their business set, so tasks get the right project goal and profile. There are no projects yet.
 - [ ] **P2** `tasks/todo.md` still says phases 5 and 6 are uncommitted, but both are committed (ed837fc and e18c0b0). Correct the notes.
 - [ ] **P2** Open items still sitting in `tasks/todo.md`: Ctrl+K commands for the emergency controls, Etsy API publishing, itch.io uploads, owner create/edit of listing packages. The Ventures mailbox test that the file still lists as pending has since passed. Keep these items here from now on.
@@ -70,8 +70,8 @@ Built 2026-11-17: agents now get a knowledge block (project goal, business profi
 
 ## 3. Accounts, identities and credentials
 
-- [ ] **P1** **Multiple GitHub accounts.** Today GitHub uses a single "top priority" account, and it isn't connected yet (no GitHub account is saved). Support several accounts, each with a label and an owning business (Primrose vs personal), and pick the account by repo or project. Agents should push with the matching account, not the PC's global git login.
-- [ ] **P1 YOU** Connect both GitHub accounts once the step above exists (fine-grained tokens or a GitHub App per account, limited to the repos each needs).
+- [x] **P1** **Multiple GitHub accounts.** Today GitHub uses a single "top priority" account, and it isn't connected yet (no GitHub account is saved). Support several accounts, each with a label and an owning business (Primrose vs personal), and pick the account by repo or project. Agents should push with the matching account, not the PC's global git login. Answer From strike: 11/18 Claude Finished this
+- [x] **P1 YOU** Connect both GitHub accounts once the step above exists (fine-grained tokens or a GitHub App per account, limited to the repos each needs). Answer From strike: 11/18 done
 - [ ] **P1** **Worker isolation.** Agents run with permission checks turned off (`--dangerously-skip-permissions`, `--yolo`, `--auto`) as the same Windows user as ATLAS, so they can read `.env` and the database directly. Before agents get more powerful accounts, run them under a separate user or container that has no access to ATLAS secrets.
 - [ ] **P2** Scope agent business access by business and department. Today any agent can create, edit or delete records for all three businesses.
 - [ ] **P2** One credential area in Settings listing every connected account, its business, its last successful test and its expiry date, plus a warning before tokens expire.
@@ -81,7 +81,17 @@ Built 2026-11-17: agents now get a knowledge block (project goal, business profi
 
 Nothing exists for this yet.
 
-- [ ] **P1 YOU** List each website with its repo, GitHub account, Vercel project, domain and registrar (for the systems registry).
+- [X] **P1 YOU** List each website with its repo, GitHub account, Vercel project, domain and registrar (for the systems registry).
+Primrose:
+URL - https://primrosevents.com/
+Github - https://github.com/primroseevents/primrose-website
+Vercel - https://vercel.com/primroseevents-s-projects1/primrose-website
+Registrar - Cloudflare
+Small Business Tech 
+URL - https://smallbusinessestech.com/
+Github - https://github.com/Strikeout101/small-business-tech-security
+Vercel - https://vercel.com/eddiealba2003-9416s-projects/small-business-tech-security-u9aq
+Registrar - Cloudflare
 - [ ] **P1** Register website repos as ATLAS projects with absolute paths and the correct GitHub account.
 - [ ] **P1** Add a Vercel integration (token per Vercel account or team): list projects, deployments, build logs, environment variable names (not values) and domains.
 - [ ] **P1** Website change flow: agent branch, then pull request, then Vercel preview URL, then automatic checks (build, links, a screenshot on phone and desktop), then merge. Small content edits merge automatically once trusted (section 10). Layout or pricing changes go to the owner.
@@ -106,7 +116,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 6. Selling pages and storefronts
 
-- [ ] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites.
+- [X] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites. Answer From strike: All the ones mentioned exept Gumroad
 - [ ] **P1** Etsy API publishing (needs an Etsy-approved developer app). Include listing create and update, inventory, prices within limits, and reading orders.
 - [ ] **P2** itch.io uploads with the butler tool.
 - [ ] **P2** Orders flow: new order, record it, fulfil it (digital delivery or a task), send the customer a message, and mark the deal paid only from verified payment evidence.
@@ -134,7 +144,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ### Primrose Events (rentals)
 
-- [ ] **P1 YOU** Provide the rental inventory, pricing rules, delivery and service area rules, and an example quote format.
+- [X] **P1 YOU** Provide the rental inventory, pricing rules, delivery and service area rules, and an example quote format. Answer From strike: Has been answered in SETUP-INFO-NEEDED
 - [ ] **P2** Inventory and availability by date, so a quote cannot double-book an item.
 - [ ] **P2** Pre-event and post-event message schedule: confirmation, delivery reminder, check-out, check-in, review request.
 - [ ] **P2** Quote documents (PDF) and acceptance tracking. Today "shared" sends nothing.
@@ -153,7 +163,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 9. Homelab
 
-- [ ] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now.
+- [X] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now. Answer From strike: Has been answered in SETUP-INFO-NEEDED
 - [ ] **P2** Switch from password to SSH key auth, using a dedicated agent login per host with only the sudo it needs.
 - [ ] **P2** Turn on `restrict_agents` and grant hosts to the homelab department only.
 - [ ] **P2** Proxmox API (read: nodes, VMs, containers, storage, backups). Changes under policy.
@@ -167,14 +177,14 @@ Today every rule is hard-coded. Tech and Rental customer-facing work always goes
 
 - [ ] **P1** **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
 - [ ] **P1** **Client importance:** add a tier on contacts (normal, important, VIP). Important and VIP clients always go to the owner; normal clients follow the policy.
-- [ ] **P1** **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic.
+- [ ] **P1** **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic. Answer From strike: 1K for now
 - [ ] **P1** Remove the hard-coded line in the VP review prompt that forces every Tech and Rental customer item to escalate. Read the policy instead.
 - [ ] **P1** Fix the free-text keyword check: any message containing words like "pay" or "buy" goes to the owner, which catches normal customer emails. Use structured facts instead.
 - [ ] **P2** **Trust ramp:** after N approved items of a kind with no corrections, offer to move that kind down a level. Record the track record per agent and per action.
 - [ ] **P2** Spending tiers: a monthly budget per business and category with a per-item limit. Today every spend request goes to the owner with no threshold, and an approval only records permission; no money moves.
 - [ ] **P2** Send paths for social posts and SMS under the same policy (today they cannot be sent at all).
-- [ ] **P2** Owner override and undo: an audit list of everything done automatically, with a way to flag a mistake that turns into a lesson (section 2).
-- [ ] **P2 YOU** Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines.
+- [~] **P2** Owner override and undo: an audit list of everything done automatically, with a way to flag a mistake that turns into a lesson (section 2). Answer From strike: I do not want to do this until we have most of the autonomy features/logic/etc. configured
+- [ ] **P2 YOU** Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines. Answer From strike: I do not want to do this until all/most the autonomy setting/features/logic are in place
 - [ ] **P3** Profit goals (needs costs plus verified revenue).
 - [ ] **P3** Money movement (refunds, payouts, deposits) stays manual until you decide otherwise.
 
@@ -215,11 +225,11 @@ Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the
 
 - [x] (2026-11-17, in business profiles) Service areas, business hours and prices or pricing rules for each business.
 - [x] (2026-11-17, in business profiles: no unapproved discounts, availability promises, price changes or money handling) Topics, promises, discounts or customer groups agents must avoid.
-- [ ] Which deals and which clients count as "big" or "important" (amounts and names or rules), for section 10.
-- [ ] Monthly spending budget per business and per provider (AI subscriptions, listing fees, ads).
-- [ ] Posting frequency and the platforms for each business. (Partly answered: agents give ideas and drafts; the owner and partner post videos. Frequency still open.)
+- [~] Which deals and which clients count as "big" or "important" (amounts and names or rules), for section 10. - Answer From strike: For now anything ove 1K is considered big, this should be a setting honestly
+- [~] Monthly spending budget per business and per provider (AI subscriptions, listing fees, ads). Answer From strike: If refering to the AI providers the usage should just be up to the subscription for now, as of now we have 0 budgets for ads, listing etc. Once we have a plan and a product/service/etc I might be willing to invest in ads agents shouldbe able to ask for approval on this
+- [~] Posting frequency and the platforms for each business. (Partly answered: agents give ideas and drafts; the owner and partner post videos. Frequency still open.) Answer From strike: I am thinking a minimum of 3 per week but honestly should be more for the venture, and I have been thinking and I do want agent to make videos for veanture but this needs to be discused and applied
 - [x] (2026-11-17: reputable public sources) Acceptable sources for lead research.
-- [ ] Where customers, jobs and quotes live today (the source of truth to import from). (Partly answered: Google Sheets for leads, Square for quotes; ATLAS is the source of truth from now on.)
+- [~] Where customers, jobs and quotes live today (the source of truth to import from). (Partly answered: Google Sheets for leads, Square for quotes; ATLAS is the source of truth from now on.) Answer From strike: Like meantioned there is nothing besides the excel if the agents want to make their own or use/suggest a free tool I can connect for them or maybe even one they can make themself in my homelab that would be fine with me but i have nothing 
 - [x] (2026-11-17: yes, director-approved) Whether routine model upgrades may be approved by the director without you.
 - [x] (2026-11-17, in `knowledge/systems.md`) Hardware available to run workers (main PC, homelab, Precision laptop) and when.
 

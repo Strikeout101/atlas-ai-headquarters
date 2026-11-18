@@ -3,19 +3,18 @@ import type { DatabaseSync } from "node:sqlite";
 /**
  * The businesses ATLAS works for. This is the one place the list lives on the server.
  *
- * `approval` says who signs off on customer-facing actions (sending mail, posting, outreach):
- * - `owner`: the two businesses the owner runs personally. Agents research and draft; the owner approves sends.
- * - `vp`: the AI-run ventures. The two VP agents review and approve; the owner sees only what they escalate.
- * Spending money is never covered by this; it always needs the owner.
+ * Who approves customer sends, record changes and code pushes is set per business by the owner
+ * (business-policies.ts). Spending money is never covered by those settings; it always needs the owner.
  */
 export const BUSINESS_KEYS = ["tech", "rental", "ventures"] as const;
 export type BusinessKey = (typeof BUSINESS_KEYS)[number];
 export type BusinessApprover = "owner" | "vp";
 
-export const BUSINESSES: Record<BusinessKey, { label: string; approval: BusinessApprover }> = {
-  tech: { label: "Tech services business", approval: "owner" },
-  rental: { label: "Events and rentals business", approval: "owner" },
-  ventures: { label: "AI-run ventures (online products and services)", approval: "vp" },
+/** Labels only. Who approves what is an owner setting: see business-policies.ts. */
+export const BUSINESSES: Record<BusinessKey, { label: string }> = {
+  tech: { label: "Tech services business" },
+  rental: { label: "Events and rentals business" },
+  ventures: { label: "AI-run ventures (online products and services)" },
 };
 
 export function isBusinessKey(value: unknown): value is BusinessKey {

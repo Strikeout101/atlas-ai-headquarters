@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { decryptSecret } from "../../../../oauth/helpers.ts";
+import { planCodePush, queueCodePush } from "../../../code-pushes.ts";
+import { githubAccountToken, openPullRequest, pushBranchAs, scrubTokenFromOrigin } from "../../../github-accounts.ts";
 import type { WorktreeInfo } from "./lifecycle.ts";
 import {
   autoCommitWorktreePendingChanges,
@@ -187,24 +188,15 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
     }
   }
 
-  function getGitHubToken(): string | null {
-    const row = db
-      .prepare(
-        "SELECT access_token_enc FROM oauth_accounts WHERE provider = 'github' AND status = 'active' ORDER BY priority ASC, updated_at DESC LIMIT 1",
-      )
-      .get() as { access_token_enc: string } | undefined;
-    if (!row?.access_token_enc) return null;
-    try {
-      return decryptSecret(row.access_token_enc);
-    } catch {
-      return null;
-    }
-  }
-
+  /**
+   * Merges reviewed work into the project's dev branch, then pushes it with the project's own GitHub account (or queues
+   * the push for approval, per the business's code_pushes setting). Never uses the PC's own git login.
+   */
   function mergeToDevAndCreatePR(
     projectPath: string,
     taskId: string,
     githubRepo: string,
+    projectId: string | null = null,
   ): { success: boolean; message: string; conflicts?: string[]; prUrl?: string } {
     const info = taskWorktrees.get(taskId);
     if (!info) return { success: false, message: "No worktree found for this task" };
@@ -264,63 +256,40 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
         timeout: 30000,
       });
 
-      const token = getGitHubToken();
-      if (token) {
-        const remoteUrl = `https://x-access-token:${token}@github.com/${githubRepo}.git`;
-        execFileSync("git", ["remote", "set-url", "origin", remoteUrl], {
-          cwd: projectPath,
-          stdio: "pipe",
-          timeout: 5000,
+      const plan = planCodePush(db as any, projectId);
+      let pushNote: string;
+      if (plan.action === "skip") {
+        pushNote = `not pushed: ${plan.reason}. Add a GitHub account in Settings > Businesses.`;
+        appendTaskLog(taskId, "system", `Merged to dev locally; ${pushNote}`);
+      } else if (plan.action === "queue") {
+        const request = queueCodePush(db as any, {
+          project_id: projectId!,
+          task_id: taskId,
+          business: plan.business,
+          github_repo: githubRepo,
+          project_path: projectPath,
+          branch: "dev",
+          account_id: plan.accountId!,
+          title: taskTitle,
         });
-      }
-      execFileSync("git", ["push", "origin", "dev"], {
-        cwd: projectPath,
-        stdio: "pipe",
-        timeout: 60000,
-      });
-
-      if (token) {
-        const [owner, repo] = githubRepo.split("/");
-        void (async () => {
-          try {
-            const listRes = await fetch(
-              `https://api.github.com/repos/${owner}/${repo}/pulls?head=${owner}:dev&base=main&state=open`,
-              { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } },
-            );
-            const existingPRs = await listRes.json();
-            if (Array.isArray(existingPRs) && existingPRs.length > 0) {
-              const prUrl = existingPRs[0].html_url;
-              console.log(`[Claw-Empire] Existing PR updated: ${prUrl}`);
-              appendTaskLog(taskId, "system", `GitHub PR updated: ${prUrl}`);
-            } else {
-              const createRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls`, {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  Accept: "application/vnd.github+json",
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  title: `[Climpire] ${taskTitle}`,
-                  body: `## Climpire Task\n\n**Task:** ${taskTitle}\n**Task ID:** ${taskId.slice(0, 8)}\n\nAutomatically created by Climpire workflow.`,
-                  head: "dev",
-                  base: "main",
-                }),
-              });
-              if (createRes.ok) {
-                const prData = (await createRes.json()) as { html_url?: string };
-                console.log(`[Claw-Empire] Created PR: ${prData.html_url}`);
-                appendTaskLog(taskId, "system", `GitHub PR created: ${prData.html_url}`);
-              } else {
-                const errBody = await createRes.text();
-                console.warn(`[Claw-Empire] Failed to create PR: ${createRes.status} ${errBody}`);
-                appendTaskLog(taskId, "system", `GitHub PR creation failed: ${createRes.status}`);
-              }
-            }
-          } catch (prErr) {
-            console.warn(`[Claw-Empire] PR creation error:`, prErr);
-          }
-        })();
+        pushNote = `push waits for approval (${plan.reason}); request ${request.id.slice(0, 8)}`;
+        appendTaskLog(taskId, "system", `Merged to dev locally; ${pushNote}.`);
+      } else {
+        // Push now (synchronously, so a failure is reported); the pull request is opened in the background.
+        const token = githubAccountToken(db as any, plan.accountId!);
+        if (!token) throw new Error("GitHub token for this project could not be read");
+        scrubTokenFromOrigin(projectPath, githubRepo);
+        pushBranchAs(projectPath, githubRepo, "dev", token);
+        pushNote = `pushed (${plan.reason})`;
+        void openPullRequest(githubRepo, token, {
+          head: "dev",
+          base: "main",
+          title: `[ATLAS] ${taskTitle}`.slice(0, 250),
+          body: `Reviewed and approved in ATLAS.\n\nTask: ${taskId.slice(0, 8)}`,
+        }).then((pr) => {
+          if (pr.url) appendTaskLog(taskId, "system", `GitHub PR ${pr.created ? "created" : "updated"}: ${pr.url}`);
+          else if (pr.error) appendTaskLog(taskId, "system", `GitHub PR could not be opened (${pr.error})`);
+        });
       }
 
       try {
@@ -335,7 +304,7 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
 
       return {
         success: true,
-        message: `Merged ${info.branchName} → dev and pushed to origin.`,
+        message: `Merged ${info.branchName} → dev; ${pushNote}.`,
       };
     } catch (err: unknown) {
       try {

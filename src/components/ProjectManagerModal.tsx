@@ -54,6 +54,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
   const [projectPath, setProjectPath] = useState("");
   const [coreGoal, setCoreGoal] = useState("");
   const [business, setBusiness] = useState<Project["business"]>(null);
+  const [githubAccountId, setGithubAccountId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reportDetail, setReportDetail] = useState<TaskReportDetail | null>(null);
 
@@ -120,6 +121,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
           setProjectPath(res.project.project_path);
           setCoreGoal(res.project.core_goal);
           setBusiness(res.project.business ?? null);
+          setGithubAccountId(res.project.github_account_id ?? null);
           setAssignmentMode(res.project.assignment_mode || "auto");
           setSelectedAgentIds(new Set(res.project.assigned_agent_ids || []));
         }
@@ -220,6 +222,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
     setProjectPath(viewedProject.project_path);
     setCoreGoal(viewedProject.core_goal);
     setBusiness(viewedProject.business ?? null);
+    setGithubAccountId(viewedProject.github_account_id ?? null);
     setAssignmentMode(viewedProject.assignment_mode || "auto");
     setSelectedAgentIds(new Set(viewedProject.assigned_agent_ids || []));
     setManualAssignmentWarning(null);
@@ -240,6 +243,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
     name,
     coreGoal,
     business,
+    githubAccountId,
     selectedAgentIds,
     loadProjects,
     search,
@@ -386,6 +390,8 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
                   setCoreGoal={setCoreGoal}
                   business={business}
                   setBusiness={setBusiness}
+                  githubAccountId={githubAccountId}
+                  setGithubAccountId={setGithubAccountId}
                   saving={saving}
                   canSave={canSave}
                   pathToolsVisible={pathToolsVisible}
@@ -430,6 +436,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
                       setProjectPath(viewedProject.project_path);
                       setCoreGoal(viewedProject.core_goal);
                       setBusiness(viewedProject.business ?? null);
+                      setGithubAccountId(viewedProject.github_account_id ?? null);
                     }
                   }}
                   onStartEditSelected={startEditSelected}

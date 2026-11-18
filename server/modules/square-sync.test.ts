@@ -10,6 +10,9 @@ import {
   testSquareConnection,
   syncSquarePayments,
   runSquareSyncTick,
+  createSquareConnection,
+  deleteSquareConnection,
+  listSquareConnections,
 } from "./square-sync.ts";
 vi.mock("../oauth/helpers.ts", () => ({
   encryptSecret: (value: string) => `sealed:${value}`,
@@ -347,5 +350,164 @@ describe("Square complete pagination, coverage, and stale-operation fences", () 
     expect(h.fetcher).toHaveBeenCalledTimes(1);
     await runSquareSyncTick(h.db, h.deps);
     expect(h.fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("several Square accounts", () => {
+  const primroseLocations = [{ id: "location-p", name: "Primrose", currency: "USD", status: "ACTIVE" }];
+  function multi() {
+    const db = new DatabaseSync(":memory:");
+    dbs.push(db);
+    applyBaseSchema(db);
+    ensureAutonomySchema(db);
+    db.exec("CREATE TABLE business_contacts(id TEXT PRIMARY KEY)");
+    ensureSquareSchema(db);
+    // Each token sees its own account's locations and payments; the same payment id exists in both on purpose.
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const token = String((init?.headers as Record<string, string>).Authorization);
+      const primrose = token.includes("primrose");
+      const body =
+        new URL(String(input)).pathname === "/v2/locations"
+          ? { locations: primrose ? primroseLocations : locations }
+          : {
+              payments: [
+                payment(primrose ? { location_id: "location-p", total_money: { amount: 9900, currency: "USD" } } : {}),
+              ],
+            };
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    const deps = { fetch: fetcher, now: () => NOW };
+    return { db, deps, fetcher };
+  }
+
+  it("keeps a separate token, locations and sync per account, and payment ids never collide", async () => {
+    const { db, deps } = multi();
+    saveSquareSettings(db, { token: "main-token", history_since: "2020-01-01T00:00:00Z" }, NOW);
+    await testSquareConnection(db, deps);
+    saveSquareMappings(db, [{ business: "ventures", location_id: "location-1" }], NOW);
+
+    const primrose = createSquareConnection(
+      db,
+      { label: "Primrose Events", token: "primrose-token", history_since: "2020-01-01T00:00:00Z" },
+      NOW,
+    );
+    expect(primrose).toMatchObject({ id: 2, label: "Primrose Events", token_configured: true, enabled: false });
+    await testSquareConnection(db, deps, primrose.id);
+    expect(squareSettings(db, primrose.id).locations).toEqual(primroseLocations);
+    // A business can only take money from one account.
+    expect(() =>
+      saveSquareMappings(db, [{ business: "ventures", location_id: "location-p" }], NOW, primrose.id),
+    ).toThrow("square_business_mapped_in_other_account");
+    saveSquareMappings(db, [{ business: "rental", location_id: "location-p" }], NOW, primrose.id);
+
+    await syncSquarePayments(db, deps);
+    await syncSquarePayments(db, deps, primrose.id);
+    expect(
+      db.prepare("SELECT connection_id, business, net_minor FROM square_receipts ORDER BY connection_id").all(),
+    ).toEqual([
+      { connection_id: 1, business: "ventures", net_minor: 1500 },
+      { connection_id: 2, business: "rental", net_minor: 9900 },
+    ]);
+    expect(
+      db
+        .prepare("SELECT external_id, business FROM ledger_entries WHERE source='square_payment' ORDER BY external_id")
+        .all(),
+    ).toEqual([
+      { external_id: "production:c2:payment-1", business: "rental" },
+      { external_id: "production:payment-1", business: "ventures" },
+    ]);
+    expect(listSquareConnections(db).map((c) => [c.id, c.receipts])).toEqual([
+      [1, 1],
+      [2, 1],
+    ]);
+  });
+
+  it("changing one account's token clears only that account's mappings", async () => {
+    const { db, deps } = multi();
+    saveSquareSettings(db, { token: "main-token" }, NOW);
+    await testSquareConnection(db, deps);
+    saveSquareMappings(db, [{ business: "tech", location_id: "location-2" }], NOW);
+    const primrose = createSquareConnection(db, { label: "Primrose", token: "primrose-token" }, NOW);
+    await testSquareConnection(db, deps, primrose.id);
+    saveSquareMappings(db, [{ business: "rental", location_id: "location-p" }], NOW, primrose.id);
+    saveSquareSettings(db, { token: "primrose-token-2" }, NOW, primrose.id);
+    expect(squareSettings(db, primrose.id).mappings).toEqual([]);
+    expect(squareSettings(db).mappings).toEqual([{ business: "tech", location_id: "location-2" }]);
+  });
+
+  it("syncs every enabled account in the tick, and one failing account does not stop the others", async () => {
+    const { db, deps, fetcher } = multi();
+    saveSquareSettings(db, { token: "main-token", history_since: "2020-01-01T00:00:00Z" }, NOW);
+    await testSquareConnection(db, deps);
+    saveSquareMappings(db, [{ business: "ventures", location_id: "location-1" }], NOW);
+    saveSquareSettings(db, { enabled: true }, NOW);
+    const primrose = createSquareConnection(
+      db,
+      { label: "Primrose", token: "primrose-token", history_since: "2020-01-01T00:00:00Z" },
+      NOW,
+    );
+    await testSquareConnection(db, deps, primrose.id);
+    saveSquareMappings(db, [{ business: "rental", location_id: "location-p" }], NOW, primrose.id);
+    saveSquareSettings(db, { enabled: true }, NOW, primrose.id);
+    fetcher.mockImplementationOnce(async () => new Response("{}", { status: 500 }));
+    await expect(runSquareSyncTick(db, deps)).rejects.toThrow("square_http_500");
+    expect(squareSettings(db).last_sync_error).toBe("square_http_500");
+    expect(squareSettings(db, primrose.id)).toMatchObject({ last_sync_error: null, receipts: 1 });
+  });
+
+  it("removes only an account that imported nothing, and never the last one", async () => {
+    const { db, deps } = multi();
+    expect(() => deleteSquareConnection(db, 1)).toThrow("square_last_connection");
+    const spare = createSquareConnection(db, { label: "Spare" }, NOW);
+    deleteSquareConnection(db, spare.id);
+    expect(listSquareConnections(db).map((c) => c.id)).toEqual([1]);
+    const primrose = createSquareConnection(
+      db,
+      { label: "Primrose", token: "primrose-token", history_since: "2020-01-01T00:00:00Z" },
+      NOW,
+    );
+    await testSquareConnection(db, deps, primrose.id);
+    saveSquareMappings(db, [{ business: "rental", location_id: "location-p" }], NOW, primrose.id);
+    await syncSquarePayments(db, deps, primrose.id);
+    expect(() => deleteSquareConnection(db, primrose.id)).toThrow("square_connection_has_receipts");
+    expect(() => squareSettings(db, 99)).toThrow("square_connection_not_found");
+  });
+
+  it("upgrades a single-account database without changing any row", () => {
+    const db = new DatabaseSync(":memory:");
+    dbs.push(db);
+    applyBaseSchema(db);
+    ensureAutonomySchema(db);
+    db.exec(`CREATE TABLE business_contacts(id TEXT PRIMARY KEY);
+      CREATE TABLE square_connection (
+        id INTEGER PRIMARY KEY CHECK(id=1), environment TEXT NOT NULL DEFAULT 'production' CHECK(environment IN ('production','sandbox')),
+        token_enc TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+        history_since TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, locations_json TEXT NOT NULL DEFAULT '[]',
+        last_test_at INTEGER, last_sync_at INTEGER, last_sync_error TEXT, watermark TEXT, updated_at INTEGER NOT NULL);
+      CREATE TABLE square_location_mappings (business TEXT PRIMARY KEY,location_id TEXT NOT NULL UNIQUE);
+      CREATE TABLE square_receipts (
+        environment TEXT NOT NULL,payment_id TEXT NOT NULL,business TEXT NOT NULL,location_id TEXT NOT NULL,
+        status TEXT NOT NULL,source_type TEXT NOT NULL,currency TEXT NOT NULL,gross_minor INTEGER NOT NULL,
+        refunded_minor INTEGER NOT NULL,net_minor INTEGER NOT NULL,fee_minor INTEGER NOT NULL,fee_known INTEGER NOT NULL,
+        provider_updated_at INTEGER NOT NULL,occurred_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,
+        PRIMARY KEY(environment,payment_id));
+      INSERT INTO square_connection VALUES (1,'production','sealed:old',1,'2025-11-16T00:00:00.000Z',5,'[{"id":"L1"}]',1,2,NULL,'w',3);
+      INSERT INTO square_location_mappings VALUES ('tech','L1');
+      INSERT INTO square_receipts VALUES ('production','pay-1','tech','L1','COMPLETED','CARD','USD',100,0,100,3,1,1,1,1);`);
+    ensureSquareSchema(db);
+    ensureSquareSchema(db);
+    expect(squareSettings(db)).toMatchObject({
+      id: 1,
+      label: "Main Square account",
+      enabled: true,
+      token_configured: true,
+      watermark: "w",
+      mappings: [{ business: "tech", location_id: "L1" }],
+      receipts: 1,
+    });
+    expect(db.prepare("SELECT connection_id, payment_id, net_minor FROM square_receipts").all()).toEqual([
+      { connection_id: 1, payment_id: "pay-1", net_minor: 100 },
+    ]);
+    expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
   });
 });

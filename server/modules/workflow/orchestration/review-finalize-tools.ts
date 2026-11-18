@@ -299,7 +299,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
         const githubRepo = projectRow?.github_repo;
 
         const mergeResult = githubRepo
-          ? mergeToDevAndCreatePR(wtInfo.projectPath, taskId, githubRepo)
+          ? mergeToDevAndCreatePR(wtInfo.projectPath, taskId, githubRepo, currentTask.project_id ?? null)
           : mergeWorktree(wtInfo.projectPath, taskId);
 
         if (mergeResult.success) {

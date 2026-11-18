@@ -346,6 +346,7 @@ export async function createProject(input: {
   create_path_if_missing?: boolean;
   github_repo?: string;
   business?: Project["business"];
+  github_account_id?: string | null;
   assignment_mode?: "auto" | "manual";
   agent_ids?: string[];
 }): Promise<Project> {
@@ -359,6 +360,7 @@ export async function updateProject(
     create_path_if_missing?: boolean;
     github_repo?: string | null;
     business?: Project["business"];
+    github_account_id?: string | null;
     assignment_mode?: "auto" | "manual";
     agent_ids?: string[];
   },

@@ -300,7 +300,16 @@ describe("installSecurityMiddleware", () => {
       OAUTH_ENCRYPTION_SECRET: "mail",
       INBOX_WEBHOOK_SECRET: "inbox",
     };
-    expect(agentEnvironment(parent)).toEqual({ PATH: "tools", CLAW_EMPIRE_AGENT_PROCESS: "1" });
+    expect(agentEnvironment(parent)).toEqual({
+      PATH: "tools",
+      CLAW_EMPIRE_AGENT_PROCESS: "1",
+      // No git credentials: the owner's credential helper is switched off and git may not prompt.
+      GIT_TERMINAL_PROMPT: "0",
+      GCM_INTERACTIVE: "never",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "credential.helper",
+      GIT_CONFIG_VALUE_0: "",
+    });
     expect(parent.API_AUTH_TOKEN).toBe("owner");
   });
   it("does not issue a session to a remote client relayed by a local reverse proxy", async () => {

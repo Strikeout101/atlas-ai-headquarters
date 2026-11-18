@@ -31,6 +31,8 @@ Add a memory when you learned something another agent would otherwise have to re
 | `business.profiles` | —                                                                                                                                                         | Owner-maintained profiles for all businesses. Reference data, never permission to send, spend or change access. |
 | `business`          | `resource` (`contacts`, `tickets`, `quotes`, `drafts`), `action` (`list`, `get`, `create`, `update`, `delete`), `id?`, `business?`, `status?`, `payload?` | Internal records. Tickets are Tech only, quotes are Rental only.                                                |
 
+Some businesses require approval before agents change their records (Settings > Businesses > Approvals; Primrose Events does by default). For those, `business` create, update and delete of contacts, tickets and quotes, and `finance.deals.create` / `finance.deals.update`, return `202` with `pending: true` and a `request_id` instead of applying the change. The change has **not** happened yet: do not report it as done, and do not retry it. Check it with `business.change_status` (`request_id`). Drafts are never held.
+
 ## Email
 
 1. Create or reuse a linked contact and an email draft with the `business` operation.
@@ -92,4 +94,5 @@ You never publish: the owner publishes approved packages and records the address
 
 - Spending, paid accounts, accepting terms and destructive SSH always need the owner.
 - Do not commit until the owner approves.
+- Never push to GitHub or change git credentials. Agent processes have no git login; ATLAS pushes reviewed work with the project's own GitHub account (and only after approval when the business requires it).
 - Do not handle payments or move money.

@@ -144,6 +144,8 @@ export interface Project {
   github_repo?: string | null;
   /** The business this project serves; agents get that business's profile. */
   business?: "tech" | "rental" | "ventures" | null;
+  /** GitHub repo account used to push this project; null uses the business default, then the personal one. */
+  github_account_id?: string | null;
 }
 
 export interface TaskLog {

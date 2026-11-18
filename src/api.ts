@@ -11,6 +11,7 @@ export * from "./api/approvals";
 export * from "./api/control";
 export * from "./api/listings";
 export * from "./api/knowledge";
+export * from "./api/accounts";
 export * from "./api/autonomy";
 
 export * from "./api/finance";

@@ -1,7 +1,7 @@
 import { createOrgRequest, ORG_REQUEST_KINDS, type OrgRequestKind } from "../../org-requests.ts";
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
-import { PORT, SESSION_AUTH_TOKEN } from "../../../config/runtime.ts";
+import { localApi } from "../../local-api.ts";
 import { isDirectLocalRequest } from "../../../security/auth.ts";
 import { verifyAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { createModelUpgradeRequest, type decideModelUpgrade } from "../../model-routing.ts";
@@ -10,6 +10,14 @@ import { SSH_AGENT_ACCESS_SQL } from "../../ssh-access.ts";
 import { requestEmailApproval, getEmailApprovalStatus } from "./business-email.ts";
 import { listAgentMailboxes } from "./business-mailboxes.ts";
 import { isBusinessKey } from "../../businesses.ts";
+import {
+  ensureRecordChangeSchema,
+  isGatedResource,
+  queueRecordChange,
+  recordChangeBusiness,
+  recordChangeNeedsApproval,
+  type RecordAction,
+} from "../../record-changes.ts";
 import { addMemory, ensureAgentMemorySchema, searchMemories } from "../../agent-memory.ts";
 import { getKnowledgeTopic, resolveTaskContext } from "../../agent-knowledge.ts";
 import {
@@ -33,20 +41,6 @@ const BUSINESS_RESOURCES = new Set(["contacts", "tickets", "quotes", "drafts"]);
 const BUSINESS_ACTIONS = new Set(["list", "get", "create", "update", "delete"]);
 
 type DirectorRun = Parameters<typeof decideModelUpgrade>[4];
-
-async function localApi(method: string, pathname: string, payload?: unknown) {
-  const response = await fetch(`http://127.0.0.1:${PORT}${pathname}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${SESSION_AUTH_TOKEN}`,
-      ...(payload === undefined ? {} : { "content-type": "application/json" }),
-    },
-    body: payload === undefined ? undefined : JSON.stringify(payload),
-    signal: AbortSignal.timeout(70_000),
-  });
-  const result = await response.json().catch(() => ({ error: "invalid_local_response" }));
-  return { status: response.status, result };
-}
 
 /** Task-scoped local tool gateway. The worker never receives the global API token. */
 export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDirector: DirectorRun): void {
@@ -166,10 +160,28 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           ];
           if (payload.stage === "paid" || Object.keys(payload).some((key) => !allowed.includes(key)))
             return res.status(403).json({ error: "finance_protected_field" });
-          const item =
-            operation === "finance.deals.create"
-              ? createDeal(db, payload)
-              : updateDeal(db, typeof body.id === "string" ? body.id : "", payload);
+          const dealId = typeof body.id === "string" ? body.id : "";
+          const dealAction: RecordAction = operation === "finance.deals.create" ? "create" : "update";
+          const dealBusiness = recordChangeBusiness(db, "deals", dealAction, dealId || null, payload);
+          if (recordChangeNeedsApproval(dealBusiness)) {
+            ensureRecordChangeSchema(db);
+            const request = queueRecordChange(db, {
+              business: dealBusiness!,
+              resource: "deals",
+              action: dealAction,
+              targetId: dealId || null,
+              payload,
+              agentId: claims.agentId,
+              taskId: claims.taskId,
+            });
+            return res.status(202).json({
+              ok: true,
+              pending: true,
+              request_id: request.id,
+              message: "Deal changes for this business need approval. Queued, not applied yet.",
+            });
+          }
+          const item = operation === "finance.deals.create" ? createDeal(db, payload) : updateDeal(db, dealId, payload);
           return res.status(operation === "finance.deals.create" ? 201 : 200).json({ ok: true, item });
         }
         return res.status(403).json({ error: "finance_operation_forbidden" });
@@ -213,6 +225,15 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           return res.status(message === "listing_not_found" ? 404 : 400).json({ error: message });
         }
         return res.status(403).json({ error: "listing_operation_forbidden" });
+      }
+      if (operation === "business.change_status") {
+        ensureRecordChangeSchema(db);
+        const row = db
+          .prepare(
+            "SELECT id,business,resource,action,target_id,status,result_id,error_code,decided_by FROM record_change_requests WHERE id=? AND agent_id=?",
+          )
+          .get(typeof body.request_id === "string" ? body.request_id : "", claims.agentId);
+        return row ? res.json({ ok: true, request: row }) : res.status(404).json({ error: "record_change_not_found" });
       }
       if (operation === "org.request_status") {
         const request = db
@@ -307,6 +328,32 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
         const payload = action === "create" || action === "update" ? body.payload : undefined;
         if (payload !== undefined && JSON.stringify(payload).length > 16_000)
           return res.status(413).json({ error: "business_payload_too_large" });
+        if (["create", "update", "delete"].includes(action) && isGatedResource(resource)) {
+          const objectPayload =
+            payload && typeof payload === "object" && !Array.isArray(payload)
+              ? (payload as Record<string, unknown>)
+              : {};
+          const business = recordChangeBusiness(db, resource, action as RecordAction, id, objectPayload);
+          if (recordChangeNeedsApproval(business)) {
+            ensureRecordChangeSchema(db);
+            const request = queueRecordChange(db, {
+              business: business!,
+              resource,
+              action: action as RecordAction,
+              targetId: id,
+              payload: objectPayload,
+              agentId: claims.agentId,
+              taskId: claims.taskId,
+            });
+            return res.status(202).json({
+              ok: true,
+              pending: true,
+              request_id: request.id,
+              message:
+                "This business requires approval for record changes. The change is queued and has NOT been applied yet; continue other work or end the run and report it as pending.",
+            });
+          }
+        }
         const upstream = await localApi(method, path, payload);
         return res.status(upstream.status).json(upstream.result);
       }
@@ -361,6 +408,8 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
       const message = error instanceof Error ? error.message : "agent_tool_failed";
       const expected = new Set([
         "agent_task_not_active",
+        "record_not_found",
+        "business_id_required",
         "email_draft_not_found",
         "email_draft_not_sendable",
         "email_snapshot_already_requested",

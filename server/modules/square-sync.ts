@@ -4,11 +4,19 @@ import { encryptSecret, decryptSecret } from "../oauth/helpers.ts";
 import { isBusinessKey } from "./businesses.ts";
 import { ensureFinanceSchema, reconcilePaidDeals } from "./finance-store.ts";
 
+/**
+ * Read-only Square payment evidence, from one or more Square accounts ("connections").
+ *
+ * Primrose Events has its own Square account; Small Business Tech and Eduardo Capital share another. Each connection has
+ * its own token, locations, history window, sync watermark and lock. Each business maps to one location in one
+ * connection. Connection 1 is the original single connection: its receipts and ledger keys keep their original format.
+ */
 export const SQUARE_API_VERSION = "2026-09-16";
 export const SQUARE_SYNC_INTERVAL_MS = 15 * 60_000;
+export const PRIMARY_CONNECTION_ID = 1;
 const ORIGINS = { production: "https://connect.squareup.com", sandbox: "https://connect.squareupsandbox.com" } as const;
 const PROCESSED_SOURCES = new Set(["CARD", "BANK_ACCOUNT", "WALLET", "BUY_NOW_PAY_LATER", "SQUARE_ACCOUNT"]);
-const active = new WeakSet<DatabaseSync>();
+const active = new WeakMap<DatabaseSync, Set<number>>();
 type Row = Record<string, any>;
 export interface SquareDeps {
   fetch?: typeof fetch;
@@ -16,64 +24,205 @@ export interface SquareDeps {
   maxPages?: number;
 }
 
+function columns(db: DatabaseSync, table: string): string[] {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+}
+
+/**
+ * Creates the tables, and upgrades the single-connection layout in place: the connection table loses its
+ * `CHECK(id=1)` and gains a label, mappings and receipts gain `connection_id` (existing rows become connection 1).
+ */
 export function ensureSquareSchema(db: DatabaseSync): void {
   ensureFinanceSchema(db);
+  const connectionSql = (
+    db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='square_connection'").get() as
+      | { sql?: string }
+      | undefined
+  )?.sql;
+  const receiptCols = columns(db, "square_receipts");
+  const needsUpgrade = Boolean(connectionSql && /CHECK\s*\(\s*id\s*=\s*1\s*\)/i.test(connectionSql));
+  const receiptsNeedUpgrade = receiptCols.length > 0 && !receiptCols.includes("connection_id");
+  if (needsUpgrade || receiptsNeedUpgrade) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      if (needsUpgrade) {
+        db.exec(`ALTER TABLE square_connection RENAME TO square_connection_single;
+          CREATE TABLE square_connection (
+            id INTEGER PRIMARY KEY, label TEXT NOT NULL DEFAULT 'Square account',
+            environment TEXT NOT NULL DEFAULT 'production' CHECK(environment IN ('production','sandbox')),
+            token_enc TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+            history_since TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, locations_json TEXT NOT NULL DEFAULT '[]',
+            last_test_at INTEGER, last_sync_at INTEGER, last_sync_error TEXT, watermark TEXT, updated_at INTEGER NOT NULL
+          );
+          INSERT INTO square_connection (id,label,environment,token_enc,enabled,history_since,revision,locations_json,
+            last_test_at,last_sync_at,last_sync_error,watermark,updated_at)
+          SELECT id,'Main Square account',environment,token_enc,enabled,history_since,revision,locations_json,
+            last_test_at,last_sync_at,last_sync_error,watermark,updated_at FROM square_connection_single;
+          DROP TABLE square_connection_single;`);
+      }
+      if (receiptsNeedUpgrade) {
+        const before = (db.prepare("SELECT COUNT(*) AS n FROM square_receipts").get() as Row).n;
+        db.exec(`ALTER TABLE square_receipts RENAME TO square_receipts_single;
+          CREATE TABLE square_receipts (
+            connection_id INTEGER NOT NULL DEFAULT 1,
+            environment TEXT NOT NULL,payment_id TEXT NOT NULL,business TEXT NOT NULL,location_id TEXT NOT NULL,
+            status TEXT NOT NULL,source_type TEXT NOT NULL,currency TEXT NOT NULL,gross_minor INTEGER NOT NULL,
+            refunded_minor INTEGER NOT NULL,net_minor INTEGER NOT NULL,fee_minor INTEGER NOT NULL,fee_known INTEGER NOT NULL,
+            provider_updated_at INTEGER NOT NULL,occurred_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,
+            PRIMARY KEY(connection_id,environment,payment_id)
+          );
+          INSERT INTO square_receipts (connection_id,environment,payment_id,business,location_id,status,source_type,currency,
+            gross_minor,refunded_minor,net_minor,fee_minor,fee_known,provider_updated_at,occurred_at,updated_at)
+          SELECT 1,environment,payment_id,business,location_id,status,source_type,currency,gross_minor,refunded_minor,
+            net_minor,fee_minor,fee_known,provider_updated_at,occurred_at,updated_at FROM square_receipts_single;
+          DROP TABLE square_receipts_single;`);
+        const after = (db.prepare("SELECT COUNT(*) AS n FROM square_receipts").get() as Row).n;
+        if (after !== before) throw new Error(`square receipts upgrade copied ${after} of ${before}`);
+      }
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
   db.exec(`CREATE TABLE IF NOT EXISTS square_connection (
-    id INTEGER PRIMARY KEY CHECK(id=1), environment TEXT NOT NULL DEFAULT 'production' CHECK(environment IN ('production','sandbox')),
+    id INTEGER PRIMARY KEY, label TEXT NOT NULL DEFAULT 'Square account',
+    environment TEXT NOT NULL DEFAULT 'production' CHECK(environment IN ('production','sandbox')),
     token_enc TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
     history_since TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, locations_json TEXT NOT NULL DEFAULT '[]',
     last_test_at INTEGER, last_sync_at INTEGER, last_sync_error TEXT, watermark TEXT, updated_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS square_location_mappings (business TEXT PRIMARY KEY,location_id TEXT NOT NULL UNIQUE);
   CREATE TABLE IF NOT EXISTS square_receipts (
+    connection_id INTEGER NOT NULL DEFAULT 1,
     environment TEXT NOT NULL,payment_id TEXT NOT NULL,business TEXT NOT NULL,location_id TEXT NOT NULL,
     status TEXT NOT NULL,source_type TEXT NOT NULL,currency TEXT NOT NULL,gross_minor INTEGER NOT NULL,
     refunded_minor INTEGER NOT NULL,net_minor INTEGER NOT NULL,fee_minor INTEGER NOT NULL,fee_known INTEGER NOT NULL,
     provider_updated_at INTEGER NOT NULL,occurred_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,
-    PRIMARY KEY(environment,payment_id)
+    PRIMARY KEY(connection_id,environment,payment_id)
   );`);
+  if (!columns(db, "square_location_mappings").includes("connection_id"))
+    db.exec("ALTER TABLE square_location_mappings ADD COLUMN connection_id INTEGER NOT NULL DEFAULT 1");
   const now = Date.now();
-  db.prepare("INSERT OR IGNORE INTO square_connection(id,history_since,updated_at) VALUES(1,?,?)").run(
-    new Date(now - 365 * 86400000).toISOString(),
-    now,
-  );
+  db.prepare(
+    "INSERT OR IGNORE INTO square_connection(id,label,history_since,updated_at) VALUES(1,'Main Square account',?,?)",
+  ).run(new Date(now - 365 * 86400000).toISOString(), now);
 }
-function connection(db: DatabaseSync): Row {
-  return db.prepare("SELECT * FROM square_connection WHERE id=1").get() as Row;
+
+function connection(db: DatabaseSync, id: number): Row {
+  const row = db.prepare("SELECT * FROM square_connection WHERE id=?").get(id) as Row | undefined;
+  if (!row) throw new Error("square_connection_not_found");
+  return row;
 }
-function mappings(db: DatabaseSync): Row[] {
-  return db.prepare("SELECT business,location_id FROM square_location_mappings ORDER BY business").all();
+function mappings(db: DatabaseSync, id: number): Row[] {
+  return db
+    .prepare("SELECT business,location_id FROM square_location_mappings WHERE connection_id=? ORDER BY business")
+    .all(id);
 }
-export function squareSettings(db: DatabaseSync) {
+function lockFor(db: DatabaseSync): Set<number> {
+  let set = active.get(db);
+  if (!set) active.set(db, (set = new Set()));
+  return set;
+}
+/** Ledger key for a payment. Connection 1 keeps the original `environment:payment` format. */
+export function squareExternalId(connectionId: number, environment: string, paymentId: string): string {
+  return connectionId === PRIMARY_CONNECTION_ID
+    ? `${environment}:${paymentId}`
+    : `${environment}:c${connectionId}:${paymentId}`;
+}
+
+export function squareSettings(db: DatabaseSync, connectionId = PRIMARY_CONNECTION_ID) {
   ensureSquareSchema(db);
-  const row = connection(db);
+  const row = connection(db, connectionId);
   return {
+    id: Number(row.id),
+    label: String(row.label),
     environment: row.environment,
     token_configured: Boolean(row.token_enc),
     enabled: Boolean(row.enabled),
     history_since: row.history_since,
     locations: JSON.parse(row.locations_json),
-    mappings: mappings(db),
+    mappings: mappings(db, connectionId),
     last_test_at: row.last_test_at,
     last_sync_at: row.last_sync_at,
     last_sync_error: row.last_sync_error,
     watermark: row.watermark,
-    fee_unknown: Number((db.prepare("SELECT COUNT(*) AS n FROM square_receipts WHERE fee_known=0").get() as Row).n),
+    receipts: Number(
+      (db.prepare("SELECT COUNT(*) AS n FROM square_receipts WHERE connection_id=?").get(connectionId) as Row).n,
+    ),
+    fee_unknown: Number(
+      (
+        db
+          .prepare("SELECT COUNT(*) AS n FROM square_receipts WHERE connection_id=? AND fee_known=0")
+          .get(connectionId) as Row
+      ).n,
+    ),
   };
 }
+
+export function listSquareConnections(db: DatabaseSync) {
+  ensureSquareSchema(db);
+  return (db.prepare("SELECT id FROM square_connection ORDER BY id").all() as Row[]).map((row) =>
+    squareSettings(db, Number(row.id)),
+  );
+}
+
+function cleanLabel(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > 80) throw new Error("square_invalid_label");
+  return value.trim();
+}
+
+export function createSquareConnection(db: DatabaseSync, input: Record<string, unknown> = {}, now = Date.now()) {
+  ensureSquareSchema(db);
+  const label = cleanLabel(input.label ?? "Square account");
+  const result = db
+    .prepare("INSERT INTO square_connection(label,history_since,updated_at) VALUES(?,?,?)")
+    .run(label, new Date(now - 365 * 86400000).toISOString(), now);
+  const id = Number(result.lastInsertRowid);
+  const { label: _label, ...rest } = input;
+  if (Object.keys(rest).length) saveSquareSettings(db, rest, now, id);
+  return squareSettings(db, id);
+}
+
+/** A connection that has imported nothing can be removed; one with evidence is kept for the record (disable it). */
+export function deleteSquareConnection(db: DatabaseSync, connectionId: number): void {
+  ensureSquareSchema(db);
+  connection(db, connectionId);
+  if (connectionId === PRIMARY_CONNECTION_ID && listSquareConnections(db).length === 1)
+    throw new Error("square_last_connection");
+  if (db.prepare("SELECT 1 FROM square_receipts WHERE connection_id=? LIMIT 1").get(connectionId))
+    throw new Error("square_connection_has_receipts");
+  if (lockFor(db).has(connectionId)) throw new Error("square_sync_in_progress");
+  db.exec("SAVEPOINT square_delete");
+  try {
+    db.prepare("DELETE FROM square_location_mappings WHERE connection_id=?").run(connectionId);
+    db.prepare("DELETE FROM square_connection WHERE id=?").run(connectionId);
+    db.exec("RELEASE square_delete");
+  } catch (error) {
+    db.exec("ROLLBACK TO square_delete; RELEASE square_delete");
+    throw error;
+  }
+}
+
 function iso(value: unknown): string {
   if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw new Error("square_invalid_history_since");
   return new Date(value).toISOString();
 }
-export function saveSquareSettings(db: DatabaseSync, input: Record<string, unknown>, now = Date.now()) {
+export function saveSquareSettings(
+  db: DatabaseSync,
+  input: Record<string, unknown>,
+  now = Date.now(),
+  connectionId = PRIMARY_CONNECTION_ID,
+) {
   ensureSquareSchema(db);
-  const before = connection(db);
+  const before = connection(db, connectionId);
   const environment = input.environment ?? before.environment;
   if (environment !== "production" && environment !== "sandbox") throw new Error("square_invalid_environment");
   if ("enabled" in input && typeof input.enabled !== "boolean") throw new Error("square_invalid_enabled");
   if ("clear_token" in input && typeof input.clear_token !== "boolean") throw new Error("square_invalid_clear_token");
   if ("token" in input && (typeof input.token !== "string" || input.token.length > 4096))
     throw new Error("square_invalid_token");
+  const label = "label" in input ? cleanLabel(input.label) : String(before.label);
   const plaintext = typeof input.token === "string" ? input.token.trim() : "";
   if (plaintext && /\s/.test(plaintext)) throw new Error("square_invalid_token");
   const token = input.clear_token === true ? "" : plaintext ? encryptSecret(plaintext) : before.token_enc;
@@ -83,19 +232,20 @@ export function saveSquareSettings(db: DatabaseSync, input: Record<string, unkno
     throw new Error("square_invalid_history_since");
   if (
     db
-      .prepare("SELECT 1 FROM square_receipts WHERE environment=? AND occurred_at<? LIMIT 1")
-      .get(environment, Date.parse(since))
+      .prepare("SELECT 1 FROM square_receipts WHERE connection_id=? AND environment=? AND occurred_at<? LIMIT 1")
+      .get(connectionId, environment, Date.parse(since))
   )
     throw new Error("square_history_would_exclude_imported_receipts");
   const enabled = changed ? false : (input.enabled ?? Boolean(before.enabled));
-  if (enabled && (!token || !JSON.parse(before.locations_json).length || !mappings(db).length))
+  if (enabled && (!token || !JSON.parse(before.locations_json).length || !mappings(db, connectionId).length))
     throw new Error("square_test_and_map_before_enabling");
   db.exec("SAVEPOINT square_settings");
   try {
     db.prepare(
-      `UPDATE square_connection SET environment=?,token_enc=?,enabled=?,history_since=?,revision=revision+1,
-      locations_json=?,last_test_at=?,watermark=?,last_sync_error=NULL,updated_at=? WHERE id=1`,
+      `UPDATE square_connection SET label=?,environment=?,token_enc=?,enabled=?,history_since=?,revision=revision+1,
+      locations_json=?,last_test_at=?,watermark=?,last_sync_error=NULL,updated_at=? WHERE id=?`,
     ).run(
+      label,
       environment,
       token,
       enabled ? 1 : 0,
@@ -104,18 +254,24 @@ export function saveSquareSettings(db: DatabaseSync, input: Record<string, unkno
       changed ? null : before.last_test_at,
       changed || since !== before.history_since ? null : before.watermark,
       now,
+      connectionId,
     );
-    if (changed) db.exec("DELETE FROM square_location_mappings");
+    if (changed) db.prepare("DELETE FROM square_location_mappings WHERE connection_id=?").run(connectionId);
     db.exec("RELEASE square_settings");
   } catch (error) {
     db.exec("ROLLBACK TO square_settings; RELEASE square_settings");
     throw error;
   }
-  return squareSettings(db);
+  return squareSettings(db, connectionId);
 }
-export function saveSquareMappings(db: DatabaseSync, input: unknown, now = Date.now()) {
+export function saveSquareMappings(
+  db: DatabaseSync,
+  input: unknown,
+  now = Date.now(),
+  connectionId = PRIMARY_CONNECTION_ID,
+) {
   ensureSquareSchema(db);
-  const row = connection(db),
+  const row = connection(db, connectionId),
     known = JSON.parse(row.locations_json) as Row[];
   if (!Array.isArray(input) || input.length > 3) throw new Error("square_invalid_mappings");
   const businesses = new Set<string>(),
@@ -130,30 +286,41 @@ export function saveSquareMappings(db: DatabaseSync, input: unknown, now = Date.
       locations.has(map.location_id)
     )
       throw new Error("square_invalid_mappings");
+    // Each business takes its money from one Square account; unmap it from the other account first.
+    if (
+      db
+        .prepare("SELECT 1 FROM square_location_mappings WHERE business=? AND connection_id<>?")
+        .get(map.business, connectionId)
+    )
+      throw new Error("square_business_mapped_in_other_account");
     const prior = db
-      .prepare("SELECT business FROM square_receipts WHERE environment=? AND location_id=? AND business<>? LIMIT 1")
-      .get(row.environment, map.location_id, map.business);
+      .prepare(
+        "SELECT business FROM square_receipts WHERE connection_id=? AND environment=? AND location_id=? AND business<>? LIMIT 1",
+      )
+      .get(connectionId, row.environment, map.location_id, map.business);
     if (prior) throw new Error("square_location_history_business_locked");
     businesses.add(map.business);
     locations.add(map.location_id);
   }
   db.exec("SAVEPOINT square_mappings");
   try {
-    db.exec("DELETE FROM square_location_mappings");
+    db.prepare("DELETE FROM square_location_mappings WHERE connection_id=?").run(connectionId);
     for (const map of input)
-      db.prepare("INSERT INTO square_location_mappings(business,location_id) VALUES(?,?)").run(
+      db.prepare("INSERT INTO square_location_mappings(business,location_id,connection_id) VALUES(?,?,?)").run(
         map.business,
         map.location_id,
+        connectionId,
       );
     db.prepare(
-      "UPDATE square_connection SET revision=revision+1,watermark=NULL,enabled=CASE WHEN ?=0 THEN 0 ELSE enabled END,updated_at=? WHERE id=1",
-    ).run(input.length, now);
+      "UPDATE square_connection SET revision=revision+1,watermark=NULL,enabled=CASE WHEN ?=0 THEN 0 ELSE enabled END,updated_at=? WHERE id=?",
+    ).run(input.length, now, connectionId);
     db.exec("RELEASE square_mappings");
   } catch (error) {
     db.exec("ROLLBACK TO square_mappings; RELEASE square_mappings");
+    if (error instanceof Error && /UNIQUE/.test(error.message)) throw new Error("square_location_mapped_elsewhere");
     throw error;
   }
-  return squareSettings(db);
+  return squareSettings(db, connectionId);
 }
 async function readSquare(
   config: Row,
@@ -176,11 +343,16 @@ async function readSquare(
   return data;
 }
 function assertCurrent(db: DatabaseSync, config: Row) {
-  if (connection(db).revision !== config.revision) throw new Error("square_configuration_changed");
+  const current = db.prepare("SELECT revision FROM square_connection WHERE id=?").get(config.id) as Row | undefined;
+  if (!current || current.revision !== config.revision) throw new Error("square_configuration_changed");
 }
-export async function testSquareConnection(db: DatabaseSync, deps: SquareDeps = {}) {
+export async function testSquareConnection(
+  db: DatabaseSync,
+  deps: SquareDeps = {},
+  connectionId = PRIMARY_CONNECTION_ID,
+) {
   ensureSquareSchema(db);
-  const row = connection(db);
+  const row = connection(db, connectionId);
   if (!row.token_enc) throw new Error("square_token_required");
   const data = await readSquare(row, "/v2/locations", new URLSearchParams(), deps);
   if (!Array.isArray(data.locations)) throw new Error("square_invalid_locations");
@@ -203,11 +375,12 @@ export async function testSquareConnection(db: DatabaseSync, deps: SquareDeps = 
     };
   });
   assertCurrent(db, row);
-  db.prepare("UPDATE square_connection SET locations_json=?,last_test_at=?,revision=revision+1 WHERE id=1").run(
+  db.prepare("UPDATE square_connection SET locations_json=?,last_test_at=?,revision=revision+1 WHERE id=?").run(
     JSON.stringify(locations),
     deps.now?.() ?? Date.now(),
+    connectionId,
   );
-  return squareSettings(db);
+  return squareSettings(db, connectionId);
 }
 function money(value: unknown, currency?: string, allowNegative = false): { amount: number; currency: string } {
   const row = value as Row;
@@ -255,6 +428,7 @@ function normalizePayment(payment: Row, map: Row, config: Row, known: Row[], now
   const verified =
     config.environment === "production" && payment.status === "COMPLETED" && PROCESSED_SOURCES.has(payment.source_type);
   return {
+    connection_id: Number(config.id),
     environment: config.environment,
     payment_id: payment.id,
     business: map.business,
@@ -275,10 +449,10 @@ function normalizePayment(payment: Row, map: Row, config: Row, known: Row[], now
 }
 function upsertReceipt(db: DatabaseSync, payment: Row): void {
   const prior = db
-    .prepare("SELECT * FROM square_receipts WHERE environment=? AND payment_id=?")
-    .get(payment.environment, payment.payment_id) as Row | undefined;
+    .prepare("SELECT * FROM square_receipts WHERE connection_id=? AND environment=? AND payment_id=?")
+    .get(payment.connection_id, payment.environment, payment.payment_id) as Row | undefined;
   if (prior && prior.provider_updated_at > payment.provider_updated_at) return;
-  const external = `${payment.environment}:${payment.payment_id}`;
+  const external = squareExternalId(payment.connection_id, payment.environment, payment.payment_id);
   for (const [source, kind, amount, verified] of [
     ["square_payment", "revenue", payment.net_minor, payment.verified],
     ["square_fee", "expense", Math.max(0, payment.fee_minor), payment.verified && payment.fee_known],
@@ -310,11 +484,12 @@ function upsertReceipt(db: DatabaseSync, payment: Row): void {
     );
   }
   db.prepare(
-    `INSERT INTO square_receipts(environment,payment_id,business,location_id,status,source_type,currency,gross_minor,refunded_minor,net_minor,fee_minor,fee_known,provider_updated_at,occurred_at,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,payment_id) DO UPDATE SET status=excluded.status,source_type=excluded.source_type,
+    `INSERT INTO square_receipts(connection_id,environment,payment_id,business,location_id,status,source_type,currency,gross_minor,refunded_minor,net_minor,fee_minor,fee_known,provider_updated_at,occurred_at,updated_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(connection_id,environment,payment_id) DO UPDATE SET status=excluded.status,source_type=excluded.source_type,
     gross_minor=excluded.gross_minor,refunded_minor=excluded.refunded_minor,net_minor=excluded.net_minor,fee_minor=excluded.fee_minor,fee_known=excluded.fee_known,
     provider_updated_at=excluded.provider_updated_at,updated_at=excluded.updated_at`,
   ).run(
+    payment.connection_id,
     payment.environment,
     payment.payment_id,
     payment.business,
@@ -333,14 +508,20 @@ function upsertReceipt(db: DatabaseSync, payment: Row): void {
   );
 }
 /** GET-only, staged pagination: no partial import or advancing watermark after incomplete reads. */
-export async function syncSquarePayments(db: DatabaseSync, deps: SquareDeps = {}) {
+export async function syncSquarePayments(
+  db: DatabaseSync,
+  deps: SquareDeps = {},
+  connectionId = PRIMARY_CONNECTION_ID,
+) {
   ensureSquareSchema(db);
-  if (active.has(db)) throw new Error("square_sync_in_progress");
-  active.add(db);
-  const config = connection(db),
-    maps = mappings(db),
-    now = deps.now?.() ?? Date.now();
+  const locks = lockFor(db);
+  if (locks.has(connectionId)) throw new Error("square_sync_in_progress");
+  locks.add(connectionId);
+  const now = deps.now?.() ?? Date.now();
+  let config: Row | undefined;
   try {
+    config = connection(db, connectionId);
+    const maps = mappings(db, connectionId);
     if (!config.token_enc) throw new Error("square_token_required");
     if (!maps.length) throw new Error("square_locations_required");
     const staged = new Map<string, Row>(),
@@ -369,8 +550,8 @@ export async function syncSquarePayments(db: DatabaseSync, deps: SquareDeps = {}
           const prior =
             typeof raw?.id === "string"
               ? (db
-                  .prepare("SELECT * FROM square_receipts WHERE environment=? AND payment_id=?")
-                  .get(config.environment, raw.id) as Row | undefined)
+                  .prepare("SELECT * FROM square_receipts WHERE connection_id=? AND environment=? AND payment_id=?")
+                  .get(connectionId, config.environment, raw.id) as Row | undefined)
               : undefined;
           const payment = normalizePayment(raw, map, config, known, now, prior),
             key = payment.payment_id;
@@ -391,36 +572,46 @@ export async function syncSquarePayments(db: DatabaseSync, deps: SquareDeps = {}
     try {
       for (const payment of staged.values()) upsertReceipt(db, payment);
       reconcilePaidDeals(db);
-      db.prepare("UPDATE square_connection SET watermark=?,last_sync_at=?,last_sync_error=NULL WHERE id=1").run(
+      db.prepare("UPDATE square_connection SET watermark=?,last_sync_at=?,last_sync_error=NULL WHERE id=?").run(
         new Date(now).toISOString(),
         now,
+        connectionId,
       );
       db.exec("RELEASE square_import");
     } catch (error) {
       db.exec("ROLLBACK TO square_import; RELEASE square_import");
       throw error;
     }
-    return { ok: true as const, imported: staged.size, settings: squareSettings(db) };
+    return { ok: true as const, imported: staged.size, settings: squareSettings(db, connectionId) };
   } catch (error) {
     const code =
       error instanceof Error && /^square_[a-z0-9_]+$/.test(error.message) ? error.message : "square_sync_failed";
-    if (connection(db).revision === config.revision)
-      db.prepare("UPDATE square_connection SET last_sync_error=? WHERE id=1").run(code);
+    const current = db.prepare("SELECT revision FROM square_connection WHERE id=?").get(connectionId) as
+      | Row
+      | undefined;
+    if (config && current && current.revision === config.revision)
+      db.prepare("UPDATE square_connection SET last_sync_error=? WHERE id=?").run(code, connectionId);
     throw new Error(code);
   } finally {
-    active.delete(db);
+    locks.delete(connectionId);
   }
 }
+/** Background sync: each enabled connection that is due. One failing account does not stop the others. */
 export async function runSquareSyncTick(db: DatabaseSync, deps: SquareDeps = {}): Promise<void> {
   ensureSquareSchema(db);
-  const row = connection(db),
-    now = deps.now?.() ?? Date.now();
-  if (
-    !row.enabled ||
-    !row.token_enc ||
-    (row.last_sync_at && now - row.last_sync_at < SQUARE_SYNC_INTERVAL_MS) ||
-    active.has(db)
-  )
-    return;
-  await syncSquarePayments(db, deps);
+  const now = deps.now?.() ?? Date.now();
+  const due = db
+    .prepare("SELECT id,last_sync_at FROM square_connection WHERE enabled=1 AND token_enc<>'' ORDER BY id")
+    .all() as Row[];
+  let firstError: unknown = null;
+  for (const row of due) {
+    const id = Number(row.id);
+    if ((row.last_sync_at && now - row.last_sync_at < SQUARE_SYNC_INTERVAL_MS) || lockFor(db).has(id)) continue;
+    try {
+      await syncSquarePayments(db, deps, id);
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError) throw firstError;
 }

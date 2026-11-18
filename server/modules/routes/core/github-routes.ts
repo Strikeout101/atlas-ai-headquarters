@@ -1,4 +1,11 @@
 import fs from "node:fs";
+import {
+  ensureGitHubAccountSchema,
+  gitHubAuthEnv,
+  githubAccountToken,
+  isValidRepoName,
+  plainRepoUrl,
+} from "../../github-accounts.ts";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
@@ -11,7 +18,19 @@ export type GitHubRouteDeps = Pick<RuntimeContext, "app" | "db" | "broadcast">;
 export function registerGitHubRoutes(deps: GitHubRouteDeps): void {
   const { app, db, broadcast } = deps;
 
-  function getGitHubAccessToken(): string | null {
+  /**
+   * Token for repo listing and cloning: the GitHub repo account asked for, else the personal default, else any repo
+   * account, and only when none exist yet the Copilot sign-in (so importing keeps working before setup).
+   */
+  function getGitHubAccessToken(accountId?: unknown): string | null {
+    ensureGitHubAccountSchema(db as any);
+    if (typeof accountId === "string" && accountId) return githubAccountToken(db as any, accountId);
+    const repoAccount = db
+      .prepare(
+        "SELECT id FROM github_accounts ORDER BY (business IS NULL AND is_default=1) DESC, is_default DESC, created_at LIMIT 1",
+      )
+      .get() as { id: string } | undefined;
+    if (repoAccount) return githubAccountToken(db as any, repoAccount.id);
     const row = db
       .prepare(
         "SELECT access_token_enc, scope FROM oauth_accounts WHERE provider = 'github' AND status = 'active' ORDER BY priority ASC, updated_at DESC LIMIT 1",
@@ -102,7 +121,7 @@ export function registerGitHubRoutes(deps: GitHubRouteDeps): void {
   });
 
   app.get("/api/github/repos", async (req, res) => {
-    const token = getGitHubAccessToken();
+    const token = getGitHubAccessToken(req.query.account_id);
     if (!token) return res.status(401).json({ error: "github_not_connected" });
     const q = String(req.query.q || "").trim();
     const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
@@ -149,7 +168,7 @@ export function registerGitHubRoutes(deps: GitHubRouteDeps): void {
 
   app.get("/api/github/repos/:owner/:repo/branches", async (req, res) => {
     const pat = typeof req.headers["x-github-pat"] === "string" ? req.headers["x-github-pat"].trim() : null;
-    const token = pat || getGitHubAccessToken();
+    const token = pat || getGitHubAccessToken(req.query.account_id);
     if (!token) return res.status(401).json({ error: "github_not_connected" });
     const { owner, repo } = req.params;
     const authHeader = pat ? `token ${token}` : `Bearer ${token}`;
@@ -205,9 +224,10 @@ export function registerGitHubRoutes(deps: GitHubRouteDeps): void {
 
   app.post("/api/github/clone", (req, res) => {
     const pat = typeof req.headers["x-github-pat"] === "string" ? req.headers["x-github-pat"].trim() : null;
-    const token = pat || getGitHubAccessToken();
+    const token = pat || getGitHubAccessToken(req.body?.account_id);
     if (!token) return res.status(401).json({ error: "github_not_connected" });
     const { owner, repo, branch, target_path } = req.body ?? {};
+    if (!isValidRepoName(`${owner}/${repo}`)) return res.status(400).json({ error: "invalid_github_repo" });
     if (!owner || !repo) return res.status(400).json({ error: "owner_and_repo_required" });
 
     const repoFullName = `${owner}/${repo}`;
@@ -223,14 +243,15 @@ export function registerGitHubRoutes(deps: GitHubRouteDeps): void {
     const cloneId = randomUUID();
     activeClones.set(cloneId, { status: "cloning", progress: 0, targetPath, repoFullName });
 
-    const cloneUrl = `https://x-access-token:${token}@github.com/${owner}/${repo}.git`;
+    // The token goes to this one git process as a header; the clone's origin stays the plain URL.
+    const cloneUrl = plainRepoUrl(`${owner}/${repo}`);
     const args = ["clone", "--progress"];
     if (branch) {
       args.push("--branch", branch, "--single-branch");
     }
     args.push(cloneUrl, targetPath);
 
-    const child = spawn("git", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("git", args, { stdio: ["ignore", "pipe", "pipe"], env: gitHubAuthEnv(token) });
     let stderrBuf = "";
 
     child.stderr?.on("data", (chunk: Buffer) => {

@@ -284,7 +284,7 @@ describe("knowledge block", () => {
     expect(getKnowledgeTopic(db, "project", { taskId: "t-rental" }).text).toContain("Path: C:/sites/primrose");
     expect(() => getKnowledgeTopic(db, "../../.env")).toThrow("invalid_knowledge_topic");
     expect(() => getKnowledgeTopic(db, "business", { taskId: "t-plain" })).toThrow("knowledge_business_required");
-    expect(businessProfileText(db, "ventures")).toContain("approved by the two VPs");
+    expect(businessProfileText(db, "ventures")).toContain("customer-facing work approved by both VPs");
   });
 });
 

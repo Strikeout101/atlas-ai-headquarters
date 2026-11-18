@@ -18,6 +18,7 @@ interface UseProjectSaveHandlerParams {
   name: string;
   coreGoal: string;
   business: Project["business"];
+  githubAccountId: string | null;
   selectedAgentIds: Set<string>;
   loadProjects: (targetPage: number, keyword: string) => Promise<void>;
   search: string;
@@ -41,6 +42,7 @@ export function useProjectSaveHandler({
   name,
   coreGoal,
   business,
+  githubAccountId,
   selectedAgentIds,
   loadProjects,
   search,
@@ -120,6 +122,7 @@ export function useProjectSaveHandler({
             project_path: savePath,
             core_goal: coreGoal.trim(),
             business: business ?? null,
+            github_account_id: githubAccountId,
             create_path_if_missing: createPathIfMissing,
             assignment_mode: assignmentMode,
             agent_ids: assignmentMode === "manual" ? Array.from(selectedAgentIds) : [],
@@ -131,6 +134,7 @@ export function useProjectSaveHandler({
             project_path: savePath,
             core_goal: coreGoal.trim(),
             business: business ?? null,
+            github_account_id: githubAccountId,
             create_path_if_missing: createPathIfMissing,
             assignment_mode: assignmentMode,
             agent_ids: assignmentMode === "manual" ? Array.from(selectedAgentIds) : [],

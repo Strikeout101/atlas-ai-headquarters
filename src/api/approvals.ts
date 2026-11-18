@@ -22,6 +22,29 @@ interface PendingApprovalBase {
 
 export type PendingApproval =
   | (PendingApprovalBase & {
+      /** An agent's change to a business record, held because that business requires approval for record changes. */
+      kind: "record_change";
+      business: BusinessKind;
+      resource: string;
+      action: string;
+      target_id: string | null;
+      summary: string;
+      payload: Record<string, unknown>;
+      current: Record<string, unknown> | null;
+    })
+  | (PendingApprovalBase & {
+      /** Reviewed work merged into dev locally, waiting for approval to push to GitHub. */
+      kind: "code_push";
+      business: BusinessKind | null;
+      project_id: string;
+      project_name: string | null;
+      github_repo: string;
+      branch: string;
+      account_label: string | null;
+      account_login: string | null;
+      title: string;
+    })
+  | (PendingApprovalBase & {
       /** A storefront listing package an agent prepared. Approving allows it to be published; it publishes nothing. */
       kind: "listing_publish";
       business: BusinessKind;
@@ -99,6 +122,14 @@ export async function getPendingApprovals(): Promise<PendingApproval[]> {
 export async function decidePendingApproval(item: PendingApproval, approve: boolean): Promise<void> {
   if (item.kind === "spend_request") {
     await post(`/api/finance/spend-requests/${encodeURIComponent(item.id)}/decide`, { approve });
+    return;
+  }
+  if (item.kind === "record_change") {
+    await post(`/api/record-changes/${encodeURIComponent(item.id)}/decide`, { approve });
+    return;
+  }
+  if (item.kind === "code_push") {
+    await post(`/api/code-pushes/${encodeURIComponent(item.id)}/decide`, { approve });
     return;
   }
   if (item.kind === "listing_publish") {

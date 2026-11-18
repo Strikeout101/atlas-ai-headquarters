@@ -1,15 +1,54 @@
 import type { Express } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret } from "../../../oauth/helpers.ts";
-import type { BusinessKey } from "../../businesses.ts";
+import { isBusinessKey, type BusinessKey } from "../../businesses.ts";
 import { getApprovalVpState, isOwnerApproval } from "../../approval-review-state.ts";
 import { feeNeedsOwner, getListing } from "../../listings.ts";
+import { describeRecordChange, getRecordChange } from "../../record-changes.ts";
 
 /**
  * One list of everything waiting on the owner's approval (including tasks agents suggested), for the Today page.
  * Each item is still decided through its own endpoint (listed in `decide_path`), so approval rules stay in one place.
  */
 export type PendingApproval = (
+  | {
+      /** Reviewed work merged into the project's dev branch, waiting for approval to push to GitHub. */
+      kind: "code_push";
+      id: string;
+      created_at: number;
+      task_id: string | null;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: BusinessKey | null;
+      project_id: string;
+      project_name: string | null;
+      github_repo: string;
+      branch: string;
+      account_label: string | null;
+      account_login: string | null;
+      title: string;
+      decide_path: string;
+    }
+  | {
+      /** An agent's change to a business record that the business's policy says must be approved first. */
+      kind: "record_change";
+      id: string;
+      created_at: number;
+      task_id: string | null;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: BusinessKey;
+      resource: string;
+      action: string;
+      target_id: string | null;
+      summary: string;
+      payload: Record<string, unknown>;
+      /** The record as it is now, for an update or delete. */
+      current: Record<string, unknown> | null;
+      decide_path: string;
+    }
   | {
       /** A listing package an agent prepared and wants published on a storefront. */
       kind: "listing_publish";
@@ -329,6 +368,80 @@ export function listPendingApprovals(
         opportunity_id: row.opportunity_id as string | null,
         decide_path: `/api/finance/spend-requests/${encodeURIComponent(String(row.id))}/decide`,
       });
+  }
+  if (tableExists(db, "code_push_requests")) {
+    const hasProjects = tableExists(db, "projects");
+    const hasAccounts = tableExists(db, "github_accounts");
+    const rows = db
+      .prepare(
+        `SELECT r.*, ${taskTitle} AS task_title, ${hasProjects ? "p.name" : "NULL"} AS project_name,
+         ${hasAccounts ? "g.label" : "NULL"} AS account_label, ${hasAccounts ? "g.login" : "NULL"} AS account_login,
+         ${hasTasks ? "t.assigned_agent_id" : "NULL"} AS agent_id
+       FROM code_push_requests r ${taskJoin}
+       ${hasProjects ? "LEFT JOIN projects p ON p.id = r.project_id" : ""}
+       ${hasAccounts ? "LEFT JOIN github_accounts g ON g.id = r.account_id" : ""}
+       WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows)
+      items.push({
+        kind: "code_push",
+        id: String(row.id),
+        created_at: Number(row.created_at),
+        task_id: (row.task_id as string | null) ?? null,
+        task_title: (row.task_title as string | null) ?? null,
+        agent_id: String(row.agent_id ?? "owner"),
+        agent_name: null,
+        business: isBusinessKey(row.business) ? row.business : null,
+        project_id: String(row.project_id),
+        project_name: (row.project_name as string | null) ?? null,
+        github_repo: String(row.github_repo),
+        branch: String(row.branch),
+        account_label: (row.account_label as string | null) ?? null,
+        account_login: (row.account_login as string | null) ?? null,
+        title: String(row.title),
+        decide_path: `/api/code-pushes/${encodeURIComponent(String(row.id))}/decide`,
+      });
+  }
+  if (tableExists(db, "record_change_requests")) {
+    const rows = db
+      .prepare(
+        `SELECT r.*,${taskTitle} AS task_title,${agentName} AS agent_name
+      FROM record_change_requests r ${taskJoin} ${agentJoin} WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT ?`,
+      )
+      .all(limit) as Array<Record<string, unknown>>;
+    for (const row of rows) {
+      const request = getRecordChange(db, String(row.id));
+      if (!request) continue;
+      const table = {
+        contacts: "business_contacts",
+        tickets: "business_tickets",
+        quotes: "business_quotes",
+        deals: "deals",
+      }[request.resource];
+      const current =
+        request.target_id && tableExists(db, table)
+          ? ((db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(request.target_id) as Record<string, unknown>) ??
+            null)
+          : null;
+      items.push({
+        kind: "record_change",
+        id: request.id,
+        created_at: request.created_at,
+        task_id: request.task_id,
+        task_title: row.task_title as string | null,
+        agent_id: String(request.agent_id ?? "owner"),
+        agent_name: row.agent_name as string | null,
+        business: request.business,
+        resource: request.resource,
+        action: request.action,
+        target_id: request.target_id,
+        summary: describeRecordChange(request),
+        payload: request.payload,
+        current,
+        decide_path: `/api/record-changes/${encodeURIComponent(request.id)}/decide`,
+      });
+    }
   }
   if (tableExists(db, "listing_packages")) {
     const rows = db

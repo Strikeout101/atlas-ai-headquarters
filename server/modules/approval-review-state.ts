@@ -5,7 +5,7 @@ import { factsFromContent, routeApproval } from "./approval-policy.ts";
 export interface ReviewableApproval {
   kind: string;
   id: string;
-  business?: string;
+  business?: string | null;
   org_kind?: string;
   payload?: Record<string, unknown>;
   [key: string]: unknown;
@@ -53,6 +53,9 @@ export function approvalSnapshot(item: ReviewableApproval): string {
 export function approvalRoute(item: ReviewableApproval): "owner" | "vp" {
   // Product copy is full of words like "buy" and "purchase"; they describe the product, not a spend by ATLAS.
   // The only money a listing spends is the platform fee, and the server works that out against the owner's budget.
+  // Record edits and code pushes are routed by the business's policy alone: their content (quote text, code) is not
+  // a spend by ATLAS, and scanning it for words like "payment" would send every change to the owner.
+  if (item.kind === "record_change" || item.kind === "code_push") return routeApproval(item.kind, item.business);
   if (item.kind === "listing_publish")
     return routeApproval(item.kind, item.business, { spendsMoney: item.fee_over_budget !== false });
   return routeApproval(item.kind, item.business, {

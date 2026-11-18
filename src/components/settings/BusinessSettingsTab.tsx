@@ -2,6 +2,8 @@ import SquareSettings from "./SquareSettings";
 import { useEffect, useState } from "react";
 import { BUSINESS_SETTINGS_NAMES, businessApi, type BusinessProfile } from "../../api/business";
 import BusinessMailboxes from "./BusinessMailboxes";
+import BusinessApprovals from "./BusinessApprovals";
+import GitHubAccounts from "./GitHubAccounts";
 import BusinessSocialAccounts from "./BusinessSocialAccounts";
 import SettingsSection from "./SettingsSection";
 
@@ -173,8 +175,10 @@ export default function BusinessSettingsTab() {
           </div>
         )}
       </SettingsSection>
+      <BusinessApprovals />
       <BusinessMailboxes />
       <BusinessSocialAccounts />
+      <GitHubAccounts />
       <SquareSettings />
     </div>
   );
