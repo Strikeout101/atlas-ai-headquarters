@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
+import { recordApprovalDecision } from "./trust-ramp.ts";
 import {
   githubAccountToken,
   openPullRequest,
@@ -162,6 +163,11 @@ export async function decideCodePush(
     .prepare("UPDATE code_push_requests SET status=?, decided_by=?, decided_at=? WHERE id=? AND status='pending'")
     .run(approve ? "pushed" : "denied", decidedBy, now, id);
   if (!claim.changes) throw new Error("code_push_already_decided");
+  recordApprovalDecision(
+    db,
+    { approvalKind: "code_push", business: request.business, agentId: null, approve, decidedBy },
+    now,
+  );
   if (!approve) return getCodePush(db, id)!;
   try {
     const { prUrl } = await performCodePush(

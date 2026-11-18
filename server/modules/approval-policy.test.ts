@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DEPARTMENT_IDS, factsFromContent, routeApproval } from "./approval-policy.ts";
+import { DEFAULT_DEPARTMENT_IDS, routeApproval } from "./approval-policy.ts";
 import { approvalRoute } from "./approval-review-state.ts";
 
 describe("approval policy hard floors", () => {
@@ -67,14 +67,14 @@ describe("approval policy hard floors", () => {
       }),
     ).toBe("owner");
   });
-  it("conservatively finds spending and terms in unstructured content", () => {
-    expect(factsFromContent("Purchase a premium account and accept the terms")).toMatchObject({
-      spendsMoney: true,
-      newPaidAccount: true,
-      agreesToTerms: true,
-    });
-    expect(approvalRoute({ kind: "task_proposal", id: "proposal", description: "Buy a new subscription" })).toBe(
-      "owner",
-    );
+  it("routes by structured facts, not by words like pay or buy in the text", () => {
+    // Spending is its own request kind; VPs are told to escalate anything that commits ATLAS to money or terms.
+    expect(approvalRoute({ kind: "task_proposal", id: "proposal", description: "Buy a new subscription" })).toBe("vp");
+    expect(
+      approvalRoute({ kind: "business_email", id: "e", business: "ventures", body: "You can pay at pickup." }),
+    ).toBe("vp");
+    expect(
+      approvalRoute({ kind: "task_proposal", id: "p2", payload: { new_paid_account: true } }),
+    ).toBe("owner");
   });
 });

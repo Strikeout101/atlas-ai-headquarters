@@ -6,6 +6,7 @@ import {
   businessApi,
   type BusinessContact,
   type BusinessKind,
+  type ClientTier,
   type CommunicationDraft,
   type DraftChannel,
   type DraftPurpose,
@@ -166,7 +167,14 @@ export default function BusinessWorkspace({
   const [notice, setNotice] = useState<string | null>(null);
 
   const [contactId, setContactId] = useState<string | null>(null);
-  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
+  const [contactForm, setContactForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    notes: "",
+    do_not_contact: false,
+    tier: "normal" as ClientTier,
+  });
   const [workId, setWorkId] = useState<string | null>(null);
   const [workForm, setWorkForm] = useState({
     contact_id: "",
@@ -175,6 +183,7 @@ export default function BusinessWorkspace({
     event_date: "",
     details: "",
     extra: "",
+    total: "",
   });
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftForm, setDraftForm] = useState<{
@@ -216,8 +225,8 @@ export default function BusinessWorkspace({
     setContactId(null);
     setWorkId(null);
     setDraftId(null);
-    setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
-    setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "" });
+    setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false, tier: "normal" as ClientTier });
+    setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "", total: "" });
     setDraftForm({ contact_id: "", channel: "email", purpose: "outreach", subject: "", body: "" });
     setNotice(null);
   };
@@ -231,6 +240,7 @@ export default function BusinessWorkspace({
       event_date: quote.event_date ?? "",
       details: quote.items,
       extra: quote.quote_text ?? "",
+      total: quote.total_minor ? String(Math.round(quote.total_minor / 100)) : "",
     });
   };
 
@@ -258,7 +268,14 @@ export default function BusinessWorkspace({
         if (contactId) await businessApi.contacts.update(contactId, input);
         else await businessApi.contacts.create({ business, ...input });
         setContactId(null);
-        setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
+        setContactForm({
+          name: "",
+          email: "",
+          phone: "",
+          notes: "",
+          do_not_contact: false,
+          tier: "normal" as ClientTier,
+        });
       },
       contactId ? "Contact updated." : "Contact added.",
     );
@@ -286,12 +303,13 @@ export default function BusinessWorkspace({
             event_date: workForm.event_date,
             items: workForm.details,
             quote_text: workForm.extra,
+            total_minor: workForm.total ? String(Number(workForm.total) * 100) : null,
           };
           if (workId) await businessApi.quotes.update(workId, input);
           else await businessApi.quotes.create({ ...input, status: "draft" });
         }
         setWorkId(null);
-        setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "" });
+        setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "", total: "" });
       },
       workId ? "Record updated." : business === "tech" ? "Ticket added." : "Quote drafted.",
     );
@@ -496,6 +514,11 @@ export default function BusinessWorkspace({
                             Do not contact
                           </span>
                         )}
+                        {contact.tier && contact.tier !== "normal" && (
+                          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                            {contact.tier === "vip" ? "VIP" : "Important"}
+                          </span>
+                        )}
                       </h3>
                       <p className="mt-1 text-xs text-[var(--th-text-secondary)]">
                         {[contact.email, contact.phone].filter(Boolean).join(" · ") || "No contact details"}
@@ -513,6 +536,7 @@ export default function BusinessWorkspace({
                             phone: contact.phone ?? "",
                             notes: contact.notes ?? "",
                             do_not_contact: isDoNotContact(contact),
+                            tier: contact.tier ?? "normal",
                           });
                         }}
                       >
@@ -567,6 +591,7 @@ export default function BusinessWorkspace({
                           event_date: "",
                           details: ticket.description ?? "",
                           extra: "",
+                          total: "",
                         });
                       }}
                     >
@@ -725,6 +750,21 @@ export default function BusinessWorkspace({
                     onChange={(event) => setContactForm({ ...contactForm, notes: event.target.value })}
                   />
                 </label>
+                <label className={labelClass}>
+                  Client importance
+                  <select
+                    className={inputClass}
+                    value={contactForm.tier}
+                    onChange={(event) => setContactForm({ ...contactForm, tier: event.target.value as ClientTier })}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="important">Important</option>
+                    <option value="vip">VIP</option>
+                  </select>
+                  <span className="text-xs text-[var(--th-text-secondary)]">
+                    Important and VIP clients come to you for approval (Settings &gt; Businesses &gt; Approvals).
+                  </span>
+                </label>
                 <label className="flex items-start gap-2 text-sm text-[var(--th-text-primary)]">
                   <input
                     type="checkbox"
@@ -749,7 +789,14 @@ export default function BusinessWorkspace({
                       className={buttonClass}
                       onClick={() => {
                         setContactId(null);
-                        setContactForm({ name: "", email: "", phone: "", notes: "", do_not_contact: false });
+                        setContactForm({
+                          name: "",
+                          email: "",
+                          phone: "",
+                          notes: "",
+                          do_not_contact: false,
+                          tier: "normal" as ClientTier,
+                        });
                       }}
                     >
                       Cancel
@@ -820,6 +867,17 @@ export default function BusinessWorkspace({
                 </label>
                 {business === "rental" && (
                   <label className={labelClass}>
+                    Quote total (USD)
+                    <input
+                      inputMode="numeric"
+                      className={inputClass}
+                      value={workForm.total}
+                      onChange={(event) => setWorkForm({ ...workForm, total: event.target.value.replace(/\D/g, "") })}
+                    />
+                  </label>
+                )}
+                {business === "rental" && (
+                  <label className={labelClass}>
                     Quote text
                     <textarea
                       rows={5}
@@ -840,7 +898,15 @@ export default function BusinessWorkspace({
                       className={buttonClass}
                       onClick={() => {
                         setWorkId(null);
-                        setWorkForm({ contact_id: "", title: "", device: "", event_date: "", details: "", extra: "" });
+                        setWorkForm({
+                          contact_id: "",
+                          title: "",
+                          device: "",
+                          event_date: "",
+                          details: "",
+                          extra: "",
+                          total: "",
+                        });
                       }}
                     >
                       Cancel

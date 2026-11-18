@@ -98,6 +98,24 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
           {where && <span>{where}</span>}
           <span>· {item.agent_name ?? item.agent_id}</span>
           <span>· {timeAgo(item.created_at, localeTag)}</span>
+          {item.client_tier && item.client_tier !== "normal" && (
+            <span className="rounded-full border border-amber-500/40 px-1.5 text-[11px] font-medium text-amber-500">
+              {item.client_tier === "vip" ? "VIP client" : "Important client"}
+            </span>
+          )}
+          {item.changes_client_tier && (
+            <span className="rounded-full border border-amber-500/40 px-1.5 text-[11px] font-medium text-amber-500">
+              Changes client importance
+            </span>
+          )}
+          {item.deal_amount_minor ? (
+            <span>
+              · deal{" "}
+              {item.deal_currency && item.deal_currency !== "MIXED"
+                ? formatMoney(item.deal_amount_minor, item.deal_currency, localeTag)
+                : "in several currencies"}
+            </span>
+          ) : null}
         </div>
         {heading && (
           <p
@@ -246,7 +264,15 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
           </div>
         ) : item.kind === "spend_request" ? (
           <div className="mt-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
-            <p className="font-medium">{formatMoney(item.amount_minor, item.currency, localeTag)}</p>
+            <p className="font-medium">
+              {formatMoney(item.amount_minor, item.currency, localeTag)}
+              {item.category ? (
+                <span className="ml-2 text-xs font-normal" style={{ color: "var(--th-text-muted)" }}>
+                  {item.category.replaceAll("_", " ")}
+                  {item.within_spend_budget ? " · within budget" : ""}
+                </span>
+              ) : null}
+            </p>
             <p className="mt-1 whitespace-pre-wrap break-words">{item.purpose}</p>
             <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({

@@ -5,7 +5,9 @@ import nodemailer from "nodemailer";
 import { decryptSecret } from "../../../oauth/helpers.ts";
 import { hasValidCsrfToken, shouldRequireCsrf, requireOwnerSession } from "../../../security/auth.ts";
 import { BUSINESS_SQL_LIST, syncBusinessCheck } from "../../businesses.ts";
-import { factsFromContent, routeApproval } from "../../approval-policy.ts";
+import { routeApproval, type ApprovalFacts } from "../../approval-policy.ts";
+import { contactFacts } from "../../approval-facts.ts";
+import { recordApprovalDecision } from "../../trust-ramp.ts";
 import { smtpSecurityOptions } from "./business-mailboxes.ts";
 
 type Row = Record<string, string | number | null>;
@@ -201,6 +203,14 @@ function failure(error: unknown): { status: "failed" | "unknown"; error: string 
   return { status: "unknown", error: "email_delivery_unknown" };
 }
 
+/** Client tier and deal size of the email's recipient, from the draft's contact (never from the wording). */
+function emailRoutingFacts(db: DatabaseSync, draftId: string): ApprovalFacts {
+  const draft = db.prepare("SELECT contact_id FROM business_drafts WHERE id=?").get(draftId) as
+    | { contact_id: string | null }
+    | undefined;
+  return contactFacts(db, draft?.contact_id);
+}
+
 export type EmailDecisionResult = { status: number; body: { ok?: boolean; error?: string; item?: EmailApproval } };
 
 /** Server-internal execution; callers enforce policy before invoking this exact-content decision. */
@@ -214,7 +224,7 @@ export async function decideBusinessEmail(
   if (!row) return { status: 404, body: { error: "email_approval_not_found" } };
   if (
     decidedBy.startsWith("vp:") &&
-    routeApproval("business_email", String(row.business), factsFromContent(`${row.subject}\n${row.body}`)) !== "vp"
+    routeApproval("business_email", String(row.business), emailRoutingFacts(db, String(row.draft_id))) !== "vp"
   )
     return { status: 403, body: { error: "owner_approval_required" } };
   if (row.status !== "pending")
@@ -224,6 +234,13 @@ export async function decideBusinessEmail(
     db.prepare(
       "UPDATE business_email_approvals SET status='denied',decided_at=?,decided_by=? WHERE id=? AND status='pending'",
     ).run(Date.now(), decidedBy, id);
+    recordApprovalDecision(db, {
+      approvalKind: "business_email",
+      business: row.business,
+      agentId: String(row.agent_id),
+      approve: false,
+      decidedBy,
+    });
     return { status: 200, body: { ok: true, item: result() } };
   }
   let current: ReturnType<typeof snapshot>;
@@ -248,6 +265,13 @@ export async function decideBusinessEmail(
     )
     .run(Date.now(), decidedBy, id);
   if (!claim.changes) return { status: 409, body: { error: "email_approval_not_pending", item: result() } };
+  recordApprovalDecision(db, {
+    approvalKind: "business_email",
+    business: row.business,
+    agentId: String(row.agent_id),
+    approve: true,
+    decidedBy,
+  });
   let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
   try {
     let password: string;

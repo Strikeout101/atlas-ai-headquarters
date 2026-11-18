@@ -3,6 +3,8 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 
 type Row = Record<string, unknown>;
+/** Spending categories for agent spend requests and the owner's budgets (spend-budgets.ts). */
+export const SPEND_CATEGORIES = ["ai_tools", "ads", "hosting", "software", "supplies", "other"] as const;
 export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "paid", "lost"] as const;
 export function ensureFinanceSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS deals (
@@ -31,6 +33,8 @@ export function ensureFinanceSchema(db: DatabaseSync): void {
   CREATE INDEX IF NOT EXISTS idx_ledger_opportunity ON ledger_entries(opportunity_id);
   CREATE INDEX IF NOT EXISTS idx_spend_pending ON spend_requests(status,created_at);`);
   migrateNullableFinancialReferences(db);
+  if (!(db.prepare("PRAGMA table_info(spend_requests)").all() as { name: string }[]).some((c) => c.name === "category"))
+    db.exec("ALTER TABLE spend_requests ADD COLUMN category TEXT NOT NULL DEFAULT 'other'");
   if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='business_goals'").get()) {
     const columns = db.prepare("PRAGMA table_info(business_goals)").all() as { name: string }[];
     if (!columns.some((column) => column.name === "currency"))
@@ -343,7 +347,9 @@ export function linkLedgerEntry(db: DatabaseSync, id: string, input: Row): Row {
 }
 export function createSpendRequest(db: DatabaseSync, input: Row): Row {
   ensureFinanceSchema(db);
-  only(input, ["business", "agent_id", "task_id", "opportunity_id", "amount_minor", "currency", "purpose"]);
+  only(input, ["business", "agent_id", "task_id", "opportunity_id", "amount_minor", "currency", "purpose", "category"]);
+  const category = input.category ?? "other";
+  if (!(SPEND_CATEGORIES as readonly unknown[]).includes(category)) fail("invalid_category");
   const businessKey = business(input.business),
     amount = minorAmount(input.amount_minor, true),
     code = currency(input.currency ?? "USD"),
@@ -360,15 +366,15 @@ export function createSpendRequest(db: DatabaseSync, input: Row): Row {
   if (taskId && agentId) {
     const pending = db
       .prepare(
-        "SELECT * FROM spend_requests WHERE task_id=? AND agent_id=? AND business=? AND opportunity_id IS ? AND amount_minor=? AND currency=? AND purpose=? AND status='pending' ORDER BY created_at,id LIMIT 1",
+        "SELECT * FROM spend_requests WHERE task_id=? AND agent_id=? AND business=? AND opportunity_id IS ? AND amount_minor=? AND currency=? AND purpose=? AND category=? AND status='pending' ORDER BY created_at,id LIMIT 1",
       )
-      .get(taskId, agentId, businessKey, opportunityId, amount, code, purpose);
+      .get(taskId, agentId, businessKey, opportunityId, amount, code, purpose, category as string);
     if (pending) return pending;
   }
   const id = randomUUID();
   db.prepare(
-    "INSERT INTO spend_requests(id,business,agent_id,task_id,opportunity_id,amount_minor,currency,purpose,status,created_at) VALUES (?,?,?,?,?,?,?,?,'pending',?)",
-  ).run(id, businessKey, agentId, taskId, opportunityId, amount, code, purpose, Date.now());
+    "INSERT INTO spend_requests(id,business,agent_id,task_id,opportunity_id,amount_minor,currency,purpose,category,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,'pending',?)",
+  ).run(id, businessKey, agentId, taskId, opportunityId, amount, code, purpose, category as string, Date.now());
   return db.prepare("SELECT * FROM spend_requests WHERE id=?").get(id)!;
 }
 /** Records an owner decision only. This module has no charge, transfer, refund or purchase operation. */

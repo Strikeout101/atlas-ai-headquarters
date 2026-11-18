@@ -238,21 +238,24 @@ or
 
 ### Accounts and Approvals
 
-| Method       | Path                                          | Purpose                                                                                                            |
-| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| GET/PATCH    | `/api/business/policies[/:business]`          | Per-business approval settings: `customer_sends` (owner, vp), `record_changes` and `code_pushes` (none, vp, owner) |
-| POST         | `/api/record-changes/:id/decide`              | Apply or deny an agent's held record change                                                                        |
-| GET/POST     | `/api/github-accounts`                        | GitHub repo accounts (fine-grained token each, never returned)                                                     |
-| PATCH/DELETE | `/api/github-accounts/:id`                    | Edit, set default, remove                                                                                          |
-| POST         | `/api/github-accounts/:id/test`               | Sign in with the token (GET /user)                                                                                 |
-| GET          | `/api/github-accounts/for-project/:projectId` | Which account a project pushes with                                                                                |
-| POST         | `/api/code-pushes/:id/decide`                 | Push held reviewed work and open a pull request                                                                    |
-| GET/POST     | `/api/square/connections`                     | Square accounts (Primrose has its own)                                                                             |
-| PATCH/DELETE | `/api/square/connections/:id`                 | Edit or remove one account                                                                                         |
-| PUT          | `/api/square/connections/:id/mappings`        | Map that account's locations to businesses                                                                         |
-| POST         | `/api/square/connections/:id/test`, `/sync`   | Load locations, read payments                                                                                      |
+| Method       | Path                                          | Purpose                                                                                                                                                                                                                        |
+| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET/PATCH    | `/api/business/policies[/:business]`          | Per-business approval settings: `customer_sends` (owner, vp), `record_changes` and `code_pushes` (none, vp, owner), `owner_amount_minor` (deal-size limit, 0 = off), `tier_to_owner` (important, vip, off), `trust_ramp_after` |
+| GET          | `/api/business/trust-offers`                  | Suggestions to let the VPs approve a kind of work the owner keeps approving                                                                                                                                                    |
+| POST         | `/api/business/trust-offers/:business/:kind`  | Accept (`{accept:true}`) or snooze a suggestion                                                                                                                                                                                |
+| GET/PUT      | `/api/business/spend-budgets`                 | Spending budgets per business and category; within one, both VPs may approve a spend request                                                                                                                                   |
+| POST         | `/api/record-changes/:id/decide`              | Apply or deny an agent's held record change                                                                                                                                                                                    |
+| GET/POST     | `/api/github-accounts`                        | GitHub repo accounts (fine-grained token each, never returned)                                                                                                                                                                 |
+| PATCH/DELETE | `/api/github-accounts/:id`                    | Edit, set default, remove                                                                                                                                                                                                      |
+| POST         | `/api/github-accounts/:id/test`               | Sign in with the token (GET /user)                                                                                                                                                                                             |
+| GET          | `/api/github-accounts/for-project/:projectId` | Which account a project pushes with                                                                                                                                                                                            |
+| POST         | `/api/code-pushes/:id/decide`                 | Push held reviewed work and open a pull request                                                                                                                                                                                |
+| GET/POST     | `/api/square/connections`                     | Square accounts (Primrose has its own)                                                                                                                                                                                         |
+| PATCH/DELETE | `/api/square/connections/:id`                 | Edit or remove one account                                                                                                                                                                                                     |
+| PUT          | `/api/square/connections/:id/mappings`        | Map that account's locations to businesses                                                                                                                                                                                     |
+| POST         | `/api/square/connections/:id/test`, `/sync`   | Load locations, read payments                                                                                                                                                                                                  |
 
-All changes need the owner password session and CSRF. Spending, paid accounts, accepting terms and destructive SSH always need the owner and are not settings. The original `/api/square` routes still work and act on the first Square account.
+All changes need the owner password session and CSRF. Paid accounts, accepting terms, destructive SSH and spending outside a budget always need the owner and are not settings. Routing reads structured facts (client tier on contacts, deal and quote amounts), never the wording of a message. The original `/api/square` routes still work and act on the first Square account.
 
 ### Agent Tools and Knowledge
 

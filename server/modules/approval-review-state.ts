@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { factsFromContent, routeApproval } from "./approval-policy.ts";
+import { routeApproval, type ApprovalFacts } from "./approval-policy.ts";
 
 export interface ReviewableApproval {
   kind: string;
@@ -50,21 +50,32 @@ export function approvalSnapshot(item: ReviewableApproval): string {
     .digest("hex");
 }
 
+/** Routing facts the approval list attached to the item (read from records, never from the wording). */
+export function itemFacts(item: ReviewableApproval): ApprovalFacts {
+  const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+  return {
+    clientTier: typeof item.client_tier === "string" ? item.client_tier : null,
+    amountMinor: number(item.deal_amount_minor),
+    amountCurrency: typeof item.deal_currency === "string" ? item.deal_currency : null,
+    changesClientTier: item.changes_client_tier === true,
+  };
+}
+
 export function approvalRoute(item: ReviewableApproval): "owner" | "vp" {
-  // Product copy is full of words like "buy" and "purchase"; they describe the product, not a spend by ATLAS.
-  // The only money a listing spends is the platform fee, and the server works that out against the owner's budget.
-  // Record edits and code pushes are routed by the business's policy alone: their content (quote text, code) is not
-  // a spend by ATLAS, and scanning it for words like "payment" would send every change to the owner.
-  if (item.kind === "record_change" || item.kind === "code_push") return routeApproval(item.kind, item.business);
+  // Routing uses structured facts only. Words like "pay" or "buy" in a customer email or in product copy describe the
+  // customer's side, not a spend by ATLAS; spending is its own request kind, and VPs escalate anything that commits
+  // ATLAS to money or terms.
+  if (item.kind === "spend_request")
+    return routeApproval(item.kind, item.business, { withinSpendBudget: item.within_spend_budget === true });
   if (item.kind === "listing_publish")
     return routeApproval(item.kind, item.business, { spendsMoney: item.fee_over_budget !== false });
   return routeApproval(item.kind, item.business, {
-    ...factsFromContent(JSON.stringify(item)),
+    ...itemFacts(item),
     orgKind: item.org_kind,
     departmentId: typeof item.payload?.department_id === "string" ? item.payload.department_id : undefined,
-    spendsMoney: factsFromContent(JSON.stringify(item)).spendsMoney || item.payload?.spends_money === true,
-    newPaidAccount: item.payload?.new_paid_account === true || factsFromContent(JSON.stringify(item)).newPaidAccount,
-    agreesToTerms: item.payload?.agrees_to_terms === true || factsFromContent(JSON.stringify(item)).agreesToTerms,
+    spendsMoney: item.payload?.spends_money === true,
+    newPaidAccount: item.payload?.new_paid_account === true,
+    agreesToTerms: item.payload?.agrees_to_terms === true,
   });
 }
 

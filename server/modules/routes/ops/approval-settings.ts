@@ -3,6 +3,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../security/auth.ts";
 import { ensureBusinessPolicySchema, listBusinessPolicies, saveBusinessPolicy } from "../../business-policies.ts";
 import { decideRecordChange, ensureRecordChangeSchema, getRecordChange } from "../../record-changes.ts";
+import { answerTrustOffer, ensureTrustRampSchema, listTrustOffers } from "../../trust-ramp.ts";
+import { ensureSpendBudgetSchema, listSpendBudgets, saveSpendBudget } from "../../spend-budgets.ts";
 
 function owner(req: Request, res: Response): boolean {
   if (!requireOwnerSession(req, res)) return false;
@@ -21,7 +23,14 @@ export function registerApprovalSettingsRoutes(
 ): void {
   ensureBusinessPolicySchema(db);
   ensureRecordChangeSchema(db);
-  for (const base of ["/api/business/policies", "/api/record-changes"]) {
+  ensureTrustRampSchema(db);
+  ensureSpendBudgetSchema(db);
+  for (const base of [
+    "/api/business/policies",
+    "/api/record-changes",
+    "/api/business/trust-offers",
+    "/api/business/spend-budgets",
+  ]) {
     app.use(base, (req, res, next) => {
       if (req.header("x-agent-task-token")) return res.status(403).json({ error: "owner_access_required" });
       next();
@@ -37,6 +46,33 @@ export function registerApprovalSettingsRoutes(
       return res.json({ ok: true, item });
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "policy_update_failed" });
+    }
+  });
+
+  // Trust ramp offers: never applied without the owner's answer.
+  app.get("/api/business/trust-offers", (_req, res) => res.json({ ok: true, items: listTrustOffers(db) }));
+  app.post("/api/business/trust-offers/:business/:kind", (req, res) => {
+    if (!owner(req, res)) return;
+    try {
+      const result = answerTrustOffer(db, req.params.business, req.params.kind, req.body?.accept);
+      broadcast("approvals_changed", {});
+      return res.json({ ok: true, ...result, items: listTrustOffers(db) });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "trust_offer_failed";
+      return res.status(message === "trust_offer_not_found" ? 404 : 400).json({ error: message });
+    }
+  });
+
+  // Spending budgets: within them the two VPs may approve a spend request; nothing else changes (no money moves).
+  app.get("/api/business/spend-budgets", (_req, res) => res.json({ ok: true, items: listSpendBudgets(db) }));
+  app.put("/api/business/spend-budgets", (req, res) => {
+    if (!owner(req, res)) return;
+    try {
+      const item = saveSpendBudget(db, req.body);
+      broadcast("approvals_changed", {});
+      return res.json({ ok: true, item });
+    } catch (error) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : "spend_budget_failed" });
     }
   });
 

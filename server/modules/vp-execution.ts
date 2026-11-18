@@ -5,6 +5,7 @@ import { decideOrgRequest } from "./org-requests.ts";
 import { decideListing } from "./listings.ts";
 import { decideRecordChange } from "./record-changes.ts";
 import { decideCodePush } from "./code-pushes.ts";
+import { decideSpendRequestAsVp } from "./spend-budgets.ts";
 import { decideBusinessEmail } from "./routes/ops/business-email.ts";
 import { listPendingApprovals, type PendingApproval } from "./routes/ops/approvals.ts";
 import { approvalRoute, approvalSnapshot } from "./approval-review-state.ts";
@@ -46,6 +47,10 @@ export async function executeVpApproval(
     const result = await decideRecordChange(db, item.id, approve, decidedBy);
     if (approve && result.status !== "applied") throw new Error("record_change_failed");
     deps.broadcast?.("business_records_changed", {});
+  } else if (item.kind === "spend_request") {
+    // Within the owner's spending budget only; re-checked against this month's total when recorded. No money moves.
+    decideSpendRequestAsVp(db, item.id, approve, decidedBy);
+    deps.broadcast?.("finance_changed", {});
   } else if (item.kind === "listing_publish") {
     // Re-checks the business and the month's fee budget in the same transaction that records the decision.
     decideListing(db, item.id, approve, decidedBy, reason);

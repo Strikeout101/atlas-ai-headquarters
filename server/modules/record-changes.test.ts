@@ -110,9 +110,9 @@ describe("record changes", () => {
     expect(recordChangeBusiness(db, "tickets", "create", null, {})).toBe("tech");
     expect(recordChangeBusiness(db, "contacts", "create", null, { business: "ventures" })).toBe("ventures");
     expect(recordChangeBusiness(db, "contacts", "update", "c-rental", {})).toBe("rental");
-    expect(recordChangeNeedsApproval("rental")).toBe(true);
-    expect(recordChangeNeedsApproval("tech")).toBe(false);
-    expect(recordChangeNeedsApproval(null)).toBe(false);
+    expect(recordChangeNeedsApproval(db, "rental", { resource: "contacts" as const, target_id: null, payload: {} })).toBe(true);
+    expect(recordChangeNeedsApproval(db, "tech", { resource: "contacts" as const, target_id: null, payload: {} })).toBe(false);
+    expect(recordChangeNeedsApproval(db, null, { resource: "contacts" as const, target_id: null, payload: {} })).toBe(false);
   });
 
   it("applies an approved change once and records who approved it", async () => {

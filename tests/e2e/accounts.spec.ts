@@ -67,6 +67,50 @@ test("approval levels are settings that persist after reload", async ({ page }) 
   await expect(page.getByText("Tech services approvals saved.")).toBeVisible();
 });
 
+test("deal-size limit and spending budgets are owner settings that persist", async ({ page }) => {
+  await openBusinessSettings(page);
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Approvals/ })
+    .click();
+  const tech = page.getByRole("group", { name: "Tech services approvals" });
+  const limit = tech.getByLabel("Deals and quotes this big come to me");
+  await expect(limit).toHaveValue("1000");
+  await expect(tech.getByLabel("Important clients")).toHaveValue("important");
+  await limit.fill("2500");
+  await limit.press("Enter");
+  await expect(page.getByText("Tech services approvals saved.")).toBeVisible();
+
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Spending budgets/ })
+    .click();
+  await expect(page.getByText(/ATLAS never pays for anything itself/)).toBeVisible();
+  const hosting = page.getByRole("form", { name: "Hosting and domains budget" });
+  await hosting.getByLabel("Monthly budget (USD)").fill("50");
+  await hosting.getByLabel("Per item (USD)").fill("20");
+  await hosting.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Hosting and domains budget saved.")).toBeVisible();
+
+  await page.reload();
+  const policies = await (await page.request.get("/api/business/policies")).json();
+  expect(policies.items.find((p: { business: string }) => p.business === "tech").owner_amount_minor).toBe(250000);
+  const budgets = await (await page.request.get("/api/business/spend-budgets")).json();
+  expect(
+    budgets.items.find(
+      (b: { business: string; category: string }) => b.business === "tech" && b.category === "hosting",
+    ),
+  ).toMatchObject({ monthly_cap_minor: 5000, per_item_cap_minor: 2000 });
+
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Spending budgets/ })
+    .click();
+  await page.setViewportSize({ width: 375, height: 900 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: ".tmp/e2e-budgets-phone.png", fullPage: false });
+});
+
 test("GitHub and Square account screens never show tokens and fit a phone", async ({ page }) => {
   await openBusinessSettings(page);
   await page

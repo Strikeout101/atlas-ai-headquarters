@@ -50,6 +50,8 @@ import { ensureBusinessPolicySchema } from "./modules/business-policies.ts";
 import { ensureGitHubAccountSchema } from "./modules/github-accounts.ts";
 import { ensureCodePushSchema } from "./modules/code-pushes.ts";
 import { ensureRecordChangeSchema } from "./modules/record-changes.ts";
+import { ensureTrustRampSchema } from "./modules/trust-ramp.ts";
+import { ensureSpendBudgetSchema } from "./modules/spend-budgets.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
@@ -75,6 +77,8 @@ ensureBusinessPolicySchema(db);
 ensureGitHubAccountSchema(db);
 ensureCodePushSchema(db);
 ensureRecordChangeSchema(db);
+ensureTrustRampSchema(db);
+ensureSpendBudgetSchema(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 ensureVpAgents(db);

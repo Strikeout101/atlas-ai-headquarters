@@ -5,6 +5,9 @@ import { isBusinessKey, type BusinessKey } from "../../businesses.ts";
 import { getApprovalVpState, isOwnerApproval } from "../../approval-review-state.ts";
 import { feeNeedsOwner, getListing } from "../../listings.ts";
 import { describeRecordChange, getRecordChange } from "../../record-changes.ts";
+import { contactFacts, recordChangeFacts } from "../../approval-facts.ts";
+import type { ApprovalFacts } from "../../approval-policy.ts";
+import { spendFitsBudget } from "../../spend-budgets.ts";
 
 /**
  * One list of everything waiting on the owner's approval (including tasks agents suggested), for the Today page.
@@ -86,6 +89,7 @@ export type PendingApproval = (
       currency: string;
       purpose: string;
       opportunity_id: string | null;
+      category: string;
       decide_path: string;
     }
   | {
@@ -162,12 +166,36 @@ export type PendingApproval = (
       decide_path: string;
     }
 ) & {
+  /** Routing facts the server reads from records (never from wording); part of the snapshot, so a change re-routes. */
+  client_tier?: string | null;
+  deal_amount_minor?: number | null;
+  deal_currency?: string | null;
+  changes_client_tier?: boolean;
+  /** Spend requests: true when the request fits the owner's spending budget for its business and category. */
+  within_spend_budget?: boolean;
   vp_review?: {
     status: string;
     reason: string;
     reviews: Array<{ vp_agent_id: string; verdict: string; reason: string }>;
   } | null;
 };
+
+function factFields(facts: ApprovalFacts) {
+  return {
+    client_tier: facts.clientTier ?? null,
+    deal_amount_minor: facts.amountMinor ?? null,
+    deal_currency: facts.amountCurrency ?? null,
+    ...(facts.changesClientTier ? { changes_client_tier: true } : {}),
+  };
+}
+
+function emailContactFacts(db: DatabaseSync, draftId: unknown): ApprovalFacts {
+  if (typeof draftId !== "string" || !tableExists(db, "business_drafts")) return {};
+  const draft = db.prepare("SELECT contact_id FROM business_drafts WHERE id=?").get(draftId) as
+    | { contact_id: string | null }
+    | undefined;
+  return contactFacts(db, draft?.contact_id);
+}
 
 function tableExists(db: DatabaseSync, name: string): boolean {
   return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
@@ -194,6 +222,7 @@ export function listPendingApprovals(
     const rows = db
       .prepare(
         `SELECT r.id,r.created_at,r.task_id,r.agent_id,r.business,r.sender,r.recipient,r.subject,r.body,
+      ${columnExists(db, "business_email_approvals", "draft_id") ? "r.draft_id" : "NULL AS draft_id"},
       ${taskTitle} AS task_title, ${agentName} AS agent_name FROM business_email_approvals r ${taskJoin} ${agentJoin}
       WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT ?`,
       )
@@ -214,6 +243,7 @@ export function listPendingApprovals(
         subject: String(row.subject),
         body: String(row.body),
         decide_path: `/api/business/email-approvals/${encodeURIComponent(id)}/decide`,
+        ...factFields(emailContactFacts(db, row.draft_id)),
       });
     }
   }
@@ -366,7 +396,9 @@ export function listPendingApprovals(
         currency: String(row.currency),
         purpose: String(row.purpose),
         opportunity_id: row.opportunity_id as string | null,
+        category: String(row.category ?? "other"),
         decide_path: `/api/finance/spend-requests/${encodeURIComponent(String(row.id))}/decide`,
+        within_spend_budget: spendFitsBudget(db, row),
       });
   }
   if (tableExists(db, "code_push_requests")) {
@@ -440,6 +472,7 @@ export function listPendingApprovals(
         payload: request.payload,
         current,
         decide_path: `/api/record-changes/${encodeURIComponent(request.id)}/decide`,
+        ...factFields(recordChangeFacts(db, request)),
       });
     }
   }

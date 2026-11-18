@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BUSINESS_SETTINGS_NAMES, businessApi, type BusinessProfile } from "../../api/business";
 import BusinessMailboxes from "./BusinessMailboxes";
 import BusinessApprovals from "./BusinessApprovals";
+import SpendingBudgets from "./SpendingBudgets";
 import GitHubAccounts from "./GitHubAccounts";
 import BusinessSocialAccounts from "./BusinessSocialAccounts";
 import SettingsSection from "./SettingsSection";
@@ -176,6 +177,7 @@ export default function BusinessSettingsTab() {
         )}
       </SettingsSection>
       <BusinessApprovals />
+      <SpendingBudgets />
       <BusinessMailboxes />
       <BusinessSocialAccounts />
       <GitHubAccounts />

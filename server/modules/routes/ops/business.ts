@@ -13,7 +13,15 @@ import {
 type Business = BusinessKey;
 type Body = Record<string, unknown>;
 
-type Field = { name: string; required?: boolean; max?: number; values?: readonly string[] };
+type Field = {
+  name: string;
+  required?: boolean;
+  max?: number;
+  values?: readonly string[];
+  pattern?: RegExp;
+  /** Stored instead of an empty value, for NOT NULL columns with a default. */
+  fallback?: string;
+};
 type Entity = {
   path: string;
   table: string;
@@ -28,6 +36,8 @@ const DRAFT_STATUSES = ["draft", "ready", "archived"] as const;
 const CHANNELS = ["email", "social", "sms"] as const;
 const PURPOSES = ["outreach", "promotion", "follow_up", "checkin", "checkout", "general"] as const;
 const FLAG_VALUES = ["0", "1"] as const;
+/** Important and VIP clients go to the owner (business_policies.tier_to_owner). */
+export const CLIENT_TIER_VALUES = ["normal", "important", "vip"] as const;
 
 const ENTITIES: readonly Entity[] = [
   {
@@ -40,6 +50,7 @@ const ENTITIES: readonly Entity[] = [
       { name: "phone", max: 80 },
       { name: "notes", max: 4000 },
       { name: "do_not_contact", values: FLAG_VALUES },
+      { name: "tier", values: CLIENT_TIER_VALUES, fallback: "normal" },
     ],
   },
   {
@@ -65,6 +76,9 @@ const ENTITIES: readonly Entity[] = [
       { name: "items", required: true, max: 8000 },
       { name: "quote_text", max: 8000 },
       { name: "status", required: true, values: QUOTE_STATUSES },
+      // Quote total in cents, used for the owner's deal-size approval limit.
+      { name: "total_minor", pattern: /^\d{1,13}$/ },
+      { name: "currency", pattern: /^[A-Z]{3}$/, fallback: "USD" },
     ],
   },
   {
@@ -139,6 +153,19 @@ export function ensureBusinessSchema(db: DatabaseSync): void {
   if (!contactColumns.some((column) => column.name === "do_not_contact")) {
     db.exec("ALTER TABLE business_contacts ADD COLUMN do_not_contact INTEGER NOT NULL DEFAULT 0");
   }
+  if (!contactColumns.some((column) => column.name === "tier"))
+    db.exec(
+      "ALTER TABLE business_contacts ADD COLUMN tier TEXT NOT NULL DEFAULT 'normal' CHECK(tier IN ('normal','important','vip'))",
+    );
+  const quoteColumns = new Set(
+    (db.prepare("PRAGMA table_info(business_quotes)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!quoteColumns.has("total_minor"))
+    db.exec(
+      "ALTER TABLE business_quotes ADD COLUMN total_minor INTEGER CHECK(total_minor IS NULL OR (typeof(total_minor)='integer' AND total_minor >= 0))",
+    );
+  if (!quoteColumns.has("currency"))
+    db.exec("ALTER TABLE business_quotes ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'");
   // Older databases only allow the first two businesses in these tables.
   syncBusinessCheck(db, "business_contacts");
   syncBusinessCheck(db, "business_drafts");
@@ -165,10 +192,11 @@ function readValues(entity: Entity, body: Body, partial: boolean): { values: Bod
     }
     const raw = body[field.name];
     if (raw !== null && typeof raw !== "string") return { values, error: `invalid_${field.name}` };
-    const value = typeof raw === "string" ? raw.trim() || null : null;
+    const value = (typeof raw === "string" ? raw.trim() || null : null) ?? field.fallback ?? null;
     if (field.required && !value) return { values, error: `${field.name}_required` };
     if (value !== null && field.max && value.length > field.max) return { values, error: `${field.name}_too_long` };
     if (value && field.values && !field.values.includes(value)) return { values, error: `invalid_${field.name}` };
+    if (value && field.pattern && !field.pattern.test(value)) return { values, error: `invalid_${field.name}` };
     values[field.name] = value;
   }
   if (partial && Object.keys(values).length === 0) return { values, error: "no_fields_to_update" };

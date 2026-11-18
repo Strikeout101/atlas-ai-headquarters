@@ -2,6 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
+import { recordChangeFacts } from "./approval-facts.ts";
+import { recordApprovalDecision } from "./trust-ramp.ts";
+import { needsOwnerForClientOrAmount } from "./approval-policy.ts";
 import { createDeal, updateDeal } from "./finance-store.ts";
 import { localApi } from "./local-api.ts";
 
@@ -98,9 +101,20 @@ export function recordChangeBusiness(
   return isBusinessKey(row?.business) ? row.business : null;
 }
 
-/** True when this change must wait for approval under the business's current policy. */
-export function recordChangeNeedsApproval(business: BusinessKey | null): boolean {
-  return business !== null && businessPolicy(business).record_changes !== "none";
+/**
+ * True when this change must wait for approval: the business's record_changes level is not `none`, or the change
+ * touches an important client or a deal over the owner's limit, or it sets a client's tier.
+ */
+export function recordChangeNeedsApproval(
+  db: DatabaseSync,
+  business: BusinessKey | null,
+  change: { resource: GatedResource; target_id: string | null; payload: Record<string, unknown> },
+): boolean {
+  if (business === null) return false;
+  const policy = businessPolicy(business);
+  if (policy.record_changes !== "none") return true;
+  const facts = recordChangeFacts(db, change);
+  return Boolean(facts.changesClientTier) || needsOwnerForClientOrAmount(policy, facts);
 }
 
 function toRequest(row: Row): RecordChangeRequest {
@@ -198,10 +212,23 @@ export async function decideRecordChange(
   const request = getRecordChange(db, id);
   if (!request) throw new Error("record_change_not_found");
   if (request.status !== "pending") throw new Error("record_change_already_decided");
+  const track = (approved: boolean) =>
+    recordApprovalDecision(
+      db,
+      {
+        approvalKind: "record_change",
+        business: request.business,
+        agentId: request.agent_id,
+        approve: approved,
+        decidedBy,
+      },
+      now,
+    );
   if (!approve) {
     db.prepare(
       "UPDATE record_change_requests SET status='denied',decided_by=?,decided_at=? WHERE id=? AND status='pending'",
     ).run(decidedBy, now, id);
+    track(false);
     return getRecordChange(db, id)!;
   }
   if (request.target_id) {
@@ -219,6 +246,7 @@ export async function decideRecordChange(
     )
     .run(decidedBy, now, id);
   if (!claim.changes) throw new Error("record_change_already_decided");
+  track(true);
   try {
     const resultId = await apply(db, request);
     db.prepare("UPDATE record_change_requests SET result_id=? WHERE id=?").run(resultId, id);

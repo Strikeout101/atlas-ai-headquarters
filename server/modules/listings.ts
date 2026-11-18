@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
+import { recordApprovalDecision } from "./trust-ramp.ts";
 
 /**
  * Listing packages: everything needed to publish one product on a storefront, prepared by agents.
@@ -354,6 +355,11 @@ export function decideListing(
       )
       .run(approve ? "approved" : "rejected", decidedBy, reason.trim().slice(0, 2000) || null, now, now, id).changes;
     if (!changed) fail("listing_already_decided");
+    recordApprovalDecision(
+      db,
+      { approvalKind: "listing_publish", business: current.business, agentId: current.agent_id, approve, decidedBy },
+      now,
+    );
     db.exec("RELEASE listing_decision");
     return getListing(db, id)!;
   } catch (error) {

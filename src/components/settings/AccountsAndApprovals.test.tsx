@@ -3,19 +3,43 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BusinessApprovals from "./BusinessApprovals";
 import GitHubAccounts from "./GitHubAccounts";
+import SpendingBudgets from "./SpendingBudgets";
 import ApprovalRow from "../today/ApprovalRow";
-import { githubAccountsApi, policiesApi, type BusinessPolicy, type GitHubAccount } from "../../api/accounts";
+import {
+  githubAccountsApi,
+  policiesApi,
+  spendBudgetsApi,
+  trustOffersApi,
+  type BusinessPolicy,
+  type GitHubAccount,
+  type SpendBudget,
+} from "../../api/accounts";
 import type { PendingApproval } from "../../api";
 
 vi.mock("../../api/accounts", () => ({
   policiesApi: { list: vi.fn(), update: vi.fn() },
   githubAccountsApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), test: vi.fn(), remove: vi.fn() },
+  trustOffersApi: { list: vi.fn(), answer: vi.fn() },
+  spendBudgetsApi: { list: vi.fn(), save: vi.fn() },
 }));
 
+const limits = {
+  owner_amount_minor: 100000,
+  amount_currency: "USD",
+  tier_to_owner: "important",
+  trust_ramp_after: 20,
+} as const;
 const policies: BusinessPolicy[] = [
-  { business: "tech", customer_sends: "owner", record_changes: "none", code_pushes: "none", updated_at: 0 },
-  { business: "rental", customer_sends: "owner", record_changes: "owner", code_pushes: "none", updated_at: 0 },
-  { business: "ventures", customer_sends: "vp", record_changes: "none", code_pushes: "none", updated_at: 0 },
+  { business: "tech", customer_sends: "owner", record_changes: "none", code_pushes: "none", ...limits, updated_at: 0 },
+  {
+    business: "rental",
+    customer_sends: "owner",
+    record_changes: "owner",
+    code_pushes: "none",
+    ...limits,
+    updated_at: 0,
+  },
+  { business: "ventures", customer_sends: "vp", record_changes: "none", code_pushes: "none", ...limits, updated_at: 0 },
 ];
 const account: GitHubAccount = {
   id: "g1",
@@ -37,6 +61,10 @@ beforeEach(() => {
   vi.mocked(policiesApi.update).mockReset();
   for (const fn of Object.values(githubAccountsApi)) vi.mocked(fn).mockReset();
   vi.mocked(githubAccountsApi.list).mockResolvedValue([account]);
+  vi.mocked(trustOffersApi.list).mockReset().mockResolvedValue([]);
+  vi.mocked(trustOffersApi.answer).mockReset();
+  vi.mocked(spendBudgetsApi.list).mockReset();
+  vi.mocked(spendBudgetsApi.save).mockReset();
 });
 
 describe("Approvals settings", () => {
@@ -65,6 +93,92 @@ describe("Approvals settings", () => {
     const tech = await screen.findByRole("group", { name: "Tech services approvals" });
     await user.selectOptions(within(tech).getByLabelText("Pushing reviewed code to GitHub"), "owner");
     expect(await screen.findByRole("alert")).toHaveTextContent("Sign in with your password");
+  });
+
+  it("saves the deal-size limit in whole dollars and the client tier rule", async () => {
+    const user = userEvent.setup();
+    vi.mocked(policiesApi.update).mockImplementation(async (_business, input) => ({ ...policies[0], ...input }));
+    render(<BusinessApprovals />);
+    await user.click(screen.getByText("Approvals"));
+    const tech = await screen.findByRole("group", { name: "Tech services approvals" });
+    const limit = within(tech).getByLabelText("Deals and quotes this big come to me");
+    expect(limit).toHaveValue("1000");
+    await user.clear(limit);
+    await user.type(limit, "2500{Enter}");
+    expect(policiesApi.update).toHaveBeenCalledWith("tech", { owner_amount_minor: 250000 });
+    await user.selectOptions(within(tech).getByLabelText("Important clients"), "vip");
+    expect(policiesApi.update).toHaveBeenCalledWith("tech", { tier_to_owner: "vip" });
+  });
+
+  it("shows a trust-ramp suggestion and only changes the setting when accepted", async () => {
+    const user = userEvent.setup();
+    const offer = {
+      business: "rental" as const,
+      kind: "record_changes" as const,
+      streak: 20,
+      approved: 24,
+      denied: 1,
+      agents: [],
+    };
+    vi.mocked(trustOffersApi.list).mockResolvedValue([offer]);
+    vi.mocked(trustOffersApi.answer).mockResolvedValue({
+      ok: true,
+      policy: { ...policies[1], record_changes: "vp" },
+      items: [],
+    });
+    render(<BusinessApprovals />);
+    await user.click(screen.getByText("Approvals"));
+    const card = await screen.findByRole("listitem", { name: "Events and rentals agent changes to records" });
+    expect(card).toHaveTextContent("you approved 20 agent changes to records in a row");
+    expect(policiesApi.update).not.toHaveBeenCalled();
+    await user.click(within(card).getByRole("button", { name: "Let VPs approve" }));
+    expect(trustOffersApi.answer).toHaveBeenCalledWith("rental", "record_changes", true);
+    expect(
+      await screen.findByText("Both VPs now approve agent changes to records for Events and rentals."),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("group", { name: "Events and rentals approvals" })).getByLabelText(
+        "Agent changes to contacts, tickets, quotes and deals",
+      ),
+    ).toHaveValue("vp");
+  });
+});
+
+describe("Spending budgets", () => {
+  const budget = (category: SpendBudget["category"], monthly = 0): SpendBudget => ({
+    business: "tech",
+    category,
+    currency: "USD",
+    monthly_cap_minor: monthly,
+    per_item_cap_minor: 0,
+    used_minor: 0,
+    remaining_minor: monthly,
+    month: "2026-11",
+    updated_at: 0,
+  });
+
+  it("starts at $0 and saves a budget in whole dollars", async () => {
+    const user = userEvent.setup();
+    vi.mocked(spendBudgetsApi.list).mockResolvedValue([budget("ai_tools"), budget("hosting")]);
+    vi.mocked(spendBudgetsApi.save).mockResolvedValue({ ...budget("hosting", 5000), per_item_cap_minor: 2000 });
+    render(<SpendingBudgets />);
+    expect(await screen.findByText("All $0 · every spend request comes to you")).toBeInTheDocument();
+    await user.click(screen.getByText("Spending budgets"));
+    const hosting = screen.getByRole("form", { name: "Hosting and domains budget" });
+    await user.clear(within(hosting).getByLabelText("Monthly budget (USD)"));
+    await user.type(within(hosting).getByLabelText("Monthly budget (USD)"), "50");
+    await user.clear(within(hosting).getByLabelText("Per item (USD)"));
+    await user.type(within(hosting).getByLabelText("Per item (USD)"), "20");
+    await user.click(within(hosting).getByRole("button", { name: "Save" }));
+    expect(spendBudgetsApi.save).toHaveBeenCalledWith({
+      business: "tech",
+      category: "hosting",
+      currency: "USD",
+      monthly_cap_minor: 5000,
+      per_item_cap_minor: 2000,
+    });
+    expect(await screen.findByText("Hosting and domains budget saved.")).toBeVisible();
+    expect(screen.getByText(/ATLAS never pays for anything itself/)).toBeVisible();
   });
 });
 
@@ -144,6 +258,9 @@ describe("Today rows", () => {
       summary: 'Change contact "Lee"',
       payload: { phone: "555-0100" },
       current: { phone: "555-0000", name: "Lee" },
+      client_tier: "vip",
+      deal_amount_minor: 250000,
+      deal_currency: "USD",
     };
     const onDecide = vi.fn().mockResolvedValue(undefined);
     render(
@@ -152,6 +269,8 @@ describe("Today rows", () => {
       </ul>,
     );
     expect(screen.getByText("Record change")).toBeVisible();
+    expect(screen.getByText("VIP client")).toBeVisible();
+    expect(screen.getByText(/deal \$2,500/)).toBeVisible();
     expect(screen.getByText('Change contact "Lee"')).toBeVisible();
     expect(screen.getByText("555-0000")).toHaveClass("line-through");
     expect(screen.getByText(/Approving applies exactly this/)).toBeVisible();
@@ -180,6 +299,7 @@ describe("Today rows", () => {
       </ul>,
     );
     expect(screen.getByText("Code push")).toBeVisible();
+    expect(screen.queryByText(/client/)).toBeNull();
     expect(screen.getByText("New flower wall section")).toBeVisible();
     expect(screen.getByText("primrose/site")).toBeVisible();
     expect(

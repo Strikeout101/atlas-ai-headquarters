@@ -6,6 +6,12 @@ import { decideModelUpgrade } from "./model-routing";
 import type { BusinessKind } from "./business";
 
 interface PendingApprovalBase {
+  /** Routing facts read from records: the client's tier and the biggest open deal or quote involved. */
+  client_tier?: string | null;
+  deal_amount_minor?: number | null;
+  deal_currency?: string | null;
+  changes_client_tier?: boolean;
+  within_spend_budget?: boolean;
   vp_review?: {
     status: string;
     reason: string;
@@ -67,6 +73,7 @@ export type PendingApproval =
       currency: string;
       purpose: string;
       opportunity_id: string | null;
+      category?: string;
     })
   | (PendingApprovalBase & {
       kind: "org_request";

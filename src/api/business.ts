@@ -32,11 +32,14 @@ export interface BusinessContact {
   notes: string | null;
   /** 1 when this person asked not to be contacted. Drafts to them can't be marked ready. */
   do_not_contact?: number;
+  /** Important and VIP clients go to the owner for approval (per the business's approval settings). */
+  tier?: ClientTier;
   created_at: number;
   updated_at: number;
 }
 
-type ContactFlag = { do_not_contact?: "0" | "1" };
+export type ClientTier = "normal" | "important" | "vip";
+type ContactFlag = { do_not_contact?: "0" | "1"; tier?: ClientTier };
 
 export interface BusinessProfile {
   business: BusinessKind;
@@ -72,6 +75,9 @@ export interface RentalQuote {
   event_date: string | null;
   items: string;
   quote_text: string | null;
+  /** Quote total in cents, for the owner's deal-size approval limit. */
+  total_minor?: number | null;
+  currency?: string;
   status: "draft" | "shared" | "accepted" | "declined" | "archived";
   created_at: number;
   updated_at: number;
@@ -128,11 +134,15 @@ export const businessApi = {
     list: async () => (await request<ListResponse<RentalQuote>>("/api/business/quotes")).items,
     create: async (
       input: Pick<RentalQuote, "event_name" | "items" | "status"> &
-        Partial<Pick<RentalQuote, "contact_id" | "event_date" | "quote_text">>,
+        Partial<Pick<RentalQuote, "contact_id" | "event_date" | "quote_text">> & { total_minor?: string | null },
     ) => (await post<ItemResponse<RentalQuote>>("/api/business/quotes", input)).item,
     update: async (
       id: string,
-      input: Partial<Pick<RentalQuote, "contact_id" | "event_name" | "event_date" | "items" | "quote_text" | "status">>,
+      input: Partial<
+        Pick<RentalQuote, "contact_id" | "event_name" | "event_date" | "items" | "quote_text" | "status">
+      > & {
+        total_minor?: string | null;
+      },
     ) => (await patch<ItemResponse<RentalQuote>>(`/api/business/quotes/${encodeURIComponent(id)}`, input)).item,
     remove: async (id: string) => del(`/api/business/quotes/${encodeURIComponent(id)}`),
   },

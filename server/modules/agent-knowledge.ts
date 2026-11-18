@@ -136,7 +136,17 @@ export function businessProfileText(db: Db, business: BusinessKey, maxChars = 26
         policy.customer_sends,
       )}; agent record changes approved by ${who(policy.record_changes)}; code pushes approved by ${who(
         policy.code_pushes,
-      )}; spending always needs the owner)`;
+      )}; ${
+        policy.tier_to_owner === "off"
+          ? ""
+          : policy.tier_to_owner === "vip"
+            ? "VIP clients, "
+            : "important and VIP clients, "
+      }${
+        policy.owner_amount_minor > 0
+          ? `deals of ${policy.amount_currency} ${(policy.owner_amount_minor / 100).toFixed(0)} or more, `
+          : ""
+      }spending and terms need the owner)`;
     })(),
     field("Website", "website"),
     field("Email", "email"),

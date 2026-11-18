@@ -20848,6 +20848,11 @@
                   "opportunity_id": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": ["ai_tools", "ads", "hosting", "software", "supplies", "other"],
+                    "description": "Spending category; within the owner's budget for it both VPs may approve. Defaults to other."
                   }
                 },
                 "required": ["business", "amount_minor", "purpose"],
@@ -24630,7 +24635,7 @@
       "patch": {
         "tags": ["settings"],
         "summary": "Change a business's approval settings",
-        "description": "Raise or lower automation for one business. Owner password session and CSRF token required; agent task tokens are refused.",
+        "description": "Raise or lower automation for one business: who approves, the deal-size limit, which client tiers go to the owner, and when to suggest handing a kind of work to the VPs. Owner password session and CSRF token required; agent task tokens are refused.",
         "parameters": [
           {
             "name": "business",
@@ -24660,6 +24665,25 @@
                   "code_pushes": {
                     "type": "string",
                     "enum": ["none", "vp", "owner"]
+                  },
+                  "owner_amount_minor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Deals and quotes at or above this go to the owner; 0 = off."
+                  },
+                  "amount_currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "tier_to_owner": {
+                    "type": "string",
+                    "enum": ["important", "vip", "off"]
+                  },
+                  "trust_ramp_after": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Owner approvals in a row before suggesting the VPs; 0 = never."
                   }
                 },
                 "additionalProperties": true
@@ -27504,6 +27528,186 @@
             "bearerAuth": []
           }
         ]
+      }
+    },
+    "/api/business/trust-offers": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "List trust-ramp suggestions",
+        "description": "Kinds of work the owner has approved enough times in a row, with no denial, that the app suggests letting both VPs approve them. Never applied automatically.",
+        "responses": {
+          "200": {
+            "description": "Offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "items": [
+                    {
+                      "business": "rental",
+                      "kind": "record_changes",
+                      "streak": 20,
+                      "approved": 24,
+                      "denied": 1,
+                      "agents": []
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/business/trust-offers/{business}/{kind}": {
+      "post": {
+        "tags": ["settings"],
+        "summary": "Accept or snooze a trust-ramp suggestion",
+        "description": "accept=true sets that kind to the VPs; false hides the suggestion until another full run of approvals. Owner password session and CSRF token required; agent task tokens are refused.",
+        "parameters": [
+          {
+            "name": "business",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["tech", "rental", "ventures"]
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["customer_sends", "record_changes", "code_pushes"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accept": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["accept"],
+                "additionalProperties": false
+              },
+              "example": {
+                "accept": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/business/spend-budgets": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "List spending budgets",
+        "description": "Per business and category, with this month's approved total. All start at 0.",
+        "responses": {
+          "200": {
+            "description": "Budgets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["settings"],
+        "summary": "Set a spending budget",
+        "description": "Within the per-item limit and the month's remaining budget, both VPs may approve a spend request. Approval records permission only; ATLAS moves no money. Owner password session and CSRF token required; agent task tokens are refused.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "string",
+                    "enum": ["tech", "rental", "ventures"]
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": ["ai_tools", "ads", "hosting", "software", "supplies", "other"]
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "monthly_cap_minor": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "per_item_cap_minor": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["business", "category", "monthly_cap_minor", "per_item_cap_minor"],
+                "additionalProperties": false
+              },
+              "example": {
+                "business": "tech",
+                "category": "hosting",
+                "monthly_cap_minor": 5000,
+                "per_item_cap_minor": 2000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

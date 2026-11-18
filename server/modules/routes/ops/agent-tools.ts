@@ -138,7 +138,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
             ? (body.payload as Record<string, unknown>)
             : {};
         if (operation === "finance.request_spend") {
-          const allowed = ["business", "opportunity_id", "amount_minor", "currency", "purpose"];
+          const allowed = ["business", "opportunity_id", "amount_minor", "currency", "purpose", "category"];
           if (Object.keys(payload).some((key) => !allowed.includes(key)))
             return res.status(400).json({ error: "finance_protected_field" });
           const item = createSpendRequest(db, { ...payload, agent_id: claims.agentId, task_id: claims.taskId });
@@ -163,7 +163,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           const dealId = typeof body.id === "string" ? body.id : "";
           const dealAction: RecordAction = operation === "finance.deals.create" ? "create" : "update";
           const dealBusiness = recordChangeBusiness(db, "deals", dealAction, dealId || null, payload);
-          if (recordChangeNeedsApproval(dealBusiness)) {
+          if (recordChangeNeedsApproval(db, dealBusiness, { resource: "deals", target_id: dealId || null, payload })) {
             ensureRecordChangeSchema(db);
             const request = queueRecordChange(db, {
               business: dealBusiness!,
@@ -334,7 +334,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
               ? (payload as Record<string, unknown>)
               : {};
           const business = recordChangeBusiness(db, resource, action as RecordAction, id, objectPayload);
-          if (recordChangeNeedsApproval(business)) {
+          if (recordChangeNeedsApproval(db, business, { resource, target_id: id, payload: objectPayload })) {
             ensureRecordChangeSchema(db);
             const request = queueRecordChange(db, {
               business: business!,

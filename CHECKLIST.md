@@ -173,16 +173,17 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 10. Autonomy and approvals (moving from testing to real running)
 
-In progress (Claude, from 2026-11-18). Approval levels per business are now settings. There is no client importance, deal size or trust level yet.
+Approval rules are settings per business (Settings > Businesses > Approvals and Spending budgets), routed by structured facts. Hard floors stay in code: paid accounts, accepting terms, destructive SSH, spending outside a budget.
 
-- [x] **P1** (2026-11-17, Settings > Businesses > Approvals: customer sends, record changes, code pushes; deal size and client tier still to add) **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
-- [ ] **P1** **Client importance:** add a tier on contacts (normal, important, VIP). Important and VIP clients always go to the owner; normal clients follow the policy.
-- [ ] **P1** **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic. Answer From strike: 1K for now
-- [ ] **P1** Remove the hard-coded line in the VP review prompt that forces every Tech and Rental customer item to escalate. Read the policy instead.
-- [ ] **P1** Fix the free-text keyword check: any message containing words like "pay" or "buy" goes to the owner, which catches normal customer emails. Use structured facts instead.
-- [ ] **P2** **Trust ramp:** after N approved items of a kind with no corrections, offer to move that kind down a level. Record the track record per agent and per action.
-- [ ] **P2** Spending tiers: a monthly budget per business and category with a per-item limit. Today every spend request goes to the owner with no threshold, and an approval only records permission; no money moves.
-- [ ] **P2** Send paths for social posts and SMS under the same policy (today they cannot be sent at all).
+- [x] **P1** (2026-11-17/18, Settings > Businesses > Approvals) **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
+- [x] **P1** (2026-11-18, contact form "Client importance"; agents' tier changes always go to the owner; `tier_to_owner` setting) **Client importance:** add a tier on contacts (normal, important, VIP). Important and VIP clients always go to the owner; normal clients follow the policy.
+- [x] **P1** (2026-11-18, $1,000 default per business, editable; uses the client's largest open deal or quote; quotes gained a total; other currencies go to the owner) **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic. Answer From strike: 1K for now
+- [x] **P1** (2026-11-18, vp-review.ts uses `describeApprovalRules`) Remove the hard-coded line in the VP review prompt that forces every Tech and Rental customer item to escalate. Read the policy instead.
+- [x] **P1** (2026-11-18, `factsFromContent` removed; approval-facts.ts; VPs still escalate messages that commit to money or terms) Fix the free-text keyword check: any message containing words like "pay" or "buy" goes to the owner, which catches normal customer emails. Use structured facts instead.
+- [x] **P2** (2026-11-18, trust-ramp.ts; suggestion card in Approvals, owner accepts or snoozes; owner to VPs only, "corrections" counted as denials) **Trust ramp:** after N approved items of a kind with no corrections, offer to move that kind down a level. Record the track record per agent and per action.
+- [x] **P2** (2026-11-18, Settings > Businesses > Spending budgets; all $0; listing fees keep their own budget on Listings) Spending tiers: a monthly budget per business and category with a per-item limit. Today every spend request goes to the owner with no threshold, and an approval only records permission; no money moves.
+- [ ] **P2** Send paths for social posts and SMS under the same policy (today they cannot be sent at all). Routing is ready (`social_send`, `customer_send` follow `customer_sends`); the send itself lands with Instagram publishing (section 5) and an SMS provider (section 7).
+- [ ] **P3** Trust ramp from VPs to no approval (`vp` to `none`) for record changes and code pushes, once there is a track record of VP decisions.
 - [~] **P2** Owner override and undo: an audit list of everything done automatically, with a way to flag a mistake that turns into a lesson (section 2). Answer From strike: I do not want to do this until we have most of the autonomy features/logic/etc. configured
 - [ ] **P2 YOU** Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines. Answer From strike: I do not want to do this until all/most the autonomy setting/features/logic are in place
 - [ ] **P3** Profit goals (needs costs plus verified revenue).
@@ -243,6 +244,7 @@ Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the
 
 - 2026-11-16: Phone layout with dashboard only (no 3D office on phones) and password-protected access over the home VPN. Committed 2026-11-17.
 - 2026-11-17: First full feature review and this checklist.
+- 2026-11-18: Section 10 approvals: client importance, deal-size limit, structured routing facts, policy-driven VP prompt, trust-ramp suggestions, spending budgets.
 - 2026-11-17: Agent knowledge and memory (section 2): systems registry, filled business profiles, knowledge block in task prompts, persistent memory with owner review, `knowledge.get` / `memory.*` tools, Team > Knowledge page, docs index. `SETUP-INFO-NEEDED.txt` moved out of git.
 - [X] **P1 YOU** Open ATLAS on the phone over the home VPN and confirm the login page loads at the PC's LAN address on port 8800. ## 11/17 Cofirmed 
 - [x] **P1 YOU** Square: press Test in Settings > Businesses > Square, map a real location to each business, then turn sync on. The token is already saved. - 11/17 Thsi si done functionality still needs to be tested through the agents 

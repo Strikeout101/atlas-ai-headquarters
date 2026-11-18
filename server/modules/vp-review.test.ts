@@ -240,13 +240,16 @@ describe("VP review", () => {
     await runVpReviewTick(h.deps);
     expect(h.execute).not.toHaveBeenCalled();
   });
-  it("does not review owner-floor actions even if VPs would approve", async () => {
+  it("routes by structured facts: wording alone is reviewed, and the prompt carries the owner floors", async () => {
+    // A suggestion that mentions a purchase cannot spend anything; spending needs its own spend request.
     const h = harness();
     h.db.exec("UPDATE agent_task_proposals SET description='Purchase a paid account'");
     await runVpReviewTick(h.deps);
-    expect(h.run).not.toHaveBeenCalled();
-    expect(h.execute).not.toHaveBeenCalled();
-    expect(listPendingApprovals(h.db)).toHaveLength(1);
+    expect(h.run).toHaveBeenCalled();
+    const prompt = String(h.run.mock.calls[0][1]);
+    expect(prompt).toContain("APPROVAL RULES");
+    expect(prompt).toContain("paid accounts, accepting terms or contracts");
+    expect(prompt).not.toContain("all tech/rental customer-facing work ALWAYS");
   });
   it("prevents overlapping ticks from duplicating reviews and action execution", async () => {
     const h = harness();
