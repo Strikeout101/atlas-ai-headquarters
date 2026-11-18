@@ -109,12 +109,18 @@ describe("VP planning beat", () => {
   });
   it("blocks model usage when subscription headroom is missing or the owner paused autonomy", async () => {
     const { db, deps, runAgentOneShot } = harness();
-    db.exec("DELETE FROM cli_usage_cache WHERE provider='codex'");
+    db.exec("DELETE FROM cli_usage_cache WHERE provider='claude'");
     await runVpPlanningTick(deps);
     expect(runAgentOneShot).not.toHaveBeenCalled();
     setControlMode(db, "autonomy_paused", NOW);
     await runVpPlanningTick(deps);
     expect(runAgentOneShot).not.toHaveBeenCalled();
+  });
+  it("checks the selected planning VP without requiring an unused subscription", async () => {
+    const { db, deps, runAgentOneShot } = harness();
+    db.exec("DELETE FROM cli_usage_cache WHERE provider='codex'");
+    await runVpPlanningTick(deps);
+    expect(runAgentOneShot).toHaveBeenCalledOnce();
   });
   it("advances the durable planning interval before calling a no-tools VP and avoids retries after failure", async () => {
     const { db, deps, runAgentOneShot } = harness();

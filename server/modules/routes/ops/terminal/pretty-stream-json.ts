@@ -2,6 +2,7 @@ export function prettyStreamJson(raw: string, opts: { includeReasoning?: boolean
   const chunks: string[] = [];
   let sawJson = false;
   let sawClaudeTextDelta = false;
+  let sawClaudeAssistantText = false;
   const includeReasoning = opts.includeReasoning === true;
   const pushReasoningChunk = (text: string): void => {
     if (!text) return;
@@ -31,10 +32,13 @@ export function prettyStreamJson(raw: string, opts: { includeReasoning?: boolean
         const ev = j.event;
         if (ev?.type === "content_block_delta" && ev?.delta?.type === "text_delta") {
           sawClaudeTextDelta = true;
+          sawClaudeAssistantText = true;
           chunks.push(String(ev.delta.text ?? ""));
           continue;
         }
         if (ev?.type === "content_block_start" && ev?.content_block?.type === "text" && ev?.content_block?.text) {
+          sawClaudeTextDelta = true;
+          sawClaudeAssistantText = true;
           chunks.push(String(ev.content_block.text));
           continue;
         }
@@ -49,11 +53,14 @@ export function prettyStreamJson(raw: string, opts: { includeReasoning?: boolean
           }
         }
         pushMessageChunk(assistantText);
+        if (assistantText) sawClaudeAssistantText = true;
         continue;
       }
 
       if (j.type === "result" && j.result) {
-        pushMessageChunk(String(j.result));
+        // Claude repeats its final assistant text in the result event. Appending
+        // both makes a valid no-tools JSON reply impossible to parse downstream.
+        if (!sawClaudeAssistantText) pushMessageChunk(String(j.result));
         continue;
       }
 

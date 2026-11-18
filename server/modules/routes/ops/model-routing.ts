@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import type { DatabaseSync } from "node:sqlite";
+import { getAgentPerformanceSummary } from "../../agent-performance.ts";
 import { hasValidCsrfToken, shouldRequireCsrf, requireOwnerSession } from "../../../security/auth.ts";
 import {
   availableModels,
@@ -39,12 +40,64 @@ export function registerModelRoutingRoutes(app: Express, db: Db, runDirector: Di
         "SELECT id, name, cli_provider, status FROM agents WHERE cli_provider IN ('claude','codex') ORDER BY name",
       )
       .all();
-    res.json({ ok: true, ...config, directors });
+    const localProviders = db
+      .prepare("SELECT id, name, models_cache, enabled FROM api_providers WHERE type = 'ollama' ORDER BY name")
+      .all()
+      .map((row: any) => {
+        let models: string[] = [];
+        try {
+          const parsed = JSON.parse(row.models_cache || "[]");
+          if (Array.isArray(parsed)) models = parsed.filter((v): v is string => typeof v === "string");
+        } catch {
+          /* discovery optional */
+        }
+        return { id: row.id, name: row.name, enabled: Boolean(row.enabled), models };
+      });
+    res.json({ ok: true, ...config, directors, localProviders, performance: getAgentPerformanceSummary(db) });
   });
 
   app.put("/api/model-director", (req, res) => {
     if (!csrf(req, res)) return;
-    const id = req.body?.directorAgentId;
+    const config = modelDirectorConfig(db);
+    const id = req.body?.directorAgentId ?? null;
+    const roleDirectors: Record<string, string | null> = {};
+    for (const key of ["technicalDirectorAgentId", "designDirectorAgentId"] as const) {
+      const value = req.body?.[key] === undefined ? config[key] : req.body[key];
+      if (value !== null && (typeof value !== "string" || !value.trim()))
+        return res.status(400).json({ error: "invalid_director_agent_id" });
+      if (value && !db.prepare("SELECT id FROM agents WHERE id = ? AND cli_provider IN ('claude','codex')").get(value))
+        return res.status(400).json({ error: "director_must_use_claude_or_codex" });
+      roleDirectors[key] = value;
+    }
+    const local = req.body?.localRouting === undefined ? config.localRouting : req.body.localRouting;
+    const allowedTypes = new Set(["general", "documentation", "analysis"]);
+    if (
+      !local ||
+      typeof local !== "object" ||
+      typeof local.enabled !== "boolean" ||
+      (local.apiProviderId !== null && typeof local.apiProviderId !== "string") ||
+      (local.model !== null && (typeof local.model !== "string" || local.model.length > 120)) ||
+      !Array.isArray(local.taskTypes) ||
+      local.taskTypes.length > 3 ||
+      local.taskTypes.some((v: unknown) => !allowedTypes.has(String(v))) ||
+      !Number.isSafeInteger(local.contextWindowTokens) ||
+      local.contextWindowTokens < 2048 ||
+      local.contextWindowTokens > 2000000
+    )
+      return res.status(400).json({ error: "invalid_local_routing" });
+    if (local.enabled) {
+      const provider = db
+        .prepare("SELECT models_cache FROM api_providers WHERE id = ? AND type = 'ollama' AND enabled = 1")
+        .get(local.apiProviderId ?? "") as { models_cache: string | null } | undefined;
+      let models: unknown = [];
+      try {
+        models = JSON.parse(provider?.models_cache || "[]");
+      } catch {
+        /* invalid cache */
+      }
+      if (!provider || !Array.isArray(models) || !models.includes(local.model) || !local.taskTypes.length)
+        return res.status(400).json({ error: "local_routing_requires_discovered_ollama_model" });
+    }
     if (id !== null && (typeof id !== "string" || !id.trim()))
       return res.status(400).json({ error: "invalid_director_agent_id" });
     if (id) {
@@ -75,7 +128,12 @@ export function registerModelRoutingRoutes(app: Express, db: Db, runDirector: Di
       "modelRoutingCandidates",
       JSON.stringify(candidates),
     );
-    res.json({ ok: true, directorAgentId: id ?? null, candidates });
+    for (const [key, value] of Object.entries({ ...roleDirectors, localModelRouting: local })) {
+      db.prepare(
+        "INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      ).run(key, JSON.stringify(value));
+    }
+    res.json({ ok: true, ...modelDirectorConfig(db) });
   });
 
   app.get("/api/tasks/:id/model-route", (req, res) => {

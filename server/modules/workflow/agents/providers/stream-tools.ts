@@ -4,6 +4,25 @@ type DbLike = {
   };
 };
 
+export type ProviderUsage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
+export type ProviderUsageCallback = (usage: ProviderUsage) => void;
+
+/** Provider stream usage is cumulative, so merge snapshots rather than add them. */
+export function createProviderUsageReporter(onUsage?: ProviderUsageCallback) {
+  const snapshot: ProviderUsage = {};
+  return (usage: Record<string, unknown>) => {
+    let changed = false;
+    for (const key of ["input_tokens", "output_tokens", "cost_usd"] as const) {
+      const value = usage[key];
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+        snapshot[key] = value;
+        changed = true;
+      }
+    }
+    if (changed) onUsage?.({ ...snapshot });
+  };
+}
+
 type CreateStreamToolsDeps = {
   db: DbLike;
   broadcast: (event: string, payload: unknown) => void;
@@ -104,11 +123,13 @@ export function createStreamTools(deps: CreateStreamToolsDeps) {
     signal: AbortSignal,
     safeWrite: (text: string) => boolean,
     taskId?: string,
+    onUsage?: ProviderUsageCallback,
   ): Promise<void> {
     const decoder = new TextDecoder();
     let buffer = "";
     let completed = false;
     const subtaskAccum = { buf: "" };
+    const reportUsage = createProviderUsageReporter(onUsage);
 
     const processLine = (trimmed: string) => {
       if (!trimmed || trimmed.startsWith(":")) return;
@@ -119,6 +140,12 @@ export function createStreamTools(deps: CreateStreamToolsDeps) {
       }
       try {
         const data = JSON.parse(trimmed.slice(6));
+        if (data.usage)
+          reportUsage({
+            input_tokens: data.usage.prompt_tokens ?? data.usage.input_tokens,
+            output_tokens: data.usage.completion_tokens ?? data.usage.output_tokens,
+            cost_usd: data.usage.cost_usd ?? data.usage.cost,
+          });
         const delta = data.choices?.[0]?.delta;
         if (delta?.content) {
           const text = normalizeStreamChunk(delta.content);
@@ -153,16 +180,31 @@ export function createStreamTools(deps: CreateStreamToolsDeps) {
     signal: AbortSignal,
     safeWrite: (text: string) => boolean,
     taskId?: string,
+    onUsage?: ProviderUsageCallback,
   ): Promise<void> {
     const decoder = new TextDecoder();
     let buffer = "";
     const subtaskAccum = { buf: "" };
+    const reportUsage = createProviderUsageReporter(onUsage);
 
     const processLine = (trimmed: string) => {
       if (!trimmed || trimmed.startsWith(":")) return;
       if (!trimmed.startsWith("data: ")) return;
       try {
         const data = JSON.parse(trimmed.slice(6));
+        const usage = data.response?.usageMetadata ?? data.usageMetadata;
+        if (usage) {
+          const candidates = usage.candidatesTokenCount;
+          const thoughts = usage.thoughtsTokenCount;
+          reportUsage({
+            input_tokens: usage.promptTokenCount,
+            output_tokens:
+              typeof candidates === "number" && Number.isFinite(candidates) && candidates >= 0
+                ? candidates +
+                  (typeof thoughts === "number" && Number.isFinite(thoughts) && thoughts >= 0 ? thoughts : 0)
+                : undefined,
+          });
+        }
         const candidates = data.response?.candidates ?? data.candidates;
         if (Array.isArray(candidates)) {
           for (const candidate of candidates) {

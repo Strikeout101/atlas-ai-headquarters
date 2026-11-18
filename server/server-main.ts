@@ -44,6 +44,7 @@ import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schem
 import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-packs.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
+import { ensureAgentPerformanceSchema } from "./modules/agent-performance.ts";
 import { ensureControlStateSchema } from "./modules/control-state.ts";
 import { ensureAgentMemorySchema } from "./modules/agent-memory.ts";
 import { ensureBusinessPolicySchema } from "./modules/business-policies.ts";
@@ -72,6 +73,7 @@ configureLoginStore(db);
 const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);
+ensureAgentPerformanceSchema(db);
 ensureControlStateSchema(db);
 ensureAgentMemorySchema(db);
 ensureBusinessPolicySchema(db);

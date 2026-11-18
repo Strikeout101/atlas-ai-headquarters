@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyBaseSchema } from "./bootstrap/schema/base-schema.ts";
 import { decideProposal } from "./agent-proposals.ts";
+import { ensureModelRoutingSchema } from "./model-routing.ts";
 import { ensureControlStateSchema, resetControlStateForTests, setControlMode } from "./control-state.ts";
 import {
   admitAutonomyTaskStart,
@@ -252,11 +253,14 @@ describe("autonomous delegation lineage", () => {
     await runAutonomyEngineTick(h.deps);
     h.db.prepare("INSERT INTO tasks(id,title,source_task_id) VALUES ('child','Delegated task',?)").run(root);
     h.db.exec("INSERT INTO tasks(id,title,source_task_id) VALUES ('second-child','Other delegated task','child')");
+    h.db.exec(
+      "UPDATE agents SET cli_provider='codex' WHERE id='worker'; UPDATE tasks SET assigned_agent_id='worker' WHERE id IN ('child','second-child')",
+    );
     expect(admitAutonomyTaskStart(h.db, "child", NOW)).toBeNull();
     expect(admitAutonomyTaskStart(h.db, "child", NOW)).toBeNull();
     expect(admitAutonomyTaskStart(h.db, "second-child", NOW)).toContain("cap");
     expect(h.db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations").get()).toMatchObject({ n: 2 });
-    h.setUsage("claude", [{ utilization: 0.9 }]);
+    h.setUsage("codex", [{ utilization: 0.9 }]);
     expect(autonomyTaskStartBlockReason(h.db, "child", NOW)).toContain("threshold");
   });
   it("backfills legacy descendants once when the inheritance trigger is installed", () => {
@@ -289,10 +293,69 @@ describe("subscription headroom", () => {
     h.setUsage(provider, [{ utilization: 0.2 }], NOW, "unavailable");
     expect(usageHeadroomBlockReason(h.db, NOW)).toContain("unavailable");
   });
-  it("records unknown usage without starting even local worker tasks", async () => {
+  it("blocks an actually used subscription when its usage is unknown", async () => {
+    const h = harness();
+    h.db.exec("UPDATE agents SET cli_provider='codex' WHERE id='leader'");
+    h.approve(h.queue());
+    h.db.exec("DELETE FROM cli_usage_cache");
+    await runAutonomyEngineTick(h.deps);
+    expect(h.startTask).not.toHaveBeenCalled();
+  });
+  it("admits a local worker without unrelated subscription usage", async () => {
     const h = harness();
     h.approve(h.queue());
     h.db.exec("DELETE FROM cli_usage_cache");
+    await runAutonomyEngineTick(h.deps);
+    expect(h.startTask).toHaveBeenCalledOnce();
+  });
+  it("does not let an unused unauthenticated provider block a healthy worker", async () => {
+    const h = harness();
+    h.db.exec("UPDATE agents SET cli_provider='codex' WHERE id='leader'");
+    h.setUsage("claude", [], NOW, "unauthenticated");
+    h.approve(h.queue());
+    await runAutonomyEngineTick(h.deps);
+    expect(h.startTask).toHaveBeenCalledOnce();
+  });
+  it("uses the actual routed provider and rechecks a later subscription upgrade", async () => {
+    const h = harness();
+    h.db.exec(
+      "UPDATE agents SET cli_provider='codex' WHERE id='leader'; CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY, provider TEXT)",
+    );
+    const taskId = h.approve(h.queue());
+    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'api')").run(taskId);
+    h.setUsage("codex", [], NOW, "unauthenticated");
+    await runAutonomyEngineTick(h.deps);
+    expect(h.startTask).toHaveBeenCalledOnce();
+    expect(autonomyTaskStartBlockReason(h.db, taskId, NOW)).toBeNull();
+    h.db.prepare("UPDATE task_model_routes SET provider='codex' WHERE task_id=?").run(taskId);
+    expect(autonomyTaskStartBlockReason(h.db, taskId, NOW)).toContain("unavailable");
+  });
+  it("admits an eligible configured local route before the first route has been saved", async () => {
+    const h = harness();
+    ensureModelRoutingSchema(h.db);
+    h.db.exec(
+      "UPDATE agents SET cli_provider='codex' WHERE id='leader'; INSERT INTO api_providers(id,name,type,base_url,models_cache) VALUES ('local','Local host','ollama','http://localhost:11434/v1','[\"small\"]')",
+    );
+    h.db
+      .prepare("INSERT INTO settings(key,value) VALUES ('localModelRouting',?)")
+      .run(JSON.stringify({ enabled: true, apiProviderId: "local", model: "small", taskTypes: ["documentation"] }));
+    const taskId = h.approve(h.queue());
+    h.db.prepare("UPDATE tasks SET task_type='documentation' WHERE id=?").run(taskId);
+    h.setUsage("codex", [], NOW, "unauthenticated");
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toBeNull();
+    await runAutonomyEngineTick(h.deps);
+    expect(h.startTask).toHaveBeenCalledOnce();
+    h.db.exec("UPDATE api_providers SET enabled=0 WHERE id='local'");
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("unavailable");
+  });
+  it("fails closed when an autonomous worker has no configured provider", async () => {
+    const h = harness();
+    h.db.exec("UPDATE agents SET cli_provider=NULL WHERE id='leader'");
+    const taskId = h.approve(h.queue());
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("not configured");
+    h.db.exec("CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY,provider TEXT)");
+    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'unknown-provider')").run(taskId);
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("not supported");
     await runAutonomyEngineTick(h.deps);
     expect(h.startTask).not.toHaveBeenCalled();
   });

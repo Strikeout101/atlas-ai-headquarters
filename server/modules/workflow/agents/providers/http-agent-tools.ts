@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import type { DecryptedOAuthToken } from "./types.ts";
 import { createStreamTools } from "./stream-tools.ts";
+import { createRunPerformanceTracker } from "../../../agent-performance.ts";
 import { autonomyTaskUsageBlockReason } from "../../../autonomy-engine.ts";
 import { assertRunsAllowed, automaticStartBlockReason } from "../../../control-state.ts";
 
@@ -125,6 +126,9 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
       safeWrite(header);
       if (taskId) broadcast("cli_output", { task_id: taskId, stream: "stderr", data: header });
 
+      const performance = taskId
+        ? createRunPerformanceTracker(db as any, taskId, { provider: "copilot", model, useTaskRoute: false })
+        : null;
       try {
         safeWrite("[copilot] Exchanging Copilot token...\n");
         if (taskId)
@@ -157,6 +161,7 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
               { role: "user", content: prompt },
             ],
             stream: true,
+            stream_options: { include_usage: true },
           }),
           signal,
         });
@@ -166,7 +171,9 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
           throw new Error(`Copilot API error (${resp.status}): ${text}`);
         }
 
-        await parseSSEStream(resp.body!, signal, safeWrite, taskId);
+        await parseSSEStream(resp.body!, signal, safeWrite, taskId, (usage) => {
+          performance?.ingest(`${JSON.stringify({ type: "result", usage, total_cost_usd: usage.cost_usd })}\n`);
+        });
         markOAuthAccountSuccess(account.id!);
         if (i > 0 && autoSwap && account.id) {
           setActiveOAuthAccount("github", account.id);
@@ -176,8 +183,10 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
         }
         safeWrite(`\n---\n[copilot] Done.\n`);
         if (taskId) broadcast("cli_output", { task_id: taskId, stream: "stderr", data: "\n---\n[copilot] Done.\n" });
+        performance?.finish(0, signal.aborted);
         return;
       } catch (err: any) {
+        performance?.finish(1, signal.aborted || err?.name === "AbortError");
         if (signal.aborted || err?.name === "AbortError") throw err;
         const msg = err?.message ? String(err.message) : String(err);
         markOAuthAccountFailure(account.id!, msg);
@@ -232,6 +241,9 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
       safeWrite(header);
       if (taskId) broadcast("cli_output", { task_id: taskId, stream: "stderr", data: header });
 
+      const performance = taskId
+        ? createRunPerformanceTracker(db as any, taskId, { provider: "antigravity", model, useTaskRoute: false })
+        : null;
       try {
         safeWrite(`[antigravity] Refreshing token...\n`);
         if (taskId)
@@ -288,7 +300,9 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
           throw new Error(`Antigravity API error (${resp.status}): ${text}`);
         }
 
-        await parseGeminiSSEStream(resp.body!, signal, safeWrite, taskId);
+        await parseGeminiSSEStream(resp.body!, signal, safeWrite, taskId, (usage) => {
+          performance?.ingest(`${JSON.stringify({ type: "result", usage, total_cost_usd: usage.cost_usd })}\n`);
+        });
         markOAuthAccountSuccess(account.id!);
         if (i > 0 && autoSwap && account.id) {
           setActiveOAuthAccount("google_antigravity", account.id);
@@ -299,8 +313,10 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
         safeWrite(`\n---\n[antigravity] Done.\n`);
         if (taskId)
           broadcast("cli_output", { task_id: taskId, stream: "stderr", data: "\n---\n[antigravity] Done.\n" });
+        performance?.finish(0, signal.aborted);
         return;
       } catch (err: any) {
+        performance?.finish(1, signal.aborted || err?.name === "AbortError");
         if (signal.aborted || err?.name === "AbortError") throw err;
         const msg = err?.message ? String(err.message) : String(err);
         markOAuthAccountFailure(account.id!, msg);

@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { getCurrentTaskModelRoute } from "../../model-routing.ts";
+import { createRunPerformanceTracker } from "../../agent-performance.ts";
+import { createCodexCompletionDrain } from "./providers/codex-completion-drain.ts";
 import { createAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { PORT } from "../../../config/runtime.ts";
 import { autonomyTaskUsageBlockReason } from "../../autonomy-engine.ts";
@@ -280,8 +282,11 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
       detached: process.platform !== "win32",
       windowsHide: true,
     });
+    const performance = createRunPerformanceTracker(db, taskId, { provider, model: routed?.model ?? model });
 
     let finished = false;
+    let timedOut = false;
+    let detachCompletionDrain: (() => void) | null = null;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
     let hardTimer: ReturnType<typeof setTimeout> | null = null;
     let stdoutListener: ((chunk: Buffer) => void) | null = null;
@@ -308,6 +313,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     };
     const triggerTimeout = (kind: "idle" | "hard") => {
       if (finished) return;
+      timedOut = true;
       finished = true;
       clearRunTimers();
       const timeoutMs = kind === "idle" ? TASK_RUN_IDLE_TIMEOUT_MS : TASK_RUN_HARD_TIMEOUT_MS;
@@ -342,6 +348,8 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     activeProcesses.set(taskId, child);
 
     child.on("error", (err) => {
+      detachCompletionDrain?.();
+      performance.finish(1);
       finished = true;
       clearRunTimers();
       detachOutputListeners();
@@ -358,6 +366,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
 
     // Pipe agent output to log file AND broadcast via WebSocket
     stdoutListener = (chunk: Buffer) => {
+      performance.ingest(chunk);
       touchIdleTimer();
       onRawOutput?.(chunk, "stdout");
       const text = normalizeStreamChunk(chunk, { dropCliNoise: true });
@@ -379,7 +388,10 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     child.stdout?.on("data", stdoutListener);
     child.stderr?.on("data", stderrListener);
 
-    child.on("close", () => {
+    child.on("close", (code, signal) => {
+      detachCompletionDrain?.();
+      const cancellation = !timedOut && (signal === "SIGINT" || signal === "SIGTERM");
+      performance.finish(timedOut ? 1 : (code ?? 1), cancellation);
       finished = true;
       clearRunTimers();
       detachOutputListeners();
@@ -390,6 +402,12 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
         /* ignore */
       }
     });
+
+    if (provider === "codex")
+      detachCompletionDrain = createCodexCompletionDrain(child, () => {
+        finished = true;
+        clearRunTimers();
+      });
 
     if (process.platform !== "win32") child.unref();
 

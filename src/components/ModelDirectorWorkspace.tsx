@@ -127,6 +127,9 @@ export default function ModelDirectorWorkspace() {
       const saved = await saveModelDirector({
         directorAgentId: directorId || null,
         candidates: parseCandidates(candidateDrafts),
+        technicalDirectorAgentId: config?.technicalDirectorAgentId ?? null,
+        designDirectorAgentId: config?.designDirectorAgentId ?? null,
+        localRouting: config?.localRouting,
       });
       setConfig((current) => (current ? { ...current, ...saved, directors: current.directors } : saved));
       setNotice("Director settings saved.");
@@ -231,6 +234,146 @@ export default function ModelDirectorWorkspace() {
               )}
             </label>
             <div className="grid gap-4 md:grid-cols-2">
+              {(["technical", "design"] as const).map((role) => {
+                const key = role === "technical" ? "technicalDirectorAgentId" : "designDirectorAgentId";
+                return (
+                  <div key={role} className="grid gap-2 text-xs font-medium text-[var(--th-text-secondary)]">
+                    <label htmlFor={`${role}-director`} className="capitalize">
+                      {role} director
+                    </label>
+                    <select
+                      id={`${role}-director`}
+                      value={config[key] ?? ""}
+                      onChange={(event) => setConfig({ ...config, [key]: event.target.value || null })}
+                      className={inputClass}
+                    >
+                      <option value="">Use fallback director</option>
+                      {config.directors.map((agent) => (
+                        <option key={agent.id} value={agent.id} disabled={agent.status === "offline"}>
+                          {agent.name} ({agent.cli_provider})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+            <fieldset className="space-y-3 border-y border-slate-500/20 py-4">
+              <legend className="text-base font-semibold">Routine work on Ollama</legend>
+              <p className="text-sm text-[var(--th-text-secondary)]">
+                Choose a tested local model and task kinds. Other tasks keep the worker’s provider. Existing task
+                choices stay fixed until you choose again.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={config.localRouting?.enabled ?? false}
+                  onChange={(event) =>
+                    setConfig({ ...config, localRouting: { ...config.localRouting, enabled: event.target.checked } })
+                  }
+                />
+                Route selected routine tasks locally
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-2 text-xs">
+                  <label htmlFor="routine-host">Ollama host</label>
+                  <select
+                    id="routine-host"
+                    className={inputClass}
+                    value={config.localRouting?.apiProviderId ?? ""}
+                    onChange={(event) =>
+                      setConfig({
+                        ...config,
+                        localRouting: {
+                          ...config.localRouting,
+                          apiProviderId: event.target.value || null,
+                          model: null,
+                        },
+                      })
+                    }
+                  >
+                    <option value="">Choose a host</option>
+                    {config.localProviders?.map((provider) => (
+                      <option key={provider.id} value={provider.id} disabled={!provider.enabled}>
+                        {provider.name}
+                        {provider.enabled ? "" : " (disabled)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2 text-xs">
+                  <label htmlFor="routine-model">Local model</label>
+                  <select
+                    id="routine-model"
+                    className={inputClass}
+                    value={config.localRouting?.model ?? ""}
+                    onChange={(event) =>
+                      setConfig({
+                        ...config,
+                        localRouting: { ...config.localRouting, model: event.target.value || null },
+                      })
+                    }
+                  >
+                    <option value="">Choose a discovered model</option>
+                    {config.localProviders
+                      ?.find((provider) => provider.id === config.localRouting?.apiProviderId)
+                      ?.models.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 text-sm">
+                {["general", "documentation", "analysis"].map((type) => (
+                  <label key={type} className="flex items-center gap-2 capitalize">
+                    <input
+                      type="checkbox"
+                      checked={config.localRouting?.taskTypes.includes(type) ?? false}
+                      onChange={(event) =>
+                        setConfig({
+                          ...config,
+                          localRouting: {
+                            ...config.localRouting,
+                            taskTypes: event.target.checked
+                              ? [...config.localRouting.taskTypes, type]
+                              : config.localRouting.taskTypes.filter((value) => value !== type),
+                          },
+                        })
+                      }
+                    />
+                    {type}
+                  </label>
+                ))}
+              </div>
+              <div className="grid max-w-xs gap-2 text-xs">
+                <label htmlFor="routine-context">Local context window (tokens)</label>
+                <input
+                  id="routine-context"
+                  type="number"
+                  min={2048}
+                  max={2000000}
+                  className={inputClass}
+                  value={config.localRouting?.contextWindowTokens ?? 8192}
+                  onChange={(event) =>
+                    setConfig({
+                      ...config,
+                      localRouting: { ...config.localRouting, contextWindowTokens: Number(event.target.value) },
+                    })
+                  }
+                />
+                <p className="text-[var(--th-text-secondary)]">
+                  Use the model’s configured window so rollover leaves room for tools and output.
+                </p>
+              </div>
+              {!config.localProviders?.length && (
+                <p className="text-sm text-amber-500">
+                  Add and test an Ollama connection in Settings before enabling local routing.
+                </p>
+              )}
+            </fieldset>
+            <div className="grid gap-4 md:grid-cols-2">
               {PROVIDERS.map((provider: Provider) => (
                 <label key={provider} className="grid gap-2 text-xs font-medium text-[var(--th-text-secondary)]">
                   <span className="capitalize">{provider} models</span>
@@ -253,11 +396,62 @@ export default function ModelDirectorWorkspace() {
           </form>
 
           <section className="space-y-5" aria-label="Task model routing">
+            <div className="space-y-2 border-b border-slate-500/20 pb-4">
+              <h2 className="text-lg font-semibold">Worker performance</h2>
+              <p className="text-xs text-[var(--th-text-secondary)]">
+                Success reflects worker exit codes. Rework counts repeat attempts, including resumes. Cost covers only
+                runs that reported it; unknown cost is not zero.
+              </p>
+              {!config.performance?.length ? (
+                <p className="text-sm text-[var(--th-text-secondary)]">
+                  No worker runs recorded yet. New runs feed the directors’ choices.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr>
+                        {["Agent / model", "Successful exits / launches", "Rework", "Reported cost"].map((heading) => (
+                          <th key={heading} className="px-2 py-2 font-medium">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {config.performance.map((row) => (
+                        <tr
+                          key={`${row.agent_id}/${row.provider}/${row.model}`}
+                          className="border-t border-slate-500/20"
+                        >
+                          <td className="break-all px-2 py-2">
+                            {tasks.find((task) => task.assigned_agent_id === row.agent_id)?.agent_name || row.agent_id}
+                            <br />
+                            <span className="font-mono">
+                              {row.provider}/{row.model}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 font-mono">
+                            {row.successes}/{row.runs}
+                          </td>
+                          <td className="px-2 py-2 font-mono">{row.rework_runs}</td>
+                          <td className="px-2 py-2 font-mono">
+                            {row.cost_usd === null
+                              ? "Unknown"
+                              : `$${row.cost_usd.toFixed(4)} (${row.cost_reported_runs}/${row.runs} runs)`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
             <div className="border-b border-slate-500/20 pb-4">
               <h2 className="text-lg font-semibold">Task model</h2>
               <p className="mt-1 text-sm text-[var(--th-text-secondary)]">
-                Initial routing uses the worker’s provider. An approved upgrade can move a local worker to Codex or
-                Claude for this task.
+                Selected routine tasks use Ollama; other tasks use the worker’s provider. An approved upgrade can move a
+                local worker to Codex or Claude for this task.
               </p>
             </div>
             {tasks.length === 0 ? (

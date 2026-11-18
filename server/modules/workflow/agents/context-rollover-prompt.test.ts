@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompactContextRolloverPrompt } from "./context-rollover-prompt.ts";
+import { buildCompactContextRolloverPrompt, tryBuildCompactInitialTaskPrompt } from "./context-rollover-prompt.ts";
 
 describe("context rollover prompt", () => {
   it("keeps goal and recent state while bounding a small model's prompt", () => {
@@ -15,7 +15,7 @@ describe("context rollover prompt", () => {
       },
       (parts) => `${parts.join("\n")}\n[Shared execution policy]`,
     );
-    expect(Buffer.byteLength(prompt, "utf8")).toBeLessThanOrEqual(Math.floor(4096 * 0.65));
+    expect(Buffer.byteLength(prompt, "utf8")).toBeLessThanOrEqual(Math.floor(Math.floor(4096 * 0.65) * 0.85));
     expect(prompt).toContain("Goal: implement feature");
     expect(prompt).toContain("Remaining: run tests");
     expect(prompt).toContain("Follow department rules");
@@ -36,5 +36,41 @@ describe("context rollover prompt", () => {
         (parts) => parts.join("\n"),
       ),
     ).toThrow("context_rollover_prompt_exceeds_configured_window");
+  });
+});
+
+describe("initial local prompt", () => {
+  it("preserves the full task and department requirements with context headroom", () => {
+    const description = `Beginning requirement. ${"Keep every detail. ".repeat(40)} Final requirement.`;
+    const prompt = tryBuildCompactInitialTaskPrompt(
+      {
+        taskId: "local-task",
+        title: "Write documentation",
+        description,
+        departmentSharedPrompt: "Do not omit department requirements.",
+        interruptPrompt: "Owner amendment: include a usage example.",
+        worktreeBranch: "climpire/local-task",
+        contextWindowTokens: 8192,
+      },
+      (parts) => parts.join("\n"),
+    );
+    expect(prompt).toContain(description);
+    expect(prompt).toContain("Do not omit department requirements.");
+    expect(prompt).toContain("Owner amendment: include a usage example.");
+    expect(Buffer.byteLength(prompt!)).toBeLessThanOrEqual(Math.floor(Math.floor(8192 * 0.65) * 0.85));
+  });
+  it("refuses overflow instead of truncating task requirements", () => {
+    expect(
+      tryBuildCompactInitialTaskPrompt(
+        {
+          taskId: "local-task",
+          title: "Detailed work",
+          description: "Mandatory requirement. ".repeat(1000),
+          worktreeBranch: "climpire/local-task",
+          contextWindowTokens: 4096,
+        },
+        (parts) => parts.join("\n"),
+      ),
+    ).toBeNull();
   });
 });

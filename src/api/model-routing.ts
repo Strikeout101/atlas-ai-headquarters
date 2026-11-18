@@ -3,11 +3,35 @@ import { post, put, request } from "./core";
 export type ModelDirectorConfig = {
   ok: true;
   directorAgentId: string | null;
+  technicalDirectorAgentId: string | null;
+  designDirectorAgentId: string | null;
+  localRouting: {
+    enabled: boolean;
+    apiProviderId: string | null;
+    model: string | null;
+    taskTypes: string[];
+    contextWindowTokens: number;
+  };
+  performance?: Array<{
+    agent_id: string;
+    provider: string;
+    model: string;
+    runs: number;
+    successes: number;
+    failures: number;
+    success_rate: number | null;
+    rework_runs: number;
+    cost_usd: number | null;
+    cost_reported_runs: number;
+  }>;
+  localProviders: Array<{ id: string; name: string; enabled: boolean; models: string[] }>;
   candidates: Record<string, string[]>;
   directors: Array<{ id: string; name: string; cli_provider: "claude" | "codex"; status: string }>;
 };
 
 export type TaskModelRoute = {
+  api_provider_id?: string | null;
+  context_window_tokens?: number | null;
   task_id: string;
   agent_id: string;
   provider: string;
@@ -38,7 +62,8 @@ export function getModelDirector(): Promise<ModelDirectorConfig> {
 }
 
 export function saveModelDirector(
-  input: Pick<ModelDirectorConfig, "directorAgentId" | "candidates">,
+  input: Pick<ModelDirectorConfig, "directorAgentId" | "candidates"> &
+    Partial<Pick<ModelDirectorConfig, "technicalDirectorAgentId" | "designDirectorAgentId" | "localRouting">>,
 ): Promise<ModelDirectorConfig> {
   return put("/api/model-director", input);
 }

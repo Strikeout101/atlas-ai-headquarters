@@ -1,9 +1,14 @@
 import fs from "node:fs";
+import { createRunPerformanceTracker } from "../../../agent-performance.ts";
 import path from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { decryptSecret } from "../../../../oauth/helpers.ts";
 import type { ApiProviderRow } from "./types.ts";
-import { IncompleteProviderStreamError } from "./stream-tools.ts";
+import {
+  createProviderUsageReporter,
+  IncompleteProviderStreamError,
+  type ProviderUsageCallback,
+} from "./stream-tools.ts";
 import { getCurrentTaskModelRoute } from "../../../model-routing.ts";
 import { createOpenCodeContextMonitor } from "./opencode-context-monitor.ts";
 import { setContextRolloverProcessPid } from "../context-rollover-store.ts";
@@ -56,12 +61,14 @@ type CreateApiProviderToolsDeps = {
     signal: AbortSignal,
     safeWrite: (text: string) => boolean,
     taskId?: string,
+    onUsage?: ProviderUsageCallback,
   ) => Promise<void>;
   parseGeminiSSEStream: (
     body: ReadableStream<Uint8Array>,
     signal: AbortSignal,
     safeWrite: (text: string) => boolean,
     taskId?: string,
+    onUsage?: ProviderUsageCallback,
   ) => Promise<void>;
 };
 
@@ -85,9 +92,11 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     signal: AbortSignal,
     safeWrite: (text: string) => boolean,
     taskId?: string,
+    onUsage?: ProviderUsageCallback,
   ): Promise<void> {
     const decoder = new TextDecoder();
     let buffer = "";
+    const reportUsage = createProviderUsageReporter(onUsage);
 
     const processLine = (trimmed: string) => {
       if (!trimmed || trimmed.startsWith(":")) return;
@@ -95,6 +104,8 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
       if (trimmed === "data: [DONE]") return;
       try {
         const data = JSON.parse(trimmed.slice(6));
+        const usage = data.message?.usage ?? data.usage;
+        if (usage) reportUsage({ input_tokens: usage.input_tokens, output_tokens: usage.output_tokens });
         if (data.type === "content_block_delta" && data.delta?.text) {
           const text = normalizeStreamChunk(data.delta.text);
           if (!text) return;
@@ -212,6 +223,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
           { role: "user", content: prompt },
         ],
         stream: true,
+        stream_options: { include_usage: true },
       }),
     };
   }
@@ -225,6 +237,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     apiProviderId?: string | null,
     apiModel?: string | null,
     safeWriteOverride?: (text: string) => boolean,
+    onUsage?: ProviderUsageCallback,
   ): Promise<void> {
     const safeWrite = safeWriteOverride ?? createSafeLogStreamOps(logStream).safeWrite;
 
@@ -272,11 +285,11 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     if (!resp.body) throw new ProviderUnavailableError(`API provider '${provider.name}' returned no stream`);
 
     if (provider.type === "anthropic") {
-      await parseAnthropicSSEStream(resp.body, signal, safeWrite, taskId);
+      await parseAnthropicSSEStream(resp.body, signal, safeWrite, taskId, onUsage);
     } else if (provider.type === "google") {
-      await parseGeminiSSEStream(resp.body, signal, safeWrite, taskId);
+      await parseGeminiSSEStream(resp.body, signal, safeWrite, taskId, onUsage);
     } else {
-      await parseSSEStream(resp.body, signal, safeWrite, taskId);
+      await parseSSEStream(resp.body, signal, safeWrite, taskId, onUsage);
     }
 
     safeWrite(`\n---\n[api:${provider.type}] Done.\n`);
@@ -300,9 +313,12 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     const autonomyBlock =
       automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
     if (autonomyBlock) throw new Error(autonomyBlock);
-    const provider = apiProviderId ? getApiProviderById(apiProviderId) : null;
     const taskRoute = getCurrentTaskModelRoute(db as any, taskId);
-    if (taskRoute?.provider === "api") apiModel = taskRoute.model;
+    if (taskRoute?.provider === "api") {
+      apiProviderId = taskRoute.api_provider_id ?? apiProviderId;
+      apiModel = taskRoute.model;
+    }
+    const provider = apiProviderId ? getApiProviderById(apiProviderId) : null;
     if (provider?.type === "ollama" && provider.enabled) {
       // Ollama's API chat path only emits text. Run coding tasks through the
       // existing OpenCode worktree runner so the model gets file and shell tools.
@@ -320,6 +336,9 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
       if (provider.api_key_enc) settings.apiKey = decryptSecret(provider.api_key_enc);
       const config = {
         $schema: "https://opencode.ai/config.json",
+        // ATLAS preserves the isolated worktree itself. Avoid a second snapshot
+        // scan of the project before every small local-model run.
+        snapshots: false,
         providers: {
           [providerKey]: {
             name: provider.name,
@@ -328,7 +347,11 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
             models: { [model]: { name: model } },
           },
         },
-        permission: { bash: { "*": "allow", "git commit*": "deny", "git push*": "deny" } },
+        permissions: [
+          { action: "shell", resource: "*", effect: "allow" },
+          { action: "shell", resource: "git commit *", effect: "deny" },
+          { action: "shell", resource: "git push *", effect: "deny" },
+        ],
       };
       let child: ChildProcess;
       const agentConfig = db
@@ -337,7 +360,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         )
         .get(taskId) as { context_window_tokens?: number | null } | undefined;
       const monitor = createOpenCodeContextMonitor({
-        contextWindowTokens: agentConfig?.context_window_tokens,
+        contextWindowTokens: taskRoute?.context_window_tokens ?? agentConfig?.context_window_tokens,
         onNearLimit: () => {
           if (child?.pid && killPidTree) killPidTree(child.pid);
           else child?.kill("SIGINT");
@@ -413,6 +436,14 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     } as unknown as ChildProcess;
     activeProcesses.set(taskId, mockProc);
 
+    if (provider) {
+      try {
+        apiModel = resolveApiProviderModel(provider, apiModel);
+      } catch {
+        /* execution reports invalid configuration below */
+      }
+    }
+    const performance = createRunPerformanceTracker(db as any, taskId, { provider: "api", model: apiModel });
     const runTask = (async () => {
       let exitCode = 0;
       let failureKind: "provider_unavailable" | undefined;
@@ -426,6 +457,8 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
           apiProviderId,
           apiModel,
           safeWrite,
+          (usage) =>
+            performance.ingest(`${JSON.stringify({ type: "result", usage, total_cost_usd: usage.cost_usd })}\n`),
         );
       } catch (err: any) {
         exitCode = 1;
@@ -448,6 +481,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
           broadcast("cli_output", { task_id: taskId, stream: "stderr", data: msg });
         }
       } finally {
+        performance.finish(exitCode, controller.signal.aborted);
         await new Promise<void>((resolve) => safeEnd(resolve));
         try {
           fs.unlinkSync(promptPath);

@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import type { AgentRow, OneShotRunOptions, OneShotRunResult } from "./conversation-types.ts";
 import { areRunsAllowed, registerOneShotAbort, RUNS_HALTED_ERROR } from "../../control-state.ts";
+import { createCodexCompletionDrain } from "../agents/providers/codex-completion-drain.ts";
 
 type CreateOneShotRunnerDeps = {
   logsDir: string;
@@ -102,6 +103,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     let activeStderrListener: ((chunk: Buffer) => void) | null = null;
     let activeErrorListener: ((err: Error) => void) | null = null;
     let activeCloseListener: ((code: number | null) => void) | null = null;
+    let detachCompletionDrain: (() => void) | null = null;
     let abortActiveRun: ((reason: string) => void) | null = null;
     let activeController: AbortController | null = null;
     let noToolsViolationDetected = false;
@@ -129,6 +131,8 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
         child.off("close", activeCloseListener);
         activeCloseListener = null;
       }
+      detachCompletionDrain?.();
+      detachCompletionDrain = null;
       activeChild = null;
     };
 
@@ -231,9 +235,11 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
           });
           activeChild = child;
           let settled = false;
+          let timeout: ReturnType<typeof setTimeout> | null = null;
           const settle = (callback: () => void) => {
             if (settled) return;
             settled = true;
+            if (timeout) clearTimeout(timeout);
             abortActiveRun = null;
             detachChildListeners();
             callback();
@@ -247,18 +253,16 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
           };
           abortActiveRun = abortRun;
 
-          const timeout = setTimeout(() => {
+          timeout = setTimeout(() => {
             abortRun(`timeout after ${timeoutMs}ms`);
           }, timeoutMs);
 
           activeErrorListener = (err: Error) => {
-            clearTimeout(timeout);
             settle(() => reject(err));
           };
           activeStdoutListener = (chunk: Buffer) => onChunk(chunk, "stdout");
           activeStderrListener = (chunk: Buffer) => onChunk(chunk, "stderr");
           activeCloseListener = (code: number | null) => {
-            clearTimeout(timeout);
             exitCode = code ?? 1;
             settle(() => resolve());
           };
@@ -266,6 +270,11 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
           child.stdout?.on("data", activeStdoutListener);
           child.stderr?.on("data", activeStderrListener);
           child.on("close", activeCloseListener);
+          if (provider === "codex")
+            detachCompletionDrain = createCodexCompletionDrain(child, () => {
+              exitCode = 0;
+              settle(() => resolve());
+            });
 
           child.stdin?.write(prompt);
           child.stdin?.end();
@@ -318,8 +327,11 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
       await new Promise<void>((resolve) => safeEnd(resolve));
     }
 
-    if (exitCode !== 0 && !rawOutput.trim()) {
-      return { text: "", error: `${provider} exited with code ${exitCode}` };
+    if (exitCode !== 0) {
+      const text = opts.rawOutput
+        ? prettyStreamJson(rawOutput).trim() || rawOutput.trim()
+        : normalizeConversationReply(rawOutput) || prettyStreamJson(rawOutput).trim() || rawOutput.trim();
+      return { text, error: `${provider} exited with code ${exitCode}` };
     }
 
     if (opts.rawOutput) {

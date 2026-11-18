@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   consumeModelUpgradeMarker,
+  configuredLocalTaskProvider,
   createModelUpgradeRequest,
   decideModelUpgrade,
   ensureModelRoutingSchema,
@@ -26,13 +27,14 @@ function database() {
     CREATE TABLE settings (key TEXT PRIMARY KEY,value TEXT);
     CREATE TABLE agents (id TEXT PRIMARY KEY,name TEXT,cli_provider TEXT,cli_model TEXT,api_model TEXT,api_provider_id TEXT,cli_reasoning_level TEXT,status TEXT);
     CREATE TABLE tasks (id TEXT PRIMARY KEY,title TEXT,description TEXT,assigned_agent_id TEXT,status TEXT);
-    CREATE TABLE api_providers (id TEXT PRIMARY KEY,models_cache TEXT);
+    CREATE TABLE api_providers (id TEXT PRIMARY KEY,models_cache TEXT,type TEXT DEFAULT 'ollama',enabled INTEGER DEFAULT 1);
     INSERT INTO agents VALUES ('director','Director','codex','strong',NULL,NULL,NULL,'idle');
     INSERT INTO agents VALUES ('worker','Worker','codex','small',NULL,NULL,NULL,'idle');
     INSERT INTO tasks VALUES ('task-1','Repair a difficult bug','Investigate and patch it','worker','planned');
     INSERT INTO settings VALUES ('modelDirectorAgentId','"director"');
     INSERT INTO settings VALUES ('modelRoutingCandidates','{"codex":["small","strong"]}');
   `);
+  db.exec("ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'general'");
   ensureModelRoutingSchema(db);
   return db;
 }
@@ -62,6 +64,108 @@ describe("model director routing", () => {
     const route = await routeTaskModel(db, "task-1", async () => ({ text: '{"model":"made-up"}' }));
     expect(route).toMatchObject({ model: "small", source: "default" });
   });
+
+  it("uses the design director only for design work, with a legacy fallback", async () => {
+    const db = database();
+    db.exec("INSERT INTO agents VALUES ('designer','Design Director','claude','sonnet',NULL,NULL,NULL,'idle')");
+    db.prepare("INSERT INTO settings VALUES (?,?)").run("designDirectorAgentId", JSON.stringify("designer"));
+    db.exec("UPDATE tasks SET task_type='design'");
+    const run = vi.fn(async () => ({ text: '{"model":"small"}' }));
+    await routeTaskModel(db, "task-1", run);
+    expect(run).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "designer" }),
+      expect.stringContaining("design model director"),
+      expect.any(Object),
+    );
+    db.exec("UPDATE tasks SET task_type='development'");
+    await routeTaskModel(db, "task-1", run, true);
+    expect(run).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "director" }),
+      expect.stringContaining("technical model director"),
+      expect.any(Object),
+    );
+  });
+
+  it("routes only selected routine kinds to the enabled discovered Ollama model without changing the worker", async () => {
+    const db = database();
+    db.prepare("INSERT INTO api_providers(id,models_cache) VALUES (?,?)").run(
+      "local-host",
+      JSON.stringify(["qwen-local"]),
+    );
+    db.prepare("INSERT INTO settings VALUES (?,?)").run(
+      "localModelRouting",
+      JSON.stringify({
+        enabled: true,
+        apiProviderId: "local-host",
+        model: "qwen-local",
+        taskTypes: ["documentation"],
+        contextWindowTokens: 4096,
+      }),
+    );
+    db.exec("UPDATE tasks SET task_type='documentation'");
+    const run = vi.fn(async () => ({ text: '{"model":"strong"}' }));
+    expect(await routeTaskModel(db, "task-1", run)).toMatchObject({
+      provider: "api",
+      model: "qwen-local",
+      api_provider_id: "local-host",
+      context_window_tokens: 4096,
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(configuredLocalTaskProvider(db, "task-1")).toBe("api");
+    expect(db.prepare("SELECT cli_provider,api_provider_id FROM agents WHERE id='worker'").get()).toMatchObject({
+      cli_provider: "codex",
+      api_provider_id: null,
+    });
+    expect(await routeTaskModel(db, "task-1", run, true, true)).toMatchObject({
+      provider: "codex",
+      model: "strong",
+      api_provider_id: null,
+    });
+    await routeTaskModel(db, "task-1", run, true);
+    const upgrade = createModelUpgradeRequest(
+      db,
+      "task-1",
+      "Local model cannot complete this documentation task",
+      "strong",
+    );
+    expect(upgrade).toMatchObject({ requested_provider: "codex", requested_model: "strong" });
+    await decideModelUpgrade(db, String(upgrade.id), true, "Approved by owner");
+    expect(await routeTaskModel(db, "task-1", run)).toMatchObject({
+      provider: "codex",
+      source: "upgrade",
+      api_provider_id: null,
+    });
+    db.exec("UPDATE tasks SET task_type='development'");
+    expect(await routeTaskModel(db, "task-1", run, true)).toMatchObject({
+      provider: "codex",
+      model: "strong",
+      api_provider_id: null,
+    });
+  });
+
+  it.each(["disabled", "undiscovered", "wrong-provider"])(
+    "falls back safely when the local host is %s",
+    async (kind) => {
+      const db = database();
+      db.prepare("INSERT INTO api_providers(id,models_cache,type,enabled) VALUES (?,?,?,?)").run(
+        "host",
+        JSON.stringify(kind === "undiscovered" ? [] : ["qwen"]),
+        kind === "wrong-provider" ? "openai" : "ollama",
+        kind === "disabled" ? 0 : 1,
+      );
+      db.prepare("INSERT INTO settings VALUES (?,?)").run(
+        "localModelRouting",
+        JSON.stringify({ enabled: true, apiProviderId: "host", model: "qwen", taskTypes: ["documentation"] }),
+      );
+      db.exec("UPDATE tasks SET task_type='documentation'");
+      expect(await routeTaskModel(db, "task-1", async () => ({ text: '{"model":"small"}' }))).toMatchObject({
+        provider: "codex",
+        model: "small",
+      });
+      ensureModelRoutingSchema(db);
+      expect(getTaskModelRoute(db, "task-1")?.model).toBe("small");
+    },
+  );
 
   it("requires explicit VP or owner approval for a worker upgrade", async () => {
     const db = database();

@@ -8,7 +8,10 @@ import type { AgentRow } from "../../shared/types.ts";
 import { resolveConstrainedAgentScopeForTask, selectAutoAssignableAgentForTask } from "./execution-run-auto-assign.ts";
 import { routeTaskModel, getCurrentTaskModelRoute } from "../../../model-routing.ts";
 import { getContextRollover } from "../../../workflow/agents/context-rollover-store.ts";
-import { buildCompactContextRolloverPrompt } from "../../../workflow/agents/context-rollover-prompt.ts";
+import {
+  buildCompactContextRolloverPrompt,
+  tryBuildCompactInitialTaskPrompt,
+} from "../../../workflow/agents/context-rollover-prompt.ts";
 import {
   buildInterruptPromptBlock,
   consumeInterruptPrompts,
@@ -308,11 +311,11 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     ) {
       return res.status(409).json({ error: "task_changed_during_model_routing" });
     }
-    const provider = getCurrentTaskModelRoute(db as any, id)?.provider || agent.cli_provider || "claude";
+    let provider = getCurrentTaskModelRoute(db as any, id)?.provider || agent.cli_provider || "claude";
     if (!["claude", "codex", "gemini", "opencode", "kimi", "copilot", "antigravity", "api"].includes(provider)) {
       return res.status(400).json({ error: "unsupported_provider", provider });
     }
-    const executionSession = ensureTaskExecutionSession(id, agentId, provider);
+    let executionSession = ensureTaskExecutionSession(id, agentId, provider);
     const pendingInterruptPrompts = loadPendingInterruptPrompts(db as any, id, executionSession.sessionId);
     const interruptPromptBlock = buildInterruptPromptBlock(pendingInterruptPrompts);
 
@@ -470,51 +473,85 @@ Whenever you complete a subtask, report it in this format:
     );
 
     const promptOptions = { allowWarningFix: hasExplicitWarningFixRequest(task.title, task.description) };
-    const prompt = compactRollover
-      ? buildCompactContextRolloverPrompt(
-          {
-            taskId: id,
-            title: task.title,
-            checkpointText: rollover!.checkpointText,
-            contextWindowTokens: agent.context_window_tokens,
-            departmentConstraint: deptConstraint,
-            departmentSharedPrompt: departmentPromptBlock,
-            interruptPrompt: interruptPromptBlock,
-            taskToolsPath: taskToolsScriptPath(),
-            knowledge: (maxBytes) => buildCompactKnowledgeBlock(db as any, id, maxBytes),
-            worktreeBranch: `climpire/${id.slice(0, 8)}`,
-          },
-          (parts) => buildTaskExecutionPrompt(parts, promptOptions),
-        )
-      : buildTaskExecutionPrompt(
-          [
-            (
-              buildAvailableSkillsPromptBlock ||
-              ((providerName: string) => `[Available Skills][provider=${providerName || "unknown"}][unavailable]`)
-            )(provider),
-            `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
-            "This session is task-scoped. Keep continuity for this task only and do not cross-contaminate context from other projects.",
-            projectStructureBlock,
-            recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
-            `[Task] ${task.title}`,
-            task.description ? `\n${task.description}` : "",
-            continuationCtx,
-            conversationCtx,
-            `\n---`,
-            `Agent: ${agent.name} (${roleLabel}, ${agent.department_name || "Unassigned"})`,
-            agent.personality ? `Personality: ${agent.personality}` : "",
-            deptConstraint,
-            departmentPromptBlock,
-            `NOTE: You are working in an isolated Git worktree branch (climpire/${id.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
-            `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
-            interruptPromptBlock,
-            subtaskInstruction,
-            subModelHint,
-            continuationInstruction,
-            runInstruction,
-          ],
-          { ...promptOptions, taskId: id },
+    let initialLocalPrompt: string | null = null;
+    const localRoute = getCurrentTaskModelRoute(db as any, id);
+    if (!compactRollover && localRoute?.provider === "api" && localRoute.context_window_tokens) {
+      initialLocalPrompt = tryBuildCompactInitialTaskPrompt(
+        {
+          taskId: id,
+          title: task.title,
+          description: task.description,
+          contextWindowTokens: localRoute.context_window_tokens,
+          departmentConstraint: deptConstraint,
+          departmentSharedPrompt: departmentPromptBlock,
+          interruptPrompt: interruptPromptBlock,
+          continuation: continuationCtx,
+          taskToolsPath: taskToolsScriptPath(),
+          worktreeBranch: `climpire/${id.slice(0, 8)}`,
+          knowledge: (maxBytes) => buildCompactKnowledgeBlock(db as any, id, maxBytes),
+        },
+        (parts) => buildTaskExecutionPrompt(parts, promptOptions),
+      );
+      if (!initialLocalPrompt) {
+        const fallback = await routeTaskModel(db as any, id, runAgentOneShot, true, true);
+        provider = fallback?.provider || agent.cli_provider || "claude";
+        executionSession = ensureTaskExecutionSession(id, agent.id, provider);
+        if (provider === "claude") ensureClaudeMd(projectPath, worktreePath);
+        appendTaskLog(
+          id,
+          "system",
+          "Local prompt exceeds context budget; using the configured worker with all task requirements preserved",
         );
+      }
+    }
+    const prompt =
+      initialLocalPrompt ??
+      (compactRollover
+        ? buildCompactContextRolloverPrompt(
+            {
+              taskId: id,
+              title: task.title,
+              checkpointText: rollover!.checkpointText,
+              contextWindowTokens:
+                getCurrentTaskModelRoute(db as any, id)?.context_window_tokens ?? agent.context_window_tokens,
+              departmentConstraint: deptConstraint,
+              departmentSharedPrompt: departmentPromptBlock,
+              interruptPrompt: interruptPromptBlock,
+              taskToolsPath: taskToolsScriptPath(),
+              knowledge: (maxBytes) => buildCompactKnowledgeBlock(db as any, id, maxBytes),
+              worktreeBranch: `climpire/${id.slice(0, 8)}`,
+            },
+            (parts) => buildTaskExecutionPrompt(parts, promptOptions),
+          )
+        : buildTaskExecutionPrompt(
+            [
+              (
+                buildAvailableSkillsPromptBlock ||
+                ((providerName: string) => `[Available Skills][provider=${providerName || "unknown"}][unavailable]`)
+              )(provider),
+              `[Task Session] id=${executionSession.sessionId} owner=${executionSession.agentId} provider=${executionSession.provider}`,
+              "This session is task-scoped. Keep continuity for this task only and do not cross-contaminate context from other projects.",
+              projectStructureBlock,
+              recentChanges ? `[Recent Changes]\n${recentChanges}` : "",
+              `[Task] ${task.title}`,
+              task.description ? `\n${task.description}` : "",
+              continuationCtx,
+              conversationCtx,
+              `\n---`,
+              `Agent: ${agent.name} (${roleLabel}, ${agent.department_name || "Unassigned"})`,
+              agent.personality ? `Personality: ${agent.personality}` : "",
+              deptConstraint,
+              departmentPromptBlock,
+              `NOTE: You are working in an isolated Git worktree branch (climpire/${id.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
+              `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
+              interruptPromptBlock,
+              subtaskInstruction,
+              subModelHint,
+              continuationInstruction,
+              runInstruction,
+            ],
+            { ...promptOptions, taskId: id },
+          ));
 
     if (pendingInterruptPrompts.length > 0) {
       consumeInterruptPrompts(

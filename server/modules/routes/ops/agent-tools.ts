@@ -20,6 +20,7 @@ import {
 } from "../../record-changes.ts";
 import { addMemory, ensureAgentMemorySchema, searchMemories } from "../../agent-memory.ts";
 import { getKnowledgeTopic, resolveTaskContext } from "../../agent-knowledge.ts";
+import { AgentWebError, runAgentWebOperation } from "../../agent-web.ts";
 import {
   createListing,
   ensureListingSchema,
@@ -59,6 +60,14 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
       req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
     const operation = body.operation;
     try {
+      if (operation === "web.search" || operation === "web.read") {
+        try {
+          return res.json({ ok: true, ...(await runAgentWebOperation(body)) });
+        } catch (error) {
+          if (error instanceof AgentWebError) return res.status(error.status).json({ error: error.message });
+          throw error;
+        }
+      }
       if (operation === "knowledge.get") {
         try {
           return res.json({

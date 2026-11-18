@@ -272,15 +272,15 @@ All changes need the owner password session and CSRF. Paid accounts, accepting t
 
 ### Agent Tools and Knowledge
 
-| Method    | Path                                 | Purpose                                                                                                                                           |
-| --------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST      | `/api/agent-tools`                   | Agent tool gateway for running tasks (task token in `x-agent-task-token`, local only). Operations are listed in [agent-tools.md](agent-tools.md). |
-| GET       | `/api/knowledge/documents/:topic`    | Systems registry (`systems`) or master checklist (`checklist`), read-only                                                                         |
-| GET       | `/api/knowledge/memories`            | Agent memories with counts; filters `status`, `business`, `reviewed`, `q`                                                                         |
-| POST      | `/api/knowledge/memories`            | Owner adds a memory (reviewed from the start)                                                                                                     |
-| GET/PATCH | `/api/knowledge/memories/:id`        | Read or edit a memory (editing marks it reviewed)                                                                                                 |
-| POST      | `/api/knowledge/memories/:id/review` | Mark reviewed                                                                                                                                     |
-| POST      | `/api/knowledge/memories/:id/status` | `active` or `archived`                                                                                                                            |
+| Method    | Path                                 | Purpose                                                                                                                                                                                         |
+| --------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST      | `/api/agent-tools`                   | Agent tool gateway for running tasks (task token in `x-agent-task-token`, local only), including public `web.search` and `web.read`. Operations are listed in [agent-tools.md](agent-tools.md). |
+| GET       | `/api/knowledge/documents/:topic`    | Systems registry (`systems`) or master checklist (`checklist`), read-only                                                                                                                       |
+| GET       | `/api/knowledge/memories`            | Agent memories with counts; filters `status`, `business`, `reviewed`, `q`                                                                                                                       |
+| POST      | `/api/knowledge/memories`            | Owner adds a memory (reviewed from the start)                                                                                                                                                   |
+| GET/PATCH | `/api/knowledge/memories/:id`        | Read or edit a memory (editing marks it reviewed)                                                                                                                                               |
+| POST      | `/api/knowledge/memories/:id/review` | Mark reviewed                                                                                                                                                                                   |
+| POST      | `/api/knowledge/memories/:id/status` | `active` or `archived`                                                                                                                                                                          |
 
 Memory changes need the owner password session and CSRF. Agent task tokens are refused on `/api/knowledge/*`; agents use `knowledge.get`, `memory.search` and `memory.add` through the gateway.
 

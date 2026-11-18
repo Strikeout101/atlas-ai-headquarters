@@ -14,6 +14,7 @@ Which documents describe ATLAS as it is now, and which are dated history. Pendin
 | [social-integrations.md](social-integrations.md)         | Instagram connection (read-only).                                                                                                                 |
 | [ssh-host-manager.md](ssh-host-manager.md)               | Homelab SSH hosts, approvals and grants.                                                                                                          |
 | [local-agent-resilience.md](local-agent-resilience.md)   | Local/API model workers and context rollover.                                                                                                     |
+| [models-and-workers.md](models-and-workers.md) | Routine local routing, separate directors, worker performance, public research tools and merge completion. |
 | [phase3-vp-approvals.md](phase3-vp-approvals.md)         | The two VPs and who approves what.                                                                                                                |
 | [phase4-autonomy.md](phase4-autonomy.md)                 | Goals, opportunities, routines and the autonomy engine.                                                                                           |
 | [phase5-finance.md](phase5-finance.md)                   | Deals, ledger, spending requests and read-only Square.                                                                                            |
@@ -36,6 +37,7 @@ Kept for context; check against the code before relying on them.
 | Document                                                                           | Notes                                                         |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | [operations-setup-2026-11-12.md](operations-setup-2026-11-12.md)                   | Owner setup notes from 2026-11-12.                            |
+| [models-workers-verification-2026-11-18.md](models-workers-verification-2026-11-18.md) | Real provider/autonomy verification evidence and remaining limits. |
 | [agent-access-review-2026-11-14.md](agent-access-review-2026-11-14.md)             | Access gap review from 2026-11-14; several gaps since closed. |
 | [decision-inbox-checkpoint-2026-02-22.md](decision-inbox-checkpoint-2026-02-22.md) | Upstream checkpoint (Korean).                                 |
 | [DESIGN_SKILLS.md](DESIGN_SKILLS.md)                                               | Upstream design for skill learning history.                   |

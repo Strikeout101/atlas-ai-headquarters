@@ -304,8 +304,6 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
 
         if (mergeResult.success) {
           appendTaskLog(taskId, "system", `Git merge completed: ${mergeResult.message}`);
-          cleanupWorktree(wtInfo.projectPath, taskId);
-          appendTaskLog(taskId, "system", "Worktree cleaned up after successful merge");
           mergeNote = githubRepo
             ? pickL(
                 l(
@@ -339,16 +337,16 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
             pickL(
               l(
                 [
-                  `${conflictLeaderName}: '${taskTitle}' 병합 중 충돌이 발생했습니다. 수동 해결이 필요합니다.${conflictFiles}\n브랜치: ${wtInfo.branchName}`,
+                  `${conflictLeaderName}: '${taskTitle}' 병합에 실패하여 Review에서 대기합니다. 문제를 해결한 뒤 다시 승인하세요.\n${mergeResult.message}${conflictFiles}\n브랜치: ${wtInfo.branchName}`,
                 ],
                 [
-                  `${conflictLeaderName}: Merge conflict while merging '${taskTitle}'. Manual resolution is required.${conflictFiles}\nBranch: ${wtInfo.branchName}`,
+                  `${conflictLeaderName}: Merge failed for '${taskTitle}'. Task remains in Review; resolve the failure and approve again.\n${mergeResult.message}${conflictFiles}\nBranch: ${wtInfo.branchName}`,
                 ],
                 [
-                  `${conflictLeaderName}: '${taskTitle}' のマージ中に競合が発生しました。手動解決が必要です。${conflictFiles}\nブランチ: ${wtInfo.branchName}`,
+                  `${conflictLeaderName}: '${taskTitle}' のマージに失敗したためReviewで待機します。問題を解決して再承認してください。\n${mergeResult.message}${conflictFiles}\nブランチ: ${wtInfo.branchName}`,
                 ],
                 [
-                  `${conflictLeaderName}：合并 '${taskTitle}' 时发生冲突，需要手动解决。${conflictFiles}\n分支: ${wtInfo.branchName}`,
+                  `${conflictLeaderName}：合并 '${taskTitle}' 失败，任务保留在 Review。请解决问题后重新批准。\n${mergeResult.message}${conflictFiles}\n分支: ${wtInfo.branchName}`,
                 ],
               ),
               lang,
@@ -356,16 +354,38 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
             taskId,
           );
 
-          mergeNote = pickL(
-            l(
-              [" (병합 충돌 - 수동 해결 필요)"],
-              [" (merge conflict - manual resolution required)"],
-              [" (マージ競合 - 手動解決が必要)"],
-              ["（合并冲突 - 需要手动解决）"],
-            ),
-            lang,
-          );
+          // Preserve the branch, review state and queued callbacks for a later retry.
+          // A successful worker/review is not a successful integration.
+          appendTaskLog(taskId, "system", "Review hold: merge failed; worktree preserved for retry");
+          reviewInFlight.delete(taskId);
+          return;
         }
+      }
+
+      // A parent cannot report completion while a collaboration child's integration failed.
+      if (!currentTask.source_task_id) {
+        const children = db
+          .prepare("SELECT id, title FROM tasks WHERE source_task_id = ? AND status = 'review' ORDER BY created_at ASC")
+          .all(taskId) as Array<{ id: string; title: string }>;
+        for (const child of children) {
+          finishReview(child.id, child.title);
+          const updatedChild = db.prepare("SELECT status FROM tasks WHERE id = ?").get(child.id) as
+            | { status: string }
+            | undefined;
+          if (updatedChild?.status !== "done") {
+            appendTaskLog(
+              taskId,
+              "system",
+              `Review hold: collaboration child ${child.id} has not completed integration`,
+            );
+            reviewInFlight.delete(taskId);
+            return;
+          }
+        }
+      }
+      if (wtInfo) {
+        cleanupWorktree(wtInfo.projectPath, taskId);
+        appendTaskLog(taskId, "system", "Worktree cleaned up after successful merge");
       }
 
       db.prepare("UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ? WHERE id = ?").run(t, t, taskId);
@@ -412,21 +432,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       reviewRoundState.delete(taskId);
       reviewInFlight.delete(taskId);
 
-      // Parent final approval is the merge point for collaboration children in review.
       if (!currentTask.source_task_id) {
-        const childRows = db
-          .prepare("SELECT id, title FROM tasks WHERE source_task_id = ? AND status = 'review' ORDER BY created_at ASC")
-          .all(taskId) as Array<{ id: string; title: string }>;
-        if (childRows.length > 0) {
-          appendTaskLog(
-            taskId,
-            "system",
-            `Finalization: closing ${childRows.length} collaboration child task(s) after parent review`,
-          );
-          for (const child of childRows) {
-            finishReview(child.id, child.title);
-          }
-        }
         // Generate and archive one consolidated project report via planning leader model.
         void archivePlanningConsolidatedReport(taskId);
       }

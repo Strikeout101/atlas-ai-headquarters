@@ -99,7 +99,6 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
     ensureAutonomyEngineSchema(db);
     const now = deps.now?.() ?? Date.now(),
       config = autonomyConfig(db);
-    if (usageHeadroomBlockReason(db, now)) return;
     const starts = Number(
       (db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations WHERE day=?").get(autonomyDay(now)) as Row).n,
     );
@@ -131,6 +130,7 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
       )
       .get() as unknown as AgentRow | undefined;
     if (!vp || !leaders.length) return;
+    if (usageHeadroomBlockReason(db, now, [vp.cli_provider!])) return;
     // Durable advance before the model call avoids retry storms and concurrent/restart duplicate planning.
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -179,6 +179,7 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
         : "",
       JSON.stringify({
         goal,
+        project: db.prepare("SELECT id,name,core_goal FROM projects WHERE id=?").get(goal.project_id),
         opportunities,
         team_leaders: leaders,
         recent_work: db
@@ -198,7 +199,7 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
     if (
       !isAutonomyAllowed() ||
       !(deps.ownerSecurityReady ?? isPasswordConfigured)() ||
-      usageHeadroomBlockReason(db, freshNow) ||
+      usageHeadroomBlockReason(db, freshNow, [vp.cli_provider!]) ||
       JSON.stringify(db.prepare("SELECT * FROM business_goals WHERE id=?").get(goal.id)) !== goalSnapshot ||
       Number(goal.period_end) <= freshNow
     ) {

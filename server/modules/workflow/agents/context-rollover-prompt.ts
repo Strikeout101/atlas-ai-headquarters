@@ -2,6 +2,7 @@ type CompactPromptInput = {
   taskId: string;
   title: string;
   checkpointText: string;
+  preserveCheckpoint?: boolean;
   contextWindowTokens?: number | null;
   departmentConstraint?: string | null;
   departmentSharedPrompt?: string | null;
@@ -32,18 +33,20 @@ export function buildCompactContextRolloverPrompt(
 ): string {
   const window = Number(input.contextWindowTokens);
   // UTF-8 bytes conservatively bound text tokens across languages. Keep room for OpenCode tools and output.
-  const maxPromptBytes = Number.isSafeInteger(window) && window > 0 ? Math.floor(window * 0.65) : 7_000;
+  const hardLimit = Number.isSafeInteger(window) && window > 0 ? Math.floor(window * 0.65) : 7_000;
+  // Reserve 15% of the prompt allowance for new context instead of filling every byte.
+  const maxPromptBytes = Math.floor(hardLimit * 0.85);
   const fixed = [
-    `[Task Session] task=${input.taskId}; fresh context, same task and worktree`,
+    `[Task Session] ${input.taskId}; fresh context, same worktree`,
     `[Task] ${input.title}`,
     input.departmentConstraint ? clipMiddle(input.departmentConstraint, 300) : "",
     input.departmentSharedPrompt ? clipMiddle(input.departmentSharedPrompt, 400) : "",
     input.interruptPrompt ? clipMiddle(input.interruptPrompt, 600) : "",
-    `Work in the existing isolated branch ${input.worktreeBranch}. Continue from its current files. Run relevant tests. Do not commit until the user explicitly approves.`,
+    `Continue existing branch ${input.worktreeBranch}. Run relevant tests. Do not commit without explicit user approval.`,
     input.taskToolsPath
-      ? `Task tools: ${input.taskToolsPath} (task token in the environment). Full reference: knowledge.get {"topic":"tools"}. Use model.request_upgrade if a stronger model is needed.`
+      ? `Tools: ${input.taskToolsPath}; token in env. Reference: knowledge.get {"topic":"tools"}. Need a stronger model: model.request_upgrade.`
       : "",
-    "Customer-facing sends, SSH changes and all spending go through approval; if something is pending, end this run and report it. Never use mail or Square credentials, mark a deal paid, publish a listing, or move money.",
+    "Use approval tools for customer sends, SSH changes and spending. Report pending approvals and stop. Never access mail/Square credentials, mark deals paid, publish listings or move money.",
     "Complete the remaining work directly.",
   ].filter(Boolean);
   const render = (checkpointLimit: number, knowledge = "") =>
@@ -54,9 +57,11 @@ export function buildCompactContextRolloverPrompt(
       ...(knowledge ? [knowledge] : []),
       ...fixed.slice(2),
     ]);
-  let checkpointLimit = Math.min(5_000, input.checkpointText.length);
+  let checkpointLimit = input.preserveCheckpoint
+    ? input.checkpointText.length
+    : Math.min(5_000, input.checkpointText.length);
   let prompt = render(checkpointLimit);
-  while (bytes(prompt) > maxPromptBytes && checkpointLimit > 256) {
+  while (!input.preserveCheckpoint && bytes(prompt) > maxPromptBytes && checkpointLimit > 256) {
     checkpointLimit = Math.max(256, Math.floor(checkpointLimit * 0.7));
     prompt = render(checkpointLimit);
   }
@@ -77,4 +82,38 @@ export function buildCompactContextRolloverPrompt(
     }
   }
   return prompt;
+}
+
+/** First runs must preserve every requirement; callers fall back to the configured worker if it does not fit. */
+export function tryBuildCompactInitialTaskPrompt(
+  input: Omit<CompactPromptInput, "checkpointText" | "preserveCheckpoint"> & {
+    description?: string | null;
+    continuation?: string | null;
+  },
+  finalize: (parts: string[]) => string,
+): string | null {
+  try {
+    return buildCompactContextRolloverPrompt(
+      {
+        ...input,
+        checkpointText: [
+          input.description,
+          input.departmentConstraint,
+          input.departmentSharedPrompt,
+          input.interruptPrompt,
+          input.continuation,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        preserveCheckpoint: true,
+        departmentConstraint: null,
+        departmentSharedPrompt: null,
+        interruptPrompt: null,
+      },
+      finalize,
+    ).replace("[Durable checkpoint]", "[Task requirements]");
+  } catch (error) {
+    if (error instanceof Error && error.message === "context_rollover_prompt_exceeds_configured_window") return null;
+    throw error;
+  }
 }

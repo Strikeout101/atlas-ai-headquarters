@@ -44,7 +44,7 @@ Last full review: 2026-11-17.
 ## 1. Loose ends right now
 
 - [x] **P1** (2026-11-17, committed together with agent knowledge and memory) Commit the phone layout and VPN launcher work Codex finished on 2026-11-16 (bottom tabs, menu drawer, Office hidden on phones, `start-atlas.bat` now runs `pnpm dev`). It is verified but uncommitted.
-- [ ] **P1** Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
+- [x] **P1** (2026-11-18, Codex, `autonomy-engine.ts` `autonomyTaskUsageBlockReason`: each run checks only the provider it is routed to; planning checks the selected VP. Claude-routed work still needs a valid Claude usage reading.) Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
 - [ ] **P2 YOU** Instagram: connect a token in Settings > Businesses and run Test. The account row exists but no token is stored.
 - [] **P2 YOU** Square: map the Primrose (Rental) location too. Only Tech and Ventures are mapped. #Note from Strike: Prirose uses another square account so I need ot be able to enter a second API for square
 - [X] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17). 11/17
@@ -191,13 +191,18 @@ Approval rules are settings per business (Settings > Businesses > Approvals and 
 
 ## 11. Models and workers
 
-- [ ] **P1** Run one real end-to-end autonomous cycle and record the result. It has never been verified: a goal, then the planner, then VP review, then a worker run, then the result.
-- [ ] **P2** Fix: a failed merge can still mark a task Done.
-- [ ] **P2** Use the Ollama host. It is configured but no agent uses it. Route cheap and routine work to it.
-- [ ] **P2** Web search and browsing tool for agents. `tools/playwright-mcp` is an empty folder; research relies on each CLI's own tools.
-- [ ] **P2** Agent performance tracking: success rate, rework and cost per agent and per model, feeding the model director.
-- [ ] **P3** Separate technical and design directors.
-- [ ] **P3** The small local-model prompt is at its size limit (2660 of 2662 bytes). Trim it before adding anything.
+Section 11 work by Codex on 2026-11-18, reviewed and committed by Claude the same day. Details: docs/models-and-workers.md and docs/models-workers-verification-2026-11-18.md.
+
+- [x] **P1** (2026-11-18, `scripts/qa/autonomy-real-cycle.ts`, `docs/models-workers-verification-2026-11-18.md`) Real isolated goal → planner → independent Codex/Claude VP approval → Claude worker → result → engine goal progress passed. Final task consensus uses an exact-result oracle; production routines remain disabled.
+- [ ] **P2** Investigate an intermittent Codex worker shutdown timeout: one real diagnostic emitted the correct result and `turn.completed` but did not close within 60 seconds. The verified cycle used Claude as worker and both providers as VPs. Evidence and reproduction: `docs/models-workers-verification-2026-11-18.md`.
+- [x] **P2** (2026-11-18, `server/modules/workflow/orchestration/review-finalize-tools.ts`; regression tests in the adjacent test file) Failed merges now keep tasks in Review, preserve worktrees/callbacks, and report the actual failure for retry; completion side effects run only after success.
+- [ ] **P2** Use the Ollama host. It is configured but no agent uses it. Route cheap and routine work to it. Progress 2026-11-18: task-kind routing to the local host is built (Team > Model Director, off until enabled) and plain chat with `5690-flint` works, but a real local tool worker (OpenCode) timed out three times with no output. Next: check whether the model supports tool calls and how OpenCode is configured for it.
+- [ ] **P2** Autonomy has no usage or spend cap for providers without a subscription meter (local models, `api`). Free today (only the local host is configured), but add a budget gate before a paid API key is ever connected.
+- [x] **P2** (2026-11-18, `server/modules/agent-web.ts`, `docs/agent-tools.md`) Shared `web.search` / `web.read` gateway tools; live public search/read and 45 regressions passed. Public text browsing only; interactive/authenticated pages and PDFs are not supported.
+- [x] **P2** (2026-11-18, `server/modules/agent-performance.ts`, Team > Model Director) New worker runs persist exit outcomes, repeat attempts, structured tokens and reported cost per agent/provider/model; summaries feed director prompts. Unknown cost stays unknown; HTTP account overrides and fallback attempts retain actual model attribution.
+- [x] **P3** (2026-11-18, `server/modules/model-routing.ts`, Team > Model Director) Separate technical/design selectors and task-kind routing with the existing director as fallback.
+- [ ] **P2 YOU** Select live technical/design directors and enable the desired Precision task kinds in Team > Model Director after reviewing verification. Owner explicitly chose to leave these assignments and live routing unchanged (2026-11-18).
+- [x] **P3** (2026-11-18, `server/modules/workflow/agents/context-rollover-prompt.ts`) Trimmed local prompt instructions and reserved 15% prompt headroom; initial local tasks retain mandatory instructions or fall back before launch. Basic 4096-token rollover measured 1634 UTF-8 bytes, below the 2262-byte prompt budget.
 
 ## 12. Reliability and operations
 

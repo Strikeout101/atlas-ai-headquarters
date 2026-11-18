@@ -205,12 +205,69 @@ describe("Ollama coding task runner", () => {
       expect.any(Function),
     );
     const config = JSON.parse(spawnCliAgent.mock.calls[0]![7].OPENCODE_CONFIG_CONTENT);
+    expect(config.snapshots).toBe(false);
     expect(config.providers["climpire-homelab"].settings.baseURL).toBe("http://homelab:11434/v1");
     expect(config.providers["climpire-homelab"].models["qwen-small"]).toBeDefined();
-    expect(config.permission.bash["git commit*"]).toBe("deny");
+    expect(config.permissions).toContainEqual({ action: "shell", resource: "git commit *", effect: "deny" });
+    expect(config.permissions).toContainEqual({ action: "shell", resource: "git push *", effect: "deny" });
+    expect(config).not.toHaveProperty("permission");
 
     child.emit("close", 1);
     await vi.waitFor(() => expect(handleTaskRunComplete).toHaveBeenCalledWith("task-1", 1, "provider_unavailable"));
+  });
+
+  it("uses the route-selected API endpoint instead of the assigned worker endpoint", () => {
+    const child = Object.assign(new EventEmitter(), { kill: vi.fn() }) as unknown as ChildProcess;
+    const spawnCliAgent = vi.fn((..._args: any[]) => child);
+    const readProvider = vi.fn((id: string) => ({
+      id,
+      name: "Selected local host",
+      type: "ollama",
+      base_url: "http://localhost:11434/v1",
+      api_key_enc: null,
+      enabled: 1,
+      models_cache: null,
+    }));
+    const tools = createApiProviderTools({
+      db: {
+        prepare: (sql: string) => ({
+          get: (...args: any[]) => {
+            if (sql.includes("SELECT assigned_agent_id")) return { assigned_agent_id: "worker" };
+            if (sql.includes("FROM task_model_routes"))
+              return {
+                agent_id: "worker",
+                provider: "api",
+                api_provider_id: "selected-local",
+                model: "qwen-selected",
+                context_window_tokens: 4096,
+              };
+            if (sql.includes("FROM api_providers")) return readProvider(args[0]);
+            return null;
+          },
+        }),
+      },
+      logsDir: ".",
+      activeProcesses: new Map(),
+      broadcast: vi.fn(),
+      normalizeStreamChunk: String,
+      handleTaskRunComplete: vi.fn(),
+      spawnCliAgent,
+      createSafeLogStreamOps: vi.fn() as any,
+      parseSSEStream: vi.fn(),
+      parseGeminiSSEStream: vi.fn(),
+    });
+    tools.launchApiProviderAgent(
+      "task-1",
+      "old-endpoint",
+      "old-model",
+      "Do work",
+      "C:/worktree",
+      "task.log",
+      new AbortController(),
+      9001,
+    );
+    expect(readProvider).toHaveBeenCalledWith("selected-local");
+    expect(spawnCliAgent.mock.calls[0]![5]).toBe("climpire-selected-local/qwen-selected");
   });
 
   it("ignores a late close from an older run after its replacement starts", () => {
@@ -242,7 +299,16 @@ describe("Ollama coding task runner", () => {
       parseSSEStream: vi.fn(),
       parseGeminiSSEStream: vi.fn(),
     });
-    tools.launchApiProviderAgent("task-1", "local", "qwen", "Do work", "C:\\worktree", "task.log", new AbortController(), 9001);
+    tools.launchApiProviderAgent(
+      "task-1",
+      "local",
+      "qwen",
+      "Do work",
+      "C:\\worktree",
+      "task.log",
+      new AbortController(),
+      9001,
+    );
     activeProcesses.set("task-1", replacement);
     child.emit("close", 0);
     expect(handleTaskRunComplete).not.toHaveBeenCalled();

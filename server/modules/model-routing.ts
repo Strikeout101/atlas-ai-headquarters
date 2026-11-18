@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { getAgentPerformanceSummary } from "./agent-performance.ts";
 
 type Db = Pick<DatabaseSync, "exec" | "prepare">;
 type Agent = {
@@ -14,7 +15,14 @@ type Agent = {
   cli_reasoning_level: string | null;
   cli_fallback_provider?: string | null;
 };
-type Task = { id: string; title: string; description: string | null; assigned_agent_id: string | null; status: string };
+type Task = {
+  task_type?: string;
+  id: string;
+  title: string;
+  description: string | null;
+  assigned_agent_id: string | null;
+  status: string;
+};
 type DirectorRun = (
   agent: Agent,
   prompt: string,
@@ -22,6 +30,8 @@ type DirectorRun = (
 ) => Promise<{ text: string; error?: string }>;
 
 export type TaskModelRoute = {
+  api_provider_id?: string | null;
+  context_window_tokens?: number | null;
   task_id: string;
   agent_id: string;
   provider: string;
@@ -61,6 +71,11 @@ export function ensureModelRoutingSchema(db: Db): void {
     );
     CREATE INDEX IF NOT EXISTS idx_model_upgrade_requests_task ON model_upgrade_requests(task_id, created_at DESC);
   `);
+  const routeColumns = db.prepare("PRAGMA table_info(task_model_routes)").all() as Array<{ name: string }>;
+  if (!routeColumns.some((c) => c.name === "api_provider_id"))
+    db.exec("ALTER TABLE task_model_routes ADD COLUMN api_provider_id TEXT");
+  if (!routeColumns.some((c) => c.name === "context_window_tokens"))
+    db.exec("ALTER TABLE task_model_routes ADD COLUMN context_window_tokens INTEGER");
   const columns = db.prepare("PRAGMA table_info(model_upgrade_requests)").all() as Array<{ name: string }>;
   if (!columns.some((c) => c.name === "requested_provider"))
     db.exec("ALTER TABLE model_upgrade_requests ADD COLUMN requested_provider TEXT");
@@ -78,7 +93,15 @@ function setting<T>(db: Db, key: string, fallback: T): T {
   }
 }
 
-export function modelDirectorConfig(db: Db): { directorAgentId: string | null; candidates: Record<string, string[]> } {
+export type LocalRoutingConfig = {
+  enabled: boolean;
+  apiProviderId: string | null;
+  model: string | null;
+  taskTypes: string[];
+  contextWindowTokens: number;
+};
+
+export function modelDirectorConfig(db: Db) {
   const directorAgentId = setting<string | null>(db, "modelDirectorAgentId", null);
   const raw = setting<Record<string, unknown>>(db, "modelRoutingCandidates", {});
   const candidates: Record<string, string[]> = {};
@@ -90,7 +113,24 @@ export function modelDirectorConfig(db: Db): { directorAgentId: string | null; c
       ].slice(0, 30);
     }
   }
+  const technical = setting<string | null>(db, "technicalDirectorAgentId", null);
+  const design = setting<string | null>(db, "designDirectorAgentId", null);
+  const local = setting<Partial<LocalRoutingConfig> | null>(db, "localModelRouting", null);
   return {
+    technicalDirectorAgentId: typeof technical === "string" && technical ? technical : null,
+    designDirectorAgentId: typeof design === "string" && design ? design : null,
+    localRouting: {
+      enabled: local?.enabled === true,
+      apiProviderId: typeof local?.apiProviderId === "string" ? local.apiProviderId : null,
+      model: typeof local?.model === "string" ? local.model : null,
+      taskTypes: Array.isArray(local?.taskTypes)
+        ? local.taskTypes.filter((v): v is string => typeof v === "string")
+        : ["documentation", "analysis"],
+      contextWindowTokens:
+        Number.isSafeInteger(local?.contextWindowTokens) && Number(local?.contextWindowTokens) >= 2048
+          ? Number(local?.contextWindowTokens)
+          : 8192,
+    } satisfies LocalRoutingConfig,
     directorAgentId: typeof directorAgentId === "string" && directorAgentId ? directorAgentId : null,
     candidates,
   };
@@ -126,9 +166,7 @@ export function availableModels(db: Db, agent: Agent): string[] {
 }
 
 function taskAndAgent(db: Db, taskId: string): { task: Task; agent: Agent } | null {
-  const task = db
-    .prepare("SELECT id, title, description, assigned_agent_id, status FROM tasks WHERE id = ?")
-    .get(taskId) as Task | undefined;
+  const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId) as Task | undefined;
   if (!task?.assigned_agent_id) return null;
   const agent = db.prepare("SELECT * FROM agents WHERE id = ?").get(task.assigned_agent_id) as Agent | undefined;
   return agent ? { task, agent } : null;
@@ -165,12 +203,14 @@ function saveRoute(
   source: TaskModelRoute["source"],
   reason: string,
   directorId: string | null,
+  local?: { apiProviderId: string; contextWindowTokens: number },
 ): TaskModelRoute {
   db.prepare(
-    `INSERT INTO task_model_routes (task_id,agent_id,provider,model,reasoning_level,source,reason,director_agent_id,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET
+    `INSERT INTO task_model_routes (task_id,agent_id,provider,model,reasoning_level,source,reason,director_agent_id,updated_at,api_provider_id,context_window_tokens)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET
       agent_id=excluded.agent_id,provider=excluded.provider,model=excluded.model,reasoning_level=excluded.reasoning_level,
-      source=excluded.source,reason=excluded.reason,director_agent_id=excluded.director_agent_id,updated_at=excluded.updated_at`,
+      source=excluded.source,reason=excluded.reason,director_agent_id=excluded.director_agent_id,updated_at=excluded.updated_at,
+      api_provider_id=excluded.api_provider_id,context_window_tokens=excluded.context_window_tokens`,
   ).run(
     taskId,
     agent.id,
@@ -181,6 +221,8 @@ function saveRoute(
     reason,
     directorId,
     Date.now(),
+    local?.apiProviderId ?? (agent.cli_provider === "api" ? agent.api_provider_id : null),
+    local?.contextWindowTokens ?? null,
   );
   return getTaskModelRoute(db, taskId, agent.id)!;
 }
@@ -196,8 +238,10 @@ function jsonDecision(text: string): Record<string, unknown> | null {
   }
 }
 
-function director(db: Db): Agent | null {
-  const id = modelDirectorConfig(db).directorAgentId;
+function director(db: Db, taskType?: string): Agent | null {
+  const config = modelDirectorConfig(db);
+  const id =
+    (taskType === "design" ? config.designDirectorAgentId : config.technicalDirectorAgentId) || config.directorAgentId;
   if (!id) return null;
   const row = db
     .prepare(
@@ -207,20 +251,59 @@ function director(db: Db): Agent | null {
   return row && (row.cli_provider === "claude" || row.cli_provider === "codex") ? row : null;
 }
 
+/** Match the same validated local route before subscription admission, without starting a director. */
+export function configuredLocalTaskProvider(db: Pick<DatabaseSync, "prepare">, taskId: string): "api" | null {
+  try {
+    const local = modelDirectorConfig(db as Db).localRouting;
+    const task = db.prepare("SELECT task_type FROM tasks WHERE id = ?").get(taskId) as
+      | { task_type: string }
+      | undefined;
+    if (!local.enabled || !local.apiProviderId || !local.model || !task || !local.taskTypes.includes(task.task_type))
+      return null;
+    const provider = db
+      .prepare("SELECT type,enabled,models_cache FROM api_providers WHERE id = ?")
+      .get(local.apiProviderId) as { type: string; enabled: number; models_cache: string | null } | undefined;
+    const models: unknown = JSON.parse(provider?.models_cache || "[]");
+    return provider?.type === "ollama" && provider.enabled && Array.isArray(models) && models.includes(local.model)
+      ? "api"
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function routeTaskModel(
   db: Db,
   taskId: string,
   runDirector: DirectorRun,
   force = false,
+  skipLocal = false,
 ): Promise<TaskModelRoute | null> {
   const found = taskAndAgent(db, taskId);
   if (!found) return null;
   const { task, agent } = found;
   const existing = getTaskModelRoute(db, taskId, agent.id);
   if (existing && !force) return existing;
+  const local = modelDirectorConfig(db).localRouting;
+  if (!skipLocal && configuredLocalTaskProvider(db, taskId) === "api" && local.apiProviderId && local.model) {
+    return saveRoute(
+      db,
+      taskId,
+      { ...agent, cli_provider: "api" },
+      local.model,
+      null,
+      "default",
+      `Routine ${task.task_type} task routed to the configured Ollama host`,
+      null,
+      { apiProviderId: local.apiProviderId, contextWindowTokens: local.contextWindowTokens },
+    );
+  }
   const candidates = availableModels(db, agent);
-  if (candidates.length === 0) return null;
-  const directorAgent = director(db);
+  if (candidates.length === 0) {
+    if (skipLocal) db.prepare("DELETE FROM task_model_routes WHERE task_id = ?").run(taskId);
+    return null;
+  }
+  const directorAgent = director(db, task.task_type);
   if (!directorAgent || candidates.length === 1) {
     return saveRoute(
       db,
@@ -234,9 +317,14 @@ export async function routeTaskModel(
     );
   }
   const prompt = [
-    "You are the model director. Choose exactly one listed model for this worker's task. Do not use tools.",
+    `You are the ${task.task_type === "design" ? "design" : "technical"} model director. Choose exactly one listed model for this worker's task. Prefer economical models for routine work; use stronger models for complexity or repeated failures. Do not use tools.`,
     `Task: ${task.title}\n${(task.description ?? "").slice(0, 4000)}`,
     `Worker: ${agent.name}; provider: ${agent.cli_provider}; allowed models: ${JSON.stringify(candidates)}`,
+    `Recorded worker performance (success is exit-code success; rework includes resumes; reported cost coverage only, missing cost unknown): ${JSON.stringify(
+      getAgentPerformanceSummary(db, { agentId: agent.id })
+        .filter((row) => row.provider === agent.cli_provider && candidates.includes(row.model))
+        .slice(0, 30),
+    )}`,
     'Reply only JSON: {"model":"one allowed model","reason":"brief justification"}.',
   ].join("\n\n");
   try {
@@ -281,11 +369,11 @@ export function createModelUpgradeRequest(
   if (!found) throw new Error("task_or_agent_not_found");
   const explanation = reason.trim();
   if (explanation.length < 10 || explanation.length > 2000) throw new Error("invalid_reason");
+  const currentRoute = getTaskModelRoute(db, taskId, found.agent.id);
+  const currentProvider = currentRoute?.provider || found.agent.cli_provider;
   const provider =
     requestedProvider?.trim() ||
-    (found.agent.cli_provider === "api"
-      ? found.agent.cli_fallback_provider || "codex"
-      : found.agent.cli_provider || "claude");
+    (currentProvider === "api" ? found.agent.cli_fallback_provider || "codex" : found.agent.cli_provider || "claude");
   if (provider !== found.agent.cli_provider && !["codex", "claude"].includes(provider))
     throw new Error("invalid_upgrade_provider");
   const targetAgent =
@@ -293,7 +381,6 @@ export function createModelUpgradeRequest(
       ? found.agent
       : { ...found.agent, cli_provider: provider, cli_model: null, cli_reasoning_level: null };
   const candidates = availableModels(db, targetAgent);
-  const currentRoute = getTaskModelRoute(db, taskId, found.agent.id);
   const current =
     currentRoute?.model ?? (found.agent.cli_provider === "api" ? found.agent.api_model : found.agent.cli_model);
   const next =

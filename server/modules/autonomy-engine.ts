@@ -5,6 +5,7 @@ import { isAutonomyAllowed } from "./control-state.ts";
 import { ensureAgentProposalSchema } from "./agent-proposals.ts";
 import { ensureAutonomySchema, autonomyConfig, appendAutonomyLedger } from "./autonomy-store.ts";
 import { isPasswordConfigured } from "../security/login-sessions.ts";
+import { configuredLocalTaskProvider } from "./model-routing.ts";
 
 type Row = Record<string, any>;
 const running = new WeakSet<DatabaseSync>();
@@ -28,9 +29,16 @@ export function autonomyDay(now: number): string {
   }).format(now);
 }
 
-export function usageHeadroomBlockReason(db: DatabaseSync, now = Date.now()): string | null {
+export function usageHeadroomBlockReason(
+  db: DatabaseSync,
+  now = Date.now(),
+  providers: Iterable<string> = ["codex", "claude"],
+): string | null {
   const config = autonomyConfig(db);
-  for (const provider of ["codex", "claude"]) {
+  for (const provider of new Set(providers)) {
+    // Subscription windows apply to the provider actually being called. A local
+    // model must not be blocked by an unrelated, disconnected subscription.
+    if (provider !== "codex" && provider !== "claude") continue;
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cli_usage_cache'").get())
       return "Subscription usage is not available yet";
     const row = db.prepare("SELECT data_json,updated_at FROM cli_usage_cache WHERE provider=?").get(provider) as
@@ -197,7 +205,17 @@ export function autonomyTaskUsageBlockReason(db: DatabaseSync, taskId: string, n
   const task = db.prepare("SELECT origin FROM tasks WHERE id=?").get(taskId) as Row | undefined;
   if (task?.origin !== "autonomy") return null;
   if (!isAutonomyAllowed()) return "Autonomy is paused";
-  return usageHeadroomBlockReason(db, now);
+  const route = table(db, "task_model_routes")
+    ? (db.prepare("SELECT provider FROM task_model_routes WHERE task_id=?").get(taskId) as Row | undefined)
+    : undefined;
+  const assigned = db
+    .prepare("SELECT a.cli_provider FROM agents a JOIN tasks t ON t.assigned_agent_id=a.id WHERE t.id=?")
+    .get(taskId) as Row | undefined;
+  const provider = route?.provider ?? configuredLocalTaskProvider(db, taskId) ?? assigned?.cli_provider;
+  if (typeof provider !== "string" || !provider) return "Autonomous worker provider is not configured";
+  if (!["codex", "claude", "gemini", "kimi", "opencode", "copilot", "antigravity", "api"].includes(provider))
+    return "Autonomous worker provider is not supported";
+  return usageHeadroomBlockReason(db, now, [provider]);
 }
 
 /** Reserve every new autonomous task, including delegates, once; continuations reuse their reservation. */
@@ -245,7 +263,7 @@ export function autonomyTaskStartBlockReason(db: DatabaseSync, taskId: string, n
   if (!isAutonomyAllowed()) return "Autonomy is paused";
   if (work.status !== "running") return "Autonomous admission is no longer active";
   const source = sourceBlockReason(db, work);
-  return source || usageHeadroomBlockReason(db, now);
+  return source;
 }
 
 function sourceBlockReason(db: DatabaseSync, work: Row): string | null {
@@ -436,11 +454,6 @@ export async function runAutonomyEngineTick(deps: EngineDeps): Promise<void> {
       return;
     }
     enqueueSchedules(db, now);
-    const block = usageHeadroomBlockReason(db, now);
-    if (block) {
-      ledger(db, "blocked", block, now);
-      return;
-    }
     const works = db
       .prepare("SELECT * FROM autonomy_work WHERE status='planned' ORDER BY created_at LIMIT 20")
       .all() as Row[];
@@ -464,6 +477,11 @@ export async function runAutonomyEngineTick(deps: EngineDeps): Promise<void> {
         agent.current_task_id
       ) {
         ledger(db, "waiting", "Waiting for an idle team leader and an unchanged planned task", now, work);
+        continue;
+      }
+      const usageBlock = autonomyTaskUsageBlockReason(db, work.task_id, now);
+      if (usageBlock) {
+        ledger(db, "blocked", usageBlock, now, work);
         continue;
       }
       const config = autonomyConfig(db),
