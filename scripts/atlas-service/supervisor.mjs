@@ -325,7 +325,8 @@ async function main() {
   const log = (message) => {
     const line = `${new Date().toISOString()} ${message}\n`;
     fs.appendFileSync(supervisorLog, line);
-    process.stdout.write(line);
+    // Only echo when run by hand in a terminal; the login task runs hidden and the log file is the record.
+    if (process.argv.includes("--echo")) process.stdout.write(line);
   };
 
   // One supervisor at a time.

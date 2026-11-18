@@ -80,7 +80,9 @@ New-Item -ItemType Directory -Force -Path $ServiceDir | Out-Null
 switch ($Command) {
   "install" {
     $node = Get-NodePath
-    $action = New-ScheduledTaskAction -Execute $node -Argument "`"$Supervisor`" --port $Port" -WorkingDirectory $RepoDir
+    # wscript runs node with no window: a console window could be closed by accident or pause the supervisor's output.
+    $hidden = Join-Path $PSScriptRoot "run-hidden.vbs"
+    $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "//B //Nologo `"$hidden`" `"$node`" `"$Supervisor`" --port $Port" -WorkingDirectory $RepoDir
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
       -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
