@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createPromptSkillsHelper } from "./prompt-skills.ts";
+import { buildTaskToolsLine } from "./task-tools-line.ts";
+import { buildKnowledgeBlock } from "../../agent-knowledge.ts";
 
 type DbLike = {
   prepare: (sql: string) => {
@@ -58,12 +60,27 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
     return lines.join("\n");
   }
 
+  /**
+   * With `taskId`, the prompt starts with the shared knowledge block (project goal, business profile, systems
+   * summary, relevant memories) and carries the shared task tools line. The small-model continuation prompt passes
+   * no taskId because it adds its own compact block within a byte budget.
+   */
   function buildTaskExecutionPrompt(
     parts: Array<string | null | undefined>,
-    opts: { allowWarningFix?: boolean } = {},
+    opts: { allowWarningFix?: boolean; taskId?: string } = {},
   ): string {
+    let knowledge = "";
+    if (opts.taskId) {
+      try {
+        knowledge = buildKnowledgeBlock(db as any, opts.taskId);
+      } catch (error) {
+        console.warn(`[knowledge] block unavailable for task ${opts.taskId}: ${String(error)}`);
+      }
+    }
     return [
+      knowledge,
       ...parts,
+      opts.taskId ? buildTaskToolsLine() : "",
       EXECUTION_CONTINUITY_POLICY_LINES.join("\n"),
       buildMvpCodeReviewPolicyBlock(Boolean(opts.allowWarningFix)),
     ]

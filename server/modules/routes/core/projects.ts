@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { isBusinessKey } from "../../businesses.ts";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -246,6 +247,9 @@ export function registerProjectRoutes({
     }
 
     const githubRepo = typeof body.github_repo === "string" ? body.github_repo.trim() || null : null;
+    if (body.business !== undefined && body.business !== null && body.business !== "" && !isBusinessKey(body.business))
+      return res.status(400).json({ error: "invalid_business" });
+    const business = isBusinessKey(body.business) ? body.business : null;
     const assignmentMode = body.assignment_mode === "manual" ? "manual" : "auto";
     const validatedAgentIds = validateProjectAgentIds((body as Record<string, unknown>).agent_ids);
     if ("error" in validatedAgentIds) {
@@ -262,11 +266,11 @@ export function registerProjectRoutes({
       db.prepare(
         `
       INSERT INTO projects (
-        id, name, project_path, core_goal, assignment_mode, last_used_at, created_at, updated_at, github_repo
+        id, name, project_path, core_goal, assignment_mode, last_used_at, created_at, updated_at, github_repo, business
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
-      ).run(id, name, projectPath, coreGoal, assignmentMode, t, t, t, githubRepo);
+      ).run(id, name, projectPath, coreGoal, assignmentMode, t, t, t, githubRepo, business);
 
       if (assignmentMode === "manual" && agentIds.length > 0) {
         const insertPA = db.prepare("INSERT INTO project_agents (project_id, agent_id, created_at) VALUES (?, ?, ?)");
@@ -348,6 +352,12 @@ export function registerProjectRoutes({
       const value = typeof body.github_repo === "string" ? body.github_repo.trim() || null : null;
       updates.push("github_repo = ?");
       params.push(value);
+    }
+    if ("business" in body) {
+      if (body.business !== null && body.business !== "" && !isBusinessKey(body.business))
+        return res.status(400).json({ error: "invalid_business" });
+      updates.push("business = ?");
+      params.push(isBusinessKey(body.business) ? body.business : null);
     }
     if ("assignment_mode" in body) {
       const value = body.assignment_mode === "manual" ? "manual" : "auto";

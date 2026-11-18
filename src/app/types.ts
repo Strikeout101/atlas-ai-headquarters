@@ -14,6 +14,7 @@ export type View =
   | "homelab"
   | "model_director"
   | "vp_decisions"
+  | "knowledge"
   | "skills"
   | "settings";
 export type TaskPanelTab = "terminal" | "minutes";

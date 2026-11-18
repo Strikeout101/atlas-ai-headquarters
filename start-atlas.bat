@@ -24,8 +24,9 @@ if not exist node_modules (
 
 echo.
 echo Starting... the browser opens at http://127.0.0.1:8800 once the server is up.
+echo Phones on the home VPN can use this PC's LAN address on port 8800 and the existing password.
 echo Keep this window open while you test. Close it (or press Ctrl+C) to stop the server.
 echo.
 start "" cmd /c "timeout /t 12 >nul & start http://127.0.0.1:8800"
-call pnpm dev:local
+call pnpm dev
 pause

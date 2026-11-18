@@ -345,6 +345,7 @@ export async function createProject(input: {
   core_goal: string;
   create_path_if_missing?: boolean;
   github_repo?: string;
+  business?: Project["business"];
   assignment_mode?: "auto" | "manual";
   agent_ids?: string[];
 }): Promise<Project> {
@@ -357,6 +358,7 @@ export async function updateProject(
   patchData: Partial<Pick<Project, "name" | "project_path" | "core_goal">> & {
     create_path_if_missing?: boolean;
     github_repo?: string | null;
+    business?: Project["business"];
     assignment_mode?: "auto" | "manual";
     agent_ids?: string[];
   },

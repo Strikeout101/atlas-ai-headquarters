@@ -119,11 +119,68 @@ test.describe("ATLAS shell", () => {
 });
 
 test.describe("ATLAS shell on a phone", () => {
-  test.use({ viewport: { width: 375, height: 812 } });
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+  test("bottom tabs, menu, Escape and backdrop work without Office", async ({ page }) => {
+    await openApp(page, "/office");
+    await expect(page).toHaveURL(/\/$/);
+    const tabs = page.getByRole("navigation", { name: "Main", exact: true }).last();
+    await expect(tabs.getByRole("button", { name: "Today" })).toBeVisible();
+    for (const [label, path] of [
+      ["Work", "/work"],
+      ["Autonomy", "/autonomy"],
+      ["Revenue", "/revenue"],
+    ]) {
+      await tabs.getByRole("button", { name: label, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+    }
+    await tabs.getByRole("button", { name: "Menu", exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: "Navigation", exact: true });
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Office", exact: true })).toHaveCount(0);
+    const bounds = await drawer.locator("aside").boundingBox();
+    expect(bounds?.x).toBe(0);
+    await page.screenshot({ path: ".tmp/phone-menu.png" });
+    await drawer.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(drawer).toHaveCount(0);
+    await tabs.getByRole("button", { name: "Menu", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toHaveCount(0);
+    await expect(tabs.getByRole("button", { name: "Menu", exact: true })).toBeFocused();
+    await tabs.getByRole("button", { name: "Menu", exact: true }).click();
+    await page.mouse.click(350, 400);
+    await expect(drawer).toHaveCount(0);
+    await tabs.getByRole("button", { name: "Today" }).click();
+    await expect(page.locator("main h2", { hasText: "Today" })).toBeVisible();
+    await page.screenshot({ path: ".tmp/phone-layout.png" });
+  });
+
+  test("landscape touch phones keep phone navigation; desktop resizing restores Office", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openApp(page);
+    await page.setViewportSize({ width: 1100, height: 440 });
+    await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.getByRole("button", { name: "Menu", exact: true })).toHaveCount(0);
+    await expect(sidebar(page).getByRole("button", { name: "Office", exact: true })).toBeVisible();
+  });
 
   test("no page scrolls sideways", async ({ page }) => {
     await openApp(page);
-    for (const path of ["/", "/work", "/tech", "/events", "/outreach", "/homelab", "/team", "/settings"]) {
+    for (const path of [
+      "/",
+      "/work",
+      "/autonomy",
+      "/revenue",
+      "/tech",
+      "/events",
+      "/ventures",
+      "/outreach",
+      "/homelab",
+      "/team",
+      "/settings",
+    ]) {
       await page.goto(path);
       await expect(page.locator("main")).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

@@ -543,6 +543,7 @@ export function createCrossDeptCooperationTools(deps: CrossDeptCooperationDeps) 
             ],
             {
               allowWarningFix: hasExplicitWarningFixRequest(crossTaskData.title, crossTaskData.description),
+              taskId: crossTaskId,
             },
           );
           const executionSession = ensureTaskExecutionSession(crossTaskId, execAgent.id, execProvider);

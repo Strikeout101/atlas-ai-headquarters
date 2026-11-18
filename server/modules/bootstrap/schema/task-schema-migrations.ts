@@ -3,6 +3,15 @@ import type { DatabaseSync } from "node:sqlite";
 type DbLike = Pick<DatabaseSync, "exec" | "prepare">;
 
 export function applyTaskSchemaMigrations(db: DbLike): void {
+  // Which business a project serves (tech / rental / ventures). Null means not tied to one business.
+  try {
+    const projectCols = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+    if (projectCols.length > 0 && !projectCols.some((c) => c.name === "business")) {
+      db.exec("ALTER TABLE projects ADD COLUMN business TEXT");
+    }
+  } catch {
+    /* projects table missing during migration window */
+  }
   // Subtask cross-department delegation columns
   try {
     db.exec("ALTER TABLE subtasks ADD COLUMN target_department_id TEXT");

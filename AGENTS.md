@@ -69,6 +69,14 @@ These rules are additive and do NOT delete existing orchestration rules below.
 - Use logs/failing tests as evidence and resolve root causes.
 - Minimize user context-switching and avoid unnecessary hand-holding.
 
+## Master Checklist (`CHECKLIST.md`)
+
+`CHECKLIST.md` at the repo root is the single list of everything pending: features, integrations, accounts to connect, owner decisions and loose ends.
+- Read it at the start of any non-trivial task.
+- Whenever you find, create or leave something pending, add it to the right section of `CHECKLIST.md` in the same change.
+- When you finish an item, tick it and note the date and where it lives. Do not delete unfinished items.
+- Mark items only the owner can do with **YOU**. Never put secrets or customer private data in it.
+
 ## Task Management
 
 1. Plan first: write checklist in `tasks/todo.md`.

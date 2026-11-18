@@ -42,6 +42,8 @@ interface AppHeaderBarProps {
   onOpenCommandBar?: () => void;
   commandBarLabel?: string;
   moreLabel?: string;
+  /** Phone layout: navigation lives in the bottom tab bar and Office tools are left out. */
+  phone?: boolean;
 }
 
 const quietIconButtonStyle = {
@@ -75,6 +77,7 @@ export default function AppHeaderBar({
   onOpenCommandBar,
   commandBarLabel = "Search and jump",
   moreLabel = "More",
+  phone = false,
 }: AppHeaderBarProps) {
   const menuItem = (icon: ReactNode, label: string, onClick: () => void) => (
     <button
@@ -98,15 +101,17 @@ export default function AppHeaderBar({
       style={{ borderBottom: "1px solid var(--th-border)", background: "var(--th-bg-header)" }}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={onOpenMobileNav}
-          className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition lg:hidden"
-          style={quietIconButtonStyle}
-          aria-label="Open navigation"
-        >
-          <Menu size={16} strokeWidth={1.75} />
-        </button>
+        {!phone && (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition lg:hidden"
+            style={quietIconButtonStyle}
+            aria-label="Open navigation"
+          >
+            <Menu size={16} strokeWidth={1.75} />
+          </button>
+        )}
         <h1
           className="flex items-center gap-2 truncate text-[15px] font-semibold"
           style={{ color: "var(--th-text-heading)" }}
@@ -193,7 +198,7 @@ export default function AppHeaderBar({
               >
                 {menuItem(<Wrench size={15} strokeWidth={1.75} />, agentStatusLabel, onOpenAgentStatus)}
                 {menuItem(<FileText size={15} strokeWidth={1.75} />, reportLabel, onOpenReportHistory)}
-                {menuItem(<Building size={15} strokeWidth={1.75} />, roomManagerLabel, onOpenRoomManager)}
+                {!phone && menuItem(<Building size={15} strokeWidth={1.75} />, roomManagerLabel, onOpenRoomManager)}
                 {menuItem(
                   theme === "dark" ? <Sun size={15} strokeWidth={1.75} /> : <Moon size={15} strokeWidth={1.75} />,
                   theme === "dark" ? "Light mode" : "Dark mode",

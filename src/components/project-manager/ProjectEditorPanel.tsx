@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { isApiRequestError, pickProjectPathNative, type ProjectDetailResponse } from "../../api";
+import { BUSINESS_KINDS, BUSINESS_NAMES } from "../../api/business";
 import type { Agent, AssignmentMode, Department, Project } from "../../types";
 import type {
   FormFeedback,
@@ -23,6 +24,8 @@ interface ProjectEditorPanelProps {
   setProjectPath: Dispatch<SetStateAction<string>>;
   coreGoal: string;
   setCoreGoal: Dispatch<SetStateAction<string>>;
+  business: Project["business"];
+  setBusiness: Dispatch<SetStateAction<Project["business"]>>;
   saving: boolean;
   canSave: boolean;
   pathToolsVisible: boolean;
@@ -74,6 +77,8 @@ export default function ProjectEditorPanel({
   setProjectPath,
   coreGoal,
   setCoreGoal,
+  business,
+  setBusiness,
   saving,
   canSave,
   pathToolsVisible,
@@ -307,6 +312,36 @@ export default function ProjectEditorPanel({
           disabled={!isCreating && !editingProjectId}
           className="mt-1 w-full resize-none rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
         />
+      </label>
+
+      <label className="block text-xs text-slate-400">
+        {t({ ko: "사업", en: "Business", ja: "事業", zh: "业务" })}
+        <select
+          value={business ?? ""}
+          onChange={(e) => {
+            setBusiness((e.target.value || null) as Project["business"]);
+            setFormFeedback(null);
+          }}
+          disabled={!isCreating && !editingProjectId}
+          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+        >
+          <option value="">
+            {t({ ko: "특정 사업 없음", en: "Not tied to one business", ja: "特定の事業なし", zh: "不属于特定业务" })}
+          </option>
+          {BUSINESS_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {BUSINESS_NAMES[kind]}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-[11px] text-slate-500">
+          {t({
+            ko: "에이전트가 이 프로젝트 작업 시 해당 사업 프로필을 받습니다.",
+            en: "Agents working on this project get that business's profile.",
+            ja: "このプロジェクトのエージェントはその事業プロフィールを受け取ります。",
+            zh: "处理此项目的代理会获得该业务的资料。",
+          })}
+        </span>
       </label>
 
       <ManualAssignmentSelector

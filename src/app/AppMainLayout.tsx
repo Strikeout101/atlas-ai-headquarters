@@ -28,9 +28,13 @@ import TeamTabs from "../components/team/TeamTabs";
 import RevenueWorkspace from "../components/revenue/RevenueWorkspace";
 import AutonomyWorkspace from "../components/autonomy/AutonomyWorkspace";
 import VpDecisions from "../components/team/VpDecisions";
+import KnowledgeTab from "../components/team/KnowledgeTab";
 import { SETTINGS_TAB_EVENT, type SettingsTab } from "../components/settings/types";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
-import { NAV_ITEMS, TEAM_VIEWS } from "./routes";
+import { NAV_ITEMS, PHONE_HIDDEN_VIEWS, TEAM_VIEWS, VIEW_PATHS } from "./routes";
+import { usePhoneLayout } from "./usePhoneLayout";
+import PhoneTabBar from "./PhoneTabBar";
+import NavigationDrawer from "./NavigationDrawer";
 import { usePendingApprovals } from "./usePendingApprovals";
 import { useReadyDrafts } from "./useReadyDrafts";
 import { decidePendingApproval, type PendingApproval, type UpdateStatus } from "../api";
@@ -239,6 +243,17 @@ export default function AppMainLayout({
     }
   }, []);
   const [executiveDesktopOpen, setExecutiveDesktopOpen] = useState(false);
+  // Phones get the dashboard only: no Office in navigation, and its address opens Today instead.
+  const phone = usePhoneLayout();
+  const hiddenViews = phone ? PHONE_HIDDEN_VIEWS : undefined;
+  const viewUnavailable = phone && PHONE_HIDDEN_VIEWS.includes(view);
+  useEffect(() => {
+    if (!viewUnavailable) return;
+    // Replace the address so the back button does not land on the hidden page again.
+    window.history.replaceState(window.history.state, "", `${VIEW_PATHS.dashboard}${window.location.search}`);
+    setExecutiveDesktopOpen(false);
+    setView("dashboard");
+  }, [viewUnavailable, setView]);
   const officePose = useMemo(() => ({ ...DEFAULT_OFFICE_POSE }), []);
   const handleViewChange = useCallback(
     (nextView: View) => {
@@ -331,14 +346,16 @@ export default function AppMainLayout({
   );
 
   const commands = useMemo<CommandItem[]>(() => {
-    const items: CommandItem[] = NAV_ITEMS.map(({ view: target, icon: Icon, label, keywords }) => ({
-      id: `nav:${target}`,
-      group: "navigate" as const,
-      label: tr(label),
-      icon: <Icon size={15} strokeWidth={1.75} />,
-      keywords: `${keywords} ${label.en}`,
-      run: () => handleViewChange(target),
-    }));
+    const items: CommandItem[] = NAV_ITEMS.filter((item) => !(hiddenViews?.includes(item.view) ?? false)).map(
+      ({ view: target, icon: Icon, label, keywords }) => ({
+        id: `nav:${target}`,
+        group: "navigate" as const,
+        label: tr(label),
+        icon: <Icon size={15} strokeWidth={1.75} />,
+        keywords: `${keywords} ${label.en}`,
+        run: () => handleViewChange(target),
+      }),
+    );
     const settingsTabs: Array<[SettingsTab, { ko: string; en: string; ja: string; zh: string }, string]> = [
       ["general", { ko: "일반", en: "General", ja: "一般", zh: "常规" }, "company name language preferences"],
       [
@@ -397,13 +414,14 @@ export default function AppMainLayout({
       onOpenReportHistory,
       "reports history",
     );
-    action(
-      "room-manager",
-      labels.roomManagerLabel,
-      <Building size={15} strokeWidth={1.75} />,
-      onOpenRoomManager,
-      "office rooms themes",
-    );
+    if (!phone)
+      action(
+        "room-manager",
+        labels.roomManagerLabel,
+        <Building size={15} strokeWidth={1.75} />,
+        onOpenRoomManager,
+        "office rooms themes",
+      );
     action(
       "new-task",
       tr({ ko: "새 업무 만들기", en: "New task", ja: "新しいタスク", zh: "新建任务" }),
@@ -462,6 +480,8 @@ export default function AppMainLayout({
   }, [
     agents,
     handleViewChange,
+    hiddenViews,
+    phone,
     labels.agentStatusLabel,
     labels.announcementLabel,
     labels.decisionLabel,
@@ -485,7 +505,7 @@ export default function AppMainLayout({
   return (
     <I18nProvider language={labels.uiLanguage}>
       <div className="app-shell flex h-[100dvh] min-h-[100dvh] overflow-hidden">
-        <div className="hidden lg:flex lg:flex-shrink-0">
+        <div className={phone ? "hidden" : "hidden lg:flex lg:flex-shrink-0"}>
           <Sidebar
             currentView={view}
             onChangeView={handleViewChange}
@@ -494,39 +514,32 @@ export default function AppMainLayout({
             settings={settings}
             connected={connected}
             needsYouCount={needsYouCount}
+            hiddenViews={hiddenViews}
             onOpenCommandBar={() => setCommandBarOpen(true)}
           />
         </div>
 
         {mobileNavOpen && (
-          <button
-            aria-label="Close navigation"
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-            onClick={() => setMobileNavOpen(false)}
-          />
+          <NavigationDrawer onClose={() => setMobileNavOpen(false)}>
+            <Sidebar
+              currentView={view}
+              onChangeView={(nextView) => {
+                handleViewChange(nextView);
+                setMobileNavOpen(false);
+              }}
+              departments={officePresentation.departments}
+              agents={officePresentation.agents}
+              settings={settings}
+              connected={connected}
+              needsYouCount={needsYouCount}
+              hiddenViews={hiddenViews}
+              onOpenCommandBar={() => {
+                setMobileNavOpen(false);
+                setCommandBarOpen(true);
+              }}
+            />
+          </NavigationDrawer>
         )}
-        <div
-          className={`fixed inset-y-0 left-0 z-50 transition-transform duration-200 lg:hidden ${
-            mobileNavOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
-          }`}
-        >
-          <Sidebar
-            currentView={view}
-            onChangeView={(nextView) => {
-              handleViewChange(nextView);
-              setMobileNavOpen(false);
-            }}
-            departments={officePresentation.departments}
-            agents={officePresentation.agents}
-            settings={settings}
-            connected={connected}
-            needsYouCount={needsYouCount}
-            onOpenCommandBar={() => {
-              setMobileNavOpen(false);
-              setCommandBarOpen(true);
-            }}
-          />
-        </div>
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
           <AppHeaderBar
@@ -556,11 +569,12 @@ export default function AppMainLayout({
             onOpenCommandBar={() => setCommandBarOpen(true)}
             commandBarLabel={tr({ ko: "검색 및 이동", en: "Search and jump", ja: "検索・移動", zh: "搜索与跳转" })}
             moreLabel={tr({ ko: "더보기", en: "More", ja: "その他", zh: "更多" })}
+            phone={phone}
           />
 
           <EmergencyBanner />
 
-          {executiveDesktopOpen && view !== "office" && (
+          {executiveDesktopOpen && view !== "office" && !phone && (
             <div className="flex items-center justify-between border-b border-slate-500/30 bg-slate-800 px-4 py-2 text-sm text-white">
               <span>Executive desktop</span>
               <button
@@ -629,8 +643,8 @@ export default function AppMainLayout({
             </div>
           )}
 
-          <div className="p-3 sm:p-4 lg:p-6">
-            {view === "office" && (
+          <div className={phone ? "px-3 pt-3 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]" : "p-3 sm:p-4 lg:p-6"}>
+            {view === "office" && !phone && (
               <div className={officeRenderer === "atlas" ? "fixed inset-0 z-[45] bg-slate-900" : ""}>
                 <div
                   className={
@@ -840,6 +854,7 @@ export default function AppMainLayout({
             {TEAM_VIEWS.includes(view) && <TeamTabs current={view} onChange={setView} />}
             {view === "model_director" && <ModelDirectorWorkspace />}
             {view === "vp_decisions" && <VpDecisions />}
+            {view === "knowledge" && <KnowledgeTab />}
 
             {view === "agents" && (
               <AgentManager agents={agents} departments={departments} onAgentsChange={onAgentsChange} />
@@ -863,6 +878,16 @@ export default function AppMainLayout({
             )}
           </div>
         </main>
+
+        {phone && (
+          <PhoneTabBar
+            currentView={view}
+            onChangeView={handleViewChange}
+            onOpenMenu={() => setMobileNavOpen(true)}
+            menuOpen={mobileNavOpen}
+            needsYouCount={needsYouCount}
+          />
+        )}
 
         {children}
         <CommandPalette open={commandBarOpen} onClose={() => setCommandBarOpen(false)} commands={commands} />

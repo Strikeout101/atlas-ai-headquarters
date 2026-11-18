@@ -45,6 +45,7 @@ import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-pack
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
 import { ensureControlStateSchema } from "./modules/control-state.ts";
+import { ensureAgentMemorySchema } from "./modules/agent-memory.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
@@ -65,6 +66,7 @@ const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
 ensureModelRoutingSchema(db);
 ensureControlStateSchema(db);
+ensureAgentMemorySchema(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 ensureVpAgents(db);

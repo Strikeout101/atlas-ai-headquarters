@@ -198,6 +198,7 @@ export function registerAgentSpawnRoute(ctx: RuntimeContext): void {
       ],
       {
         allowWarningFix: hasExplicitWarningFixRequest(task.title, task.description),
+        taskId,
       },
     );
 

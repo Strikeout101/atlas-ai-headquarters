@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   BookOpen,
+  Brain,
   CalendarDays,
   Laptop,
   Send,
@@ -9,9 +10,11 @@ import {
   Clapperboard,
   Inbox,
   ListChecks,
+  Receipt,
   Server,
   Settings,
   Store,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import type { View } from "./types";
@@ -34,6 +37,7 @@ export const VIEW_PATHS: Record<View, string> = {
   skills: "/team/library",
   model_director: "/team/models",
   vp_decisions: "/team/vp-decisions",
+  knowledge: "/team/knowledge",
   office: "/office",
   settings: "/settings",
 };
@@ -41,6 +45,11 @@ export const VIEW_PATHS: Record<View, string> = {
 const PATH_TO_VIEW = new Map<string, View>(Object.entries(VIEW_PATHS).map(([view, path]) => [path, view as View]));
 /** Old addresses that still work. The Business page was split into Tech Services, Events and Outreach. */
 PATH_TO_VIEW.set("/business", "tech");
+
+/** Desktop-only views. On a phone they are left out of navigation and their addresses open Today. */
+export const PHONE_HIDDEN_VIEWS: View[] = ["office"];
+/** The phone layout's bottom tabs; everything else is in its Menu. */
+export const PHONE_TAB_VIEWS: View[] = ["dashboard", "tasks", "autonomy", "revenue"];
 
 export function viewFromPath(pathname: string): View {
   const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -92,7 +101,7 @@ export interface NavItem {
 }
 
 /** The Team area: one sidebar item, three tabs. */
-export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director", "vp_decisions"];
+export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director", "vp_decisions", "knowledge"];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -111,7 +120,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     view: "autonomy",
-    icon: ListChecks,
+    icon: Target,
     section: "primary",
     label: { ko: "자율 운영", en: "Autonomy", ja: "自律運用", zh: "自主运行" },
     keywords: "goals opportunities schedules research ledger digest limits",
@@ -139,7 +148,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     view: "revenue",
-    icon: ListChecks,
+    icon: Receipt,
     section: "workspaces",
     label: { ko: "매출", en: "Revenue", ja: "売上", zh: "收入" },
     keywords: "receipts payments costs finance pipeline deals square spending verified",
@@ -164,7 +173,7 @@ export const NAV_ITEMS: NavItem[] = [
     section: "system",
     label: { ko: "팀", en: "Team", ja: "チーム", zh: "团队" },
     keywords: "agents staff employees departments hire",
-    activeFor: ["skills", "model_director", "vp_decisions"],
+    activeFor: ["skills", "model_director", "vp_decisions", "knowledge"],
   },
   {
     view: "skills",
@@ -196,6 +205,14 @@ export const NAV_ITEMS: NavItem[] = [
     inSidebar: false,
     label: { ko: "VP 결정", en: "VP decisions", ja: "VPの決定", zh: "VP决策" },
     keywords: "vice president reviews approvals audit denials escalations",
+  },
+  {
+    view: "knowledge",
+    icon: Brain,
+    section: "system",
+    inSidebar: false,
+    label: { ko: "지식", en: "Knowledge", ja: "ナレッジ", zh: "知识" },
+    keywords: "memory memories lessons facts systems registry checklist hosts network agents know",
   },
   {
     view: "settings",

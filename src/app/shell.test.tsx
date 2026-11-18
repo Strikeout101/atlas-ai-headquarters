@@ -21,6 +21,7 @@ const ALL_VIEWS: View[] = [
   "homelab",
   "model_director",
   "vp_decisions",
+  "knowledge",
   "skills",
   "settings",
 ];
@@ -39,7 +40,7 @@ describe("view routes", () => {
     expect(sidebar).not.toContain("skills");
     expect(sidebar).not.toContain("model_director");
     const team = NAV_ITEMS.find((item) => item.view === "agents");
-    expect(team?.activeFor).toEqual(["skills", "model_director", "vp_decisions"]);
+    expect(team?.activeFor).toEqual(["skills", "model_director", "vp_decisions", "knowledge"]);
   });
 
   it("tolerates trailing slashes and case, and sends unknown paths to Today", () => {
@@ -118,5 +119,51 @@ describe("AppHeaderBar more menu", () => {
     expect(p.onOpenReportHistory).toHaveBeenCalled();
     expect(p.onOpenRoomManager).toHaveBeenCalled();
     expect(screen.getByText("2")).toBeInTheDocument();
+  });
+});
+
+describe("phone layout", () => {
+  it("keeps the Office off phones and gives every bottom tab a distinct icon", async () => {
+    const { PHONE_HIDDEN_VIEWS, PHONE_TAB_VIEWS } = await import("./routes");
+    expect(PHONE_HIDDEN_VIEWS).toEqual(["office"]);
+    expect(PHONE_TAB_VIEWS[0]).toBe("dashboard");
+    expect(PHONE_TAB_VIEWS.some((view) => PHONE_HIDDEN_VIEWS.includes(view))).toBe(false);
+    const icons = PHONE_TAB_VIEWS.map((view) => NAV_ITEMS.find((item) => item.view === view)?.icon);
+    expect(new Set(icons).size).toBe(PHONE_TAB_VIEWS.length);
+  });
+
+  it("drops the header's navigation button and Office tools on a phone", async () => {
+    const props = {
+      currentView: "dashboard",
+      connected: true,
+      viewTitle: "Today",
+      tasksPrimaryLabel: "Tasks",
+      decisionLabel: "Decisions",
+      decisionInboxLoading: false,
+      decisionInboxCount: 0,
+      agentStatusLabel: "Agent status",
+      reportLabel: "Reports",
+      announcementLabel: "Announcement",
+      roomManagerLabel: "Room manager",
+      theme: "light",
+      mobileHeaderMenuOpen: true,
+      onOpenMobileNav: vi.fn(),
+      onOpenTasks: vi.fn(),
+      onOpenDecisionInbox: vi.fn(),
+      onOpenAgentStatus: vi.fn(),
+      onOpenReportHistory: vi.fn(),
+      onOpenAnnouncement: vi.fn(),
+      onOpenRoomManager: vi.fn(),
+      onToggleTheme: vi.fn(),
+      onToggleMobileHeaderMenu: vi.fn(),
+      onCloseMobileHeaderMenu: vi.fn(),
+    } satisfies ComponentProps<typeof AppHeaderBar>;
+    const { rerender } = render(<AppHeaderBar {...props} />);
+    expect(screen.getByLabelText("Open navigation")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Room manager" })).toBeInTheDocument();
+    rerender(<AppHeaderBar {...props} phone />);
+    expect(screen.queryByLabelText("Open navigation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Room manager" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Reports" })).toBeInTheDocument();
   });
 });

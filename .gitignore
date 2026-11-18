@@ -78,3 +78,7 @@ Downloaded-Models/
 art/blender/*.blend
 art/blender/*.blend1
 art/blender/*.blend2
+
+# Owner-private knowledge: network map, hosts and filled setup answers stay on this PC only.
+/knowledge/
+/SETUP-INFO-NEEDED.txt

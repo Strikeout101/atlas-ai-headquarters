@@ -1,0 +1,238 @@
+# ATLAS master checklist
+
+The one place for everything that is pending: features to build, accounts to connect, decisions to make and loose ends.
+Anything pending goes here, not in chat, not only in `tasks/todo.md` and not in a phase doc.
+
+**Goal:** agents run the businesses (Small Business Tech, Primrose Events, AI Ventures), the homelab and whatever comes next on their own.
+Today the owner approves almost everything because the system is being tested. That is temporary.
+In the end the owner approves only big deals, important clients, money and anything irreversible.
+
+**Not in scope for now:** the 3D office and gameplay. The foundation is in place and it is parked until after this list (see section 15).
+
+Last full review: 2026-11-17.
+
+## How to use this file
+
+- `[ ]` not started, `[~]` partly done or built but not connected, `[x]` done (move it to "Done" at the bottom with the date).
+- **YOU** means only the owner can do it: an account, a password, a decision or a real-world check. Agents must not do these.
+- **P1** blocks the autonomy goal or something already half built. **P2** is needed for real day-to-day running. **P3** is nice to have.
+- Rules for agents (also in `AGENTS.md`):
+  - When you find, create or leave anything pending, add it here in the right section in the same change.
+  - When you finish an item, tick it and add a one-line note with the date and where it lives (file, page or doc).
+  - Do not delete items you did not finish. If an item is no longer wanted, mark it `[x] dropped:` with the reason.
+  - Do not put passwords, tokens, API keys or customer private data in this file.
+
+---
+
+## 0. What works today (short version)
+
+- **Tasks and agents:** CLI agents (Codex, Claude, Gemini, OpenCode, Kimi) run tasks in git worktrees. There are departments, meetings, reports, a task board and the Today page.
+- **Approvals:** two VPs review proposals, model upgrades, org changes and Ventures email or listings. Everything for Tech and Rental customers goes to the owner. Emergency pause and stop are available.
+- **Autonomy engine:** goals, scored opportunities, research schedules, a daily start cap and a usage-headroom gate. Nothing is configured yet and every routine is off.
+- **Businesses:** contacts, tickets (Tech), quotes (Rental), drafts, a deals pipeline, a ledger and spend requests. These are records only.
+- **Email:** three business mailboxes are connected and tested. Sending works after owner approval, one recipient, plain text. Nothing reads the inbox.
+- **Instagram:** the Primrose account row exists, read-only, but no access token is stored, so nothing is connected yet.
+- **Square:** read-only sync is on. Tech and Ventures locations are mapped; Primrose (Rental) is not mapped yet.
+- **Listings:** agents prepare Etsy and itch.io packages. The owner publishes them by hand.
+- **Homelab:** real SSH to one host. Read-only commands run automatically; everything else needs approval.
+- **Models:** Codex and Claude subscriptions; one local model host (`Precision`, address in `knowledge/systems.md`) is configured but no agent uses it. No model director agent is set. A usage cache tracks headroom.
+- **Phone access:** password login over the home VPN. Phones get the Today dashboard (no 3D office).
+- **Agent knowledge:** every task prompt carries the project goal, the business profile, a systems summary and relevant memories. Agents use `knowledge.get`, `memory.search` and `memory.add`. Review memories under Team > Knowledge.
+
+---
+
+## 1. Loose ends right now
+
+- [x] **P1** (2026-11-17, committed together with agent knowledge and memory) Commit the phone layout and VPN launcher work Codex finished on 2026-11-16 (bottom tabs, menu drawer, Office hidden on phones, `start-atlas.bat` now runs `pnpm dev`). It is verified but uncommitted.
+- [ ] **P1** Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
+- [ ] **P2 YOU** Instagram: connect a token in Settings > Businesses and run Test. The account row exists but no token is stored.
+- [ ] **P2 YOU** Square: map the Primrose (Rental) location too. Only Tech and Ventures are mapped.
+- [ ] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17).
+- [ ] **P2** Register real projects (website repos) with their business set, so tasks get the right project goal and profile. There are no projects yet.
+- [ ] **P2** `tasks/todo.md` still says phases 5 and 6 are uncommitted, but both are committed (ed837fc and e18c0b0). Correct the notes.
+- [ ] **P2** Open items still sitting in `tasks/todo.md`: Ctrl+K commands for the emergency controls, Etsy API publishing, itch.io uploads, owner create/edit of listing packages. The Ventures mailbox test that the file still lists as pending has since passed. Keep these items here from now on.
+
+## 2. Agent knowledge and memory (the "no scavenger hunt" foundation)
+
+Built 2026-11-17: agents now get a knowledge block (project goal, business profile, systems summary, relevant memories) in every task prompt, plus `knowledge.get`, `memory.search` and `memory.add` tools. Details: `docs/agent-tools.md`, `docs/README.md`.
+
+- [x] **P1** (2026-11-17, `knowledge/systems.md`, kept out of git by owner decision; template in `knowledge.example/`) Write a **systems registry** at `docs/systems.md`: every system, where it lives, how it is reached and which tool or page controls it. Cover the app, ports, DB, backups, logs, mailboxes, social accounts, Square, GitHub accounts and repos, Vercel projects, domains, homelab hosts and model hosts. Use names and locations only, never secrets.
+- [x] **P1** (2026-11-17, `server/modules/agent-knowledge.ts`, injected via `buildTaskExecutionPrompt`) Inject a short version of the registry plus the relevant business profile into every agent prompt, and add an agent tool to read the full registry (`knowledge.get`).
+- [x] **P1** (2026-11-17, `server/modules/agent-memory.ts`, review in Team > Knowledge) Add **persistent agent memory**: a table of facts and lessons that agents can write after a task and that is searched before a task. It should support scoping (global, per business, per project), sources and an owner review, so a bad lesson can be removed.
+- [x] **P1** (2026-11-17, part of the knowledge block; projects now have a Business field) Inject the project core goal into every task prompt directly. Today it appears only when the delegation step adds it.
+- [x] **P2** (2026-11-17, `docs/agent-tools.md`, `docs/api.md`, openapi with its own task-token scheme) Document the agent tool gateway (`/api/agent-tools`) in `docs/api.md` and the OpenAPI file. Today it is described only by one long line inside the prompt.
+- [x] **P2** (2026-11-17) Add `docs/README.md` as an index, and mark which docs are current reference and which are dated history (phase docs, `operations-setup-2026-11-12`, `agent-access-review-2026-11-14`).
+- [x] **P2** (2026-11-17, filled from `SETUP-INFO-NEEDED.txt`; Ventures named Eduardo Capital; owner review pending in section 1) Fill business profiles (services, prices or pricing rules, hours, service area, brand voice, do and don't) so agents stop guessing. Needs answers from section 14.
+- [x] **P3** (2026-11-17, Team > Knowledge > Systems / Checklist) Show this checklist and the systems registry inside ATLAS (read-only page or a Settings tab), so they can be read from the phone.
+- [ ] **P2** Not yet covered by the knowledge block: chat replies, meetings and the think loop (one-shot prompts). Only the planner and VP review got business profiles.
+- [ ] **P2** Ask agents for lessons automatically at task end (today they are told to call `memory.add`; nothing checks that they do).
+- [ ] **P3** Keep `knowledge/systems.md` current: update it when hosts, accounts or projects change (agents can read it but not write it).
+
+## 3. Accounts, identities and credentials
+
+- [ ] **P1** **Multiple GitHub accounts.** Today GitHub uses a single "top priority" account, and it isn't connected yet (no GitHub account is saved). Support several accounts, each with a label and an owning business (Primrose vs personal), and pick the account by repo or project. Agents should push with the matching account, not the PC's global git login.
+- [ ] **P1 YOU** Connect both GitHub accounts once the step above exists (fine-grained tokens or a GitHub App per account, limited to the repos each needs).
+- [ ] **P1** **Worker isolation.** Agents run with permission checks turned off (`--dangerously-skip-permissions`, `--yolo`, `--auto`) as the same Windows user as ATLAS, so they can read `.env` and the database directly. Before agents get more powerful accounts, run them under a separate user or container that has no access to ATLAS secrets.
+- [ ] **P2** Scope agent business access by business and department. Today any agent can create, edit or delete records for all three businesses.
+- [ ] **P2** One credential area in Settings listing every connected account, its business, its last successful test and its expiry date, plus a warning before tokens expire.
+- [ ] **P2** Instagram tokens have no automatic refresh. Add a refresh job before the 60-day expiry.
+
+## 4. Websites and code (GitHub + Vercel)
+
+Nothing exists for this yet.
+
+- [ ] **P1 YOU** List each website with its repo, GitHub account, Vercel project, domain and registrar (for the systems registry).
+- [ ] **P1** Register website repos as ATLAS projects with absolute paths and the correct GitHub account.
+- [ ] **P1** Add a Vercel integration (token per Vercel account or team): list projects, deployments, build logs, environment variable names (not values) and domains.
+- [ ] **P1** Website change flow: agent branch, then pull request, then Vercel preview URL, then automatic checks (build, links, a screenshot on phone and desktop), then merge. Small content edits merge automatically once trusted (section 10). Layout or pricing changes go to the owner.
+- [ ] **P2** Watch production: uptime checks, failed deployment alerts, SSL and domain expiry.
+- [ ] **P2** DNS: read records at the registrar or Cloudflare. Changes always need approval.
+- [ ] **P3** Site analytics (Vercel Analytics or similar) feeding goals: visits, contact form leads.
+- [ ] **P3** Contact forms on the websites create a contact and a ticket or quote in ATLAS automatically.
+
+## 5. Social media
+
+Today Instagram can be read, and drafts exist as records only. No platform can be posted to.
+
+- [ ] **P1** Instagram publishing through the Graph API (needs a Facebook Page and a Meta app). Include photo, carousel, caption and a scheduled time, all under the approval policy.
+- [ ] **P1** Content calendar: planned posts per business with status, date, platform and the assets used.
+- [ ] **P2** Facebook Page posting (same Meta app).
+- [ ] **P2** Google Business Profile: posts, reviews and replies to reviews. This matters a lot for local service businesses.
+- [ ] **P2** Comment and DM inbox: read new comments and messages, draft replies, send under policy.
+- [ ] **P2** OAuth login flow for social accounts, so tokens are not pasted by hand.
+- [ ] **P3** TikTok (deferred), then others as needed.
+- [ ] **P3** Post performance (reach, likes, follows) feeding goals and the next content plan.
+- [ ] **P2** Media library: brand assets, logos, photos of rentals and work, with tags agents can search.
+
+## 6. Selling pages and storefronts
+
+- [ ] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites.
+- [ ] **P1** Etsy API publishing (needs an Etsy-approved developer app). Include listing create and update, inventory, prices within limits, and reading orders.
+- [ ] **P2** itch.io uploads with the butler tool.
+- [ ] **P2** Orders flow: new order, record it, fulfil it (digital delivery or a task), send the customer a message, and mark the deal paid only from verified payment evidence.
+- [ ] **P2** Raise the listing fee budget from $0 if you want VPs to approve normal Etsy listings. Today every $0.20 listing goes to the owner.
+- [ ] **P3** Square catalog and invoices (read first, then create invoices under the approval policy).
+
+## 7. Communication
+
+- [ ] **P1** Inbox sync (IMAP) for the three mailboxes. New mail becomes a thread linked to a contact. Agents classify it and draft replies.
+- [ ] **P1** Owner notifications on the phone: Telegram bot (the code exists, but no token is set) and/or web push. These are for approvals waiting, failures, money and big leads.
+- [ ] **P2** Email: support STARTTLS on port 587, CC, attachments (quotes as PDF), HTML with a signature, and threads (reply in the same conversation).
+- [ ] **P2** SMS provider (Twilio or similar) for reminders and replies. Draft records already exist.
+- [ ] **P2** Install ATLAS on the phone home screen (PWA manifest and icon).
+- [ ] **P3** Phone calls and voicemail transcription to a ticket or quote.
+- [ ] **P3** A daily and weekly owner digest by email or Telegram: what happened, money in, what is waiting.
+
+## 8. Business operations
+
+### Small Business Tech
+
+- [ ] **P2** Device history per client (devices, serials, past work).
+- [ ] **P2** Estimates and invoices (create from a ticket, send under policy). Payment collection stays separate (section 10).
+- [ ] **P2** Appointments with a real calendar (Google Calendar or similar), with booking links and reminders.
+- [ ] **P2** Client conversation history in one timeline: email, SMS, calls, tickets.
+
+### Primrose Events (rentals)
+
+- [ ] **P1 YOU** Provide the rental inventory, pricing rules, delivery and service area rules, and an example quote format.
+- [ ] **P2** Inventory and availability by date, so a quote cannot double-book an item.
+- [ ] **P2** Pre-event and post-event message schedule: confirmation, delivery reminder, check-out, check-in, review request.
+- [ ] **P2** Quote documents (PDF) and acceptance tracking. Today "shared" sends nothing.
+- [ ] **P3** Contracts and waivers to sign.
+
+### AI Ventures
+
+- [ ] **P2** A pipeline from idea to product to listing to sale, with results tracked per product.
+- [ ] **P3** Asset generation and quality checks before a listing is prepared.
+
+### Shared
+
+- [ ] **P2** A real calendar module across all businesses (today Events only groups quotes by date).
+- [ ] **P2** Lead sources for the research schedules (which sites, directories or maps are allowed). The engine never invents leads.
+- [ ] **P3** Import existing customers and jobs (from Square, sheets or wherever they live now).
+
+## 9. Homelab
+
+- [ ] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now.
+- [ ] **P2** Switch from password to SSH key auth, using a dedicated agent login per host with only the sudo it needs.
+- [ ] **P2** Turn on `restrict_agents` and grant hosts to the homelab department only.
+- [ ] **P2** Proxmox API (read: nodes, VMs, containers, storage, backups). Changes under policy.
+- [ ] **P2** Monitoring and alerts: disk, backups, container health, updates waiting.
+- [ ] **P3** Routine maintenance schedules (updates, backup checks) that run on their own within the approved command list.
+- [ ] **P3** A change log per host that agents write after every change.
+
+## 10. Autonomy and approvals (moving from testing to real running)
+
+Today every rule is hard-coded. Tech and Rental customer-facing work always goes to the owner. There is no client importance, deal size or trust level.
+
+- [ ] **P1** **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
+- [ ] **P1** **Client importance:** add a tier on contacts (normal, important, VIP). Important and VIP clients always go to the owner; normal clients follow the policy.
+- [ ] **P1** **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic.
+- [ ] **P1** Remove the hard-coded line in the VP review prompt that forces every Tech and Rental customer item to escalate. Read the policy instead.
+- [ ] **P1** Fix the free-text keyword check: any message containing words like "pay" or "buy" goes to the owner, which catches normal customer emails. Use structured facts instead.
+- [ ] **P2** **Trust ramp:** after N approved items of a kind with no corrections, offer to move that kind down a level. Record the track record per agent and per action.
+- [ ] **P2** Spending tiers: a monthly budget per business and category with a per-item limit. Today every spend request goes to the owner with no threshold, and an approval only records permission; no money moves.
+- [ ] **P2** Send paths for social posts and SMS under the same policy (today they cannot be sent at all).
+- [ ] **P2** Owner override and undo: an audit list of everything done automatically, with a way to flag a mistake that turns into a lesson (section 2).
+- [ ] **P2 YOU** Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines.
+- [ ] **P3** Profit goals (needs costs plus verified revenue).
+- [ ] **P3** Money movement (refunds, payouts, deposits) stays manual until you decide otherwise.
+
+## 11. Models and workers
+
+- [ ] **P1** Run one real end-to-end autonomous cycle and record the result. It has never been verified: a goal, then the planner, then VP review, then a worker run, then the result.
+- [ ] **P2** Fix: a failed merge can still mark a task Done.
+- [ ] **P2** Use the Ollama host. It is configured but no agent uses it. Route cheap and routine work to it.
+- [ ] **P2** Web search and browsing tool for agents. `tools/playwright-mcp` is an empty folder; research relies on each CLI's own tools.
+- [ ] **P2** Agent performance tracking: success rate, rework and cost per agent and per model, feeding the model director.
+- [ ] **P3** Separate technical and design directors.
+- [ ] **P3** The small local-model prompt is at its size limit (2660 of 2662 bytes). Trim it before adding anything.
+
+## 12. Reliability and operations
+
+- [ ] **P1** Run ATLAS as a Windows service or scheduled task that starts at boot and restarts after a crash. Today it stops when the console window closes.
+- [ ] **P1** Automatic database backups (daily, keep 30 days, plus a copy off the PC such as the homelab or cloud). Include a restore test. Today backups are manual snapshots only.
+- [ ] **P1** Turn off or redirect the auto-updater. It points at the upstream claw-empire releases, which would overwrite this fork. It is off now; make sure it stays off.
+- [ ] **P2** HTTPS for phone access (Tailscale Serve or a local certificate). Today it is plain HTTP over the VPN.
+- [ ] **P2** Health alerts: if the server, a mailbox, a sync or a VP stops working, notify the owner (section 7).
+- [ ] **P2** Save server logs to files and rotate the logs folder.
+- [ ] **P2** Check that CI runs and passes on the fork (`.github/workflows/ci.yml` is inherited from upstream).
+- [ ] **P3** Move the live database out of the repo folder into a data folder.
+
+## 13. Repo and docs cleanup
+
+- [ ] **P2** Rewrite `README.md` for ATLAS (it is still entirely the upstream claw-empire README, plus the jp, ko and zh copies).
+- [ ] **P2** Remove or archive upstream leftovers: `docs/releases`, `docs/plans`, `docs/decision-inbox-checkpoint-2026-02-22.md`, Linux `deploy/`, Docker files if unused, `install.sh` and `install.ps1`, and the old launcher `scripts/run-claw-empire-dev-local.cmd`.
+- [ ] **P3** `public/models` (53 MB of GLB files) is committed to git. Decide whether to move it to Git LFS or out of the repo (ties into the 3D work later).
+- [ ] **P3** Clear `.tmp/` dev leftovers and `test-results/`.
+- [ ] **P3** Replace the claw-empire favicon and branding with ATLAS.
+
+## 14. Answers only the owner can give (YOU) 
+
+**Please review I have updated `SETUP-INFO-NEEDED.txt`
+
+Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the business profiles and `knowledge/systems.md` on 2026-11-17. Still open below.
+
+- [x] (2026-11-17, in business profiles) Service areas, business hours and prices or pricing rules for each business.
+- [x] (2026-11-17, in business profiles: no unapproved discounts, availability promises, price changes or money handling) Topics, promises, discounts or customer groups agents must avoid.
+- [ ] Which deals and which clients count as "big" or "important" (amounts and names or rules), for section 10.
+- [ ] Monthly spending budget per business and per provider (AI subscriptions, listing fees, ads).
+- [ ] Posting frequency and the platforms for each business. (Partly answered: agents give ideas and drafts; the owner and partner post videos. Frequency still open.)
+- [x] (2026-11-17: reputable public sources) Acceptable sources for lead research.
+- [ ] Where customers, jobs and quotes live today (the source of truth to import from). (Partly answered: Google Sheets for leads, Square for quotes; ATLAS is the source of truth from now on.)
+- [x] (2026-11-17: yes, director-approved) Whether routine model upgrades may be approved by the director without you.
+- [x] (2026-11-17, in `knowledge/systems.md`) Hardware available to run workers (main PC, homelab, Precision laptop) and when.
+
+## 15. Later: 3D office and gameplay (parked)
+
+- [ ] The 15 open office and 3D visual items in `tasks/todo.md` (approximately lines 143, 148, 207-213, 255-256, 349-350, 363 and 408). Move them here when that work resumes.
+
+---
+
+## Done
+
+- 2026-11-16: Phone layout with dashboard only (no 3D office on phones) and password-protected access over the home VPN. Committed 2026-11-17.
+- 2026-11-17: First full feature review and this checklist.
+- 2026-11-17: Agent knowledge and memory (section 2): systems registry, filled business profiles, knowledge block in task prompts, persistent memory with owner review, `knowledge.get` / `memory.*` tools, Team > Knowledge page, docs index. `SETUP-INFO-NEEDED.txt` moved out of git.
+- [X] **P1 YOU** Open ATLAS on the phone over the home VPN and confirm the login page loads at the PC's LAN address on port 8800. ## 11/17 Cofirmed 
+- [x] **P1 YOU** Square: press Test in Settings > Businesses > Square, map a real location to each business, then turn sync on. The token is already saved. - 11/17 Thsi si done functionality still needs to be tested through the agents 

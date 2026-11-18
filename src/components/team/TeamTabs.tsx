@@ -1,10 +1,11 @@
-import { BookOpen, Bot, Clapperboard, type LucideIcon } from "lucide-react";
+import { BookOpen, Bot, Brain, Clapperboard, type LucideIcon } from "lucide-react";
 import { useI18n } from "../../i18n";
 import type { View } from "../../app/types";
 
 const TABS: Array<{ view: View; icon: LucideIcon; label: { ko: string; en: string; ja: string; zh: string } }> = [
   { view: "agents", icon: Bot, label: { ko: "에이전트", en: "Agents", ja: "エージェント", zh: "代理" } },
   { view: "vp_decisions", icon: Bot, label: { ko: "VP 결정", en: "VP decisions", ja: "VPの決定", zh: "VP决策" } },
+  { view: "knowledge", icon: Brain, label: { ko: "지식", en: "Knowledge", ja: "ナレッジ", zh: "知识" } },
   { view: "skills", icon: BookOpen, label: { ko: "문서고", en: "Library", ja: "ライブラリ", zh: "文档库" } },
   {
     view: "model_director",

@@ -53,6 +53,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
   const [name, setName] = useState("");
   const [projectPath, setProjectPath] = useState("");
   const [coreGoal, setCoreGoal] = useState("");
+  const [business, setBusiness] = useState<Project["business"]>(null);
   const [saving, setSaving] = useState(false);
   const [reportDetail, setReportDetail] = useState<TaskReportDetail | null>(null);
 
@@ -118,6 +119,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
           setName(res.project.name);
           setProjectPath(res.project.project_path);
           setCoreGoal(res.project.core_goal);
+          setBusiness(res.project.business ?? null);
           setAssignmentMode(res.project.assignment_mode || "auto");
           setSelectedAgentIds(new Set(res.project.assigned_agent_ids || []));
         }
@@ -217,6 +219,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
     setName(viewedProject.name);
     setProjectPath(viewedProject.project_path);
     setCoreGoal(viewedProject.core_goal);
+    setBusiness(viewedProject.business ?? null);
     setAssignmentMode(viewedProject.assignment_mode || "auto");
     setSelectedAgentIds(new Set(viewedProject.assigned_agent_ids || []));
     setManualAssignmentWarning(null);
@@ -236,6 +239,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
     editingProjectId,
     name,
     coreGoal,
+    business,
     selectedAgentIds,
     loadProjects,
     search,
@@ -380,6 +384,8 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
                   setProjectPath={setProjectPath}
                   coreGoal={coreGoal}
                   setCoreGoal={setCoreGoal}
+                  business={business}
+                  setBusiness={setBusiness}
                   saving={saving}
                   canSave={canSave}
                   pathToolsVisible={pathToolsVisible}
@@ -423,6 +429,7 @@ export default function ProjectManagerModal({ agents, departments = [], onClose 
                       setName(viewedProject.name);
                       setProjectPath(viewedProject.project_path);
                       setCoreGoal(viewedProject.core_goal);
+                      setBusiness(viewedProject.business ?? null);
                     }
                   }}
                   onStartEditSelected={startEditSelected}

@@ -15,6 +15,8 @@ interface SidebarProps {
   /** Items waiting on the owner; shown as a badge on Today. */
   needsYouCount?: number;
   onOpenCommandBar?: () => void;
+  /** Views left out of the list, e.g. the Office on a phone. */
+  hiddenViews?: View[];
 }
 
 function monogram(name: string): string {
@@ -35,6 +37,7 @@ export default function Sidebar({
   connected,
   needsYouCount = 0,
   onOpenCommandBar,
+  hiddenViews,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { t, locale } = useI18n();
@@ -45,7 +48,9 @@ export default function Sidebar({
 
   const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
-  const sidebarItems = NAV_ITEMS.filter((item) => item.inSidebar !== false);
+  const sidebarItems = NAV_ITEMS.filter(
+    (item) => item.inSidebar !== false && !(hiddenViews?.includes(item.view) ?? false),
+  );
   const renderItem = ({ view, icon: Icon, label, activeFor }: NavItem) => {
     const text = t(label);
     const isActive = currentView === view || (activeFor?.includes(currentView) ?? false);

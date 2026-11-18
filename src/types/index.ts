@@ -142,6 +142,8 @@ export interface Project {
   created_at: number;
   updated_at: number;
   github_repo?: string | null;
+  /** The business this project serves; agents get that business's profile. */
+  business?: "tech" | "rental" | "ventures" | null;
 }
 
 export interface TaskLog {

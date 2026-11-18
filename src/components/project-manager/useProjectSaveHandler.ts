@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { checkProjectPath, createProject, isApiRequestError, updateProject } from "../../api";
-import type { AssignmentMode } from "../../types";
+import type { AssignmentMode, Project } from "../../types";
 import type { ManualAssignmentWarning, ProjectI18nTranslate } from "./types";
 import type { ProjectManagerPathTools } from "./useProjectManagerPathTools";
 
@@ -17,6 +17,7 @@ interface UseProjectSaveHandlerParams {
   editingProjectId: string | null;
   name: string;
   coreGoal: string;
+  business: Project["business"];
   selectedAgentIds: Set<string>;
   loadProjects: (targetPage: number, keyword: string) => Promise<void>;
   search: string;
@@ -39,6 +40,7 @@ export function useProjectSaveHandler({
   editingProjectId,
   name,
   coreGoal,
+  business,
   selectedAgentIds,
   loadProjects,
   search,
@@ -117,6 +119,7 @@ export function useProjectSaveHandler({
             name: name.trim(),
             project_path: savePath,
             core_goal: coreGoal.trim(),
+            business: business ?? null,
             create_path_if_missing: createPathIfMissing,
             assignment_mode: assignmentMode,
             agent_ids: assignmentMode === "manual" ? Array.from(selectedAgentIds) : [],
@@ -127,6 +130,7 @@ export function useProjectSaveHandler({
             name: name.trim(),
             project_path: savePath,
             core_goal: coreGoal.trim(),
+            business: business ?? null,
             create_path_if_missing: createPathIfMissing,
             assignment_mode: assignmentMode,
             agent_ids: assignmentMode === "manual" ? Array.from(selectedAgentIds) : [],
