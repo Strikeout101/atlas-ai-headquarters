@@ -51,7 +51,7 @@ async function run() {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle");
 
-  const officeButton = page.getByRole("button", { name: /Office|오피스|オフィス|办公室/i }).first();
+  const officeButton = page.getByRole("button", { name: /Office/i }).first();
   if (await officeButton.isVisible().catch(() => false)) {
     await officeButton.click();
     await page.waitForLoadState("networkidle");

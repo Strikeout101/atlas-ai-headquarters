@@ -7,7 +7,7 @@ import {
 } from "./interrupt-injection-tools.ts";
 
 describe("interrupt injection tools", () => {
-  it("sanitizeInterruptPrompt는 기본 정규화/검증을 수행한다", () => {
+  it("sanitizeInterruptPrompt normalizes and validates", () => {
     const ok = sanitizeInterruptPrompt("  hello\r\nworld  ");
     expect(ok).toEqual({ ok: true, value: "hello\nworld" });
 
@@ -22,7 +22,7 @@ describe("interrupt injection tools", () => {
     });
   });
 
-  it("hash/build block 출력이 안정적이다", () => {
+  it("hash and build block output is stable", () => {
     const hash = hashInterruptPrompt("alpha");
     expect(hash).toHaveLength(64);
     const rows: TaskInterruptInjectionRow[] = [

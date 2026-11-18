@@ -111,7 +111,7 @@ describe("selectAutoAssignableAgentForTask", () => {
     }
   });
 
-  it("프로젝트 manual 모드에서는 지정 인원 범위로만 자동 배정한다", () => {
+  it("in project manual mode, auto-assigns only within the chosen staff", () => {
     const db = setupDb();
     try {
       insertAgent(db, { id: "agent-plan", name: "Planner", department_id: "planning", created_at: 1 });
@@ -130,7 +130,7 @@ describe("selectAutoAssignableAgentForTask", () => {
     }
   });
 
-  it("선호 부서가 비어있으면 전체 idle/break 인원으로 폴백한다", () => {
+  it("falls back to all idle or on-break staff when the preferred department is empty", () => {
     const db = setupDb();
     try {
       insertAgent(db, {
@@ -160,7 +160,7 @@ describe("selectAutoAssignableAgentForTask", () => {
     }
   });
 
-  it("copilot 계정이 없으면 OAuth 없는 provider를 건너뛰고 다른 후보를 선택한다", () => {
+  it("without a copilot account, skips providers lacking OAuth and picks another candidate", () => {
     const db = setupDb();
     try {
       insertAgent(db, {
@@ -189,7 +189,7 @@ describe("selectAutoAssignableAgentForTask", () => {
     }
   });
 
-  it("copilot 활성 계정이 있으면 copilot 후보를 정상 선택한다", () => {
+  it("with an active copilot account, picks the copilot candidate", () => {
     const db = setupDb();
     try {
       db.prepare("INSERT INTO oauth_accounts (id, provider, status) VALUES (?, ?, ?)").run(

@@ -50,7 +50,7 @@ function statusClass(status: string): string {
 
 export default function TaskReportPopup({ report, agents, departments, uiLanguage, onClose }: TaskReportPopupProps) {
   useEscapeToClose(onClose);
-  const t = (text: { ko: string; en: string; ja?: string; zh?: string }) => pickLang(uiLanguage, text);
+  const t = (text: { en: string }) => pickLang(uiLanguage, text);
 
   const [currentReport, setCurrentReport] = useState<TaskReportDetail>(report);
   const [refreshingArchive, setRefreshingArchive] = useState(false);
@@ -106,14 +106,8 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
   const taskDeptFromMap = currentReport.task.department_id
     ? departmentById.get(currentReport.task.department_id)
     : undefined;
-  const taskAgentName =
-    uiLanguage === "ko"
-      ? currentReport.task.agent_name_ko || currentReport.task.agent_name
-      : currentReport.task.agent_name;
-  const taskDeptName =
-    uiLanguage === "ko"
-      ? taskDeptFromMap?.name_ko || currentReport.task.dept_name_ko || currentReport.task.dept_name
-      : taskDeptFromMap?.name || currentReport.task.dept_name || currentReport.task.dept_name_ko;
+  const taskAgentName = currentReport.task.agent_name;
+  const taskDeptName = taskDeptFromMap?.name || currentReport.task.dept_name || currentReport.task.dept_name_ko;
 
   const selectedTeam = useMemo(() => {
     if (activeTab === "planning") return null;
@@ -131,11 +125,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
 
   const renderDocuments = (documents: TaskReportDocument[], scopeKey: string) => {
     if (!documents.length) {
-      return (
-        <p className="text-xs text-slate-500">
-          {t({ ko: "문서가 없습니다", en: "No documents", ja: "ドキュメントなし", zh: "暂无文档" })}
-        </p>
-      );
+      return <p className="text-xs text-slate-500">{t({ en: "No documents" })}</p>;
     }
 
     const totalPages = Math.max(1, Math.ceil(documents.length / DOCUMENTS_PER_PAGE));
@@ -162,9 +152,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   onClick={() => toggleDoc(doc.id)}
                   className="rounded-md border border-slate-600 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700"
                 >
-                  {isExpanded
-                    ? t({ ko: "접기", en: "Collapse", ja: "折りたたむ", zh: "收起" })
-                    : t({ ko: "확장", en: "Expand", ja: "展開", zh: "展开" })}
+                  {isExpanded ? t({ en: "Collapse" }) : t({ en: "Expand" })}
                 </button>
               </div>
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-[11px] leading-relaxed text-slate-300">
@@ -185,14 +173,11 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   : "bg-slate-700 text-slate-200 hover:bg-slate-600"
               }`}
             >
-              {t({ ko: "이전", en: "Prev", ja: "前へ", zh: "上一页" })}
+              {t({ en: "Prev" })}
             </button>
             <span className="text-[11px] text-slate-400">
               {t({
-                ko: `페이지 ${currentPage}/${totalPages}`,
                 en: `Page ${currentPage}/${totalPages}`,
-                ja: `ページ ${currentPage}/${totalPages}`,
-                zh: `第 ${currentPage}/${totalPages} 页`,
               })}
             </span>
             <button
@@ -207,7 +192,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   : "bg-slate-700 text-slate-200 hover:bg-slate-600"
               }`}
             >
-              {t({ ko: "다음", en: "Next", ja: "次へ", zh: "下一页" })}
+              {t({ en: "Next" })}
             </button>
           </div>
         )}
@@ -221,10 +206,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
         <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-xs font-semibold text-emerald-300">
             {t({
-              ko: "기획팀장 최종 취합본",
               en: "Planning Lead Consolidated Summary",
-              ja: "企画リード統合サマリー",
-              zh: "规划负责人汇总摘要",
             })}
           </p>
           <div className="flex items-center gap-2">
@@ -237,26 +219,20 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   : "border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
               }`}
             >
-              {refreshingArchive
-                ? t({ ko: "갱신 중...", en: "Refreshing...", ja: "更新中...", zh: "刷新中..." })
-                : t({ ko: "취합 갱신", en: "Refresh Consolidation", ja: "統合更新", zh: "刷新汇总" })}
+              {refreshingArchive ? t({ en: "Refreshing..." }) : t({ en: "Refresh Consolidation" })}
             </button>
             <span className="text-[11px] text-emerald-400">{fmtTime(planningSummary?.generated_at)}</span>
           </div>
         </div>
         <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-emerald-100">
-          {planningSummary?.content ||
-            t({ ko: "요약 내용이 없습니다", en: "No summary text", ja: "サマリーなし", zh: "暂无摘要内容" })}
+          {planningSummary?.content || t({ en: "No summary text" })}
         </pre>
       </div>
       {branchVerificationLogs.length > 0 && (
         <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
           <p className="mb-2 text-xs font-semibold text-blue-200">
             {t({
-              ko: "최종 브랜치 검증",
               en: "Final Branch Verification",
-              ja: "最終ブランチ検証",
-              zh: "最终分支校验",
             })}
           </p>
           <div className="space-y-1.5">
@@ -273,9 +249,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
         </div>
       )}
       <div>
-        <p className="mb-2 text-xs font-medium text-slate-500">
-          {t({ ko: "문서 원문", en: "Source Documents", ja: "原本文書", zh: "原始文档" })}
-        </p>
+        <p className="mb-2 text-xs font-medium text-slate-500">{t({ en: "Source Documents" })}</p>
         {renderDocuments(planningDocs, "planning")}
       </div>
     </div>
@@ -283,11 +257,8 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
 
   const renderTeamReport = (team: TaskReportTeamSection) => {
     const teamDeptFromMap = team.department_id ? departmentById.get(team.department_id) : undefined;
-    const teamName =
-      uiLanguage === "ko"
-        ? teamDeptFromMap?.name_ko || team.department_name_ko || team.department_name
-        : teamDeptFromMap?.name || team.department_name || team.department_name_ko;
-    const teamAgent = uiLanguage === "ko" ? team.agent_name_ko || team.agent_name : team.agent_name;
+    const teamName = teamDeptFromMap?.name || team.department_name || team.department_name_ko;
+    const teamAgent = team.agent_name;
     const logs = team.logs ?? [];
     const keyLogs = logs.filter((lg) => lg.kind === "system" || lg.message.includes("Status")).slice(-20);
 
@@ -302,16 +273,14 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
             {teamName} · {teamAgent || "-"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {t({ ko: "완료", en: "Completed", ja: "完了", zh: "完成" })}: {fmtTime(team.completed_at)}
+            {t({ en: "Completed" })}: {fmtTime(team.completed_at)}
           </p>
           <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{team.summary || "-"}</p>
         </div>
 
         {team.linked_subtasks.length > 0 && (
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">
-              {t({ ko: "연결된 서브태스크", en: "Linked Subtasks", ja: "関連サブタスク", zh: "关联子任务" })}
-            </p>
+            <p className="mb-2 text-xs font-medium text-slate-500">{t({ en: "Linked Subtasks" })}</p>
             <div className="space-y-1.5">
               {team.linked_subtasks.map((st) => (
                 <div
@@ -327,17 +296,13 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
         )}
 
         <div>
-          <p className="mb-2 text-xs font-medium text-slate-500">
-            {t({ ko: "팀 문서", en: "Team Documents", ja: "チーム文書", zh: "团队文档" })}
-          </p>
+          <p className="mb-2 text-xs font-medium text-slate-500">{t({ en: "Team Documents" })}</p>
           {renderDocuments(team.documents ?? [], `team:${team.id}`)}
         </div>
 
         {keyLogs.length > 0 && (
           <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">
-              {t({ ko: "진행 로그", en: "Progress Logs", ja: "進行ログ", zh: "进度日志" })}
-            </p>
+            <p className="mb-2 text-xs font-medium text-slate-500">{t({ en: "Progress Logs" })}</p>
             <div className="space-y-1">
               {keyLogs.map((lg, idx) => (
                 <div key={`${lg.created_at}-${idx}`} className="text-[11px] text-slate-400">
@@ -364,10 +329,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
               <span className="text-xl">&#x1F4CB;</span>
               <h2 className="truncate text-lg font-bold text-white">
                 {t({
-                  ko: "작업 완료 보고서",
                   en: "Task Completion Report",
-                  ja: "タスク完了レポート",
-                  zh: "任务完成报告",
                 })}
               </h2>
               <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">{projectName}</span>
@@ -393,8 +355,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   {taskAgentName} ({currentReport.task.agent_role})
                 </span>
                 <span>
-                  {t({ ko: "완료", en: "Completed", ja: "完了", zh: "完成" })}:{" "}
-                  {fmtTime(currentReport.task.completed_at)}
+                  {t({ en: "Completed" })}: {fmtTime(currentReport.task.completed_at)}
                 </span>
                 <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-400">
                   {elapsed(currentReport.task.created_at, currentReport.task.completed_at)}
@@ -414,13 +375,10 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
                   : "bg-slate-800 text-slate-300 hover:bg-slate-700"
               }`}
             >
-              {t({ ko: "기획팀장 취합본", en: "Planning Summary", ja: "企画サマリー", zh: "规划汇总" })}
+              {t({ en: "Planning Summary" })}
             </button>
             {teamReports.map((team) => {
-              const label =
-                uiLanguage === "ko"
-                  ? team.department_name_ko || team.department_name || team.department_id || "팀"
-                  : team.department_name || team.department_id || "Team";
+              const label = team.department_name || team.department_id || "Team";
               return (
                 <button
                   key={team.id}
@@ -444,10 +402,7 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
           ) : (
             <p className="text-sm text-slate-500">
               {t({
-                ko: "표시할 보고서가 없습니다",
                 en: "No report to display",
-                ja: "表示するレポートがありません",
-                zh: "没有可显示的报告",
               })}
             </p>
           )}
@@ -457,17 +412,14 @@ export default function TaskReportPopup({ report, agents, departments, uiLanguag
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500">
               {t({
-                ko: `팀 보고서 ${teamReports.length}개`,
                 en: `${teamReports.length} team reports`,
-                ja: `チームレポート ${teamReports.length}件`,
-                zh: `${teamReports.length} 个团队报告`,
               })}
             </span>
             <button
               onClick={onClose}
               className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500"
             >
-              {t({ ko: "확인", en: "OK", ja: "OK", zh: "确认" })}
+              {t({ en: "OK" })}
             </button>
           </div>
         </div>

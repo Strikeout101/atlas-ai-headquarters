@@ -6,14 +6,14 @@ import { buildLookMap, lookForSprite, portraitUrl } from "./atlas-office/agentLo
 /** Map agent IDs to sprite numbers (stable order, same as OfficeView) */
 export function buildSpriteMap(agents: Agent[]): Map<string, number> {
   const map = new Map<string, number>();
-  // 1) sprite_number가 DB에 지정된 에이전트 우선
+  // 1) Agents with a sprite_number in the database
   for (const a of agents) {
     if (a.sprite_number != null && a.sprite_number > 0) map.set(a.id, a.sprite_number);
   }
-  // 2) DORO fallback (sprite_number 미지정시)
+  // 2) DORO fallback (no sprite_number)
   const doro = agents.find((a) => a.name === "DORO");
   if (doro && !map.has(doro.id)) map.set(doro.id, 13);
-  // 3) 나머지: 자동 할당 (1-12 순환)
+  // 3) Everyone else: assigned automatically (cycles 1-12)
   const rest = [...agents].filter((a) => !map.has(a.id)).sort((a, b) => a.id.localeCompare(b.id));
   rest.forEach((a, i) => map.set(a.id, (i % 12) + 1));
   return map;
@@ -87,10 +87,16 @@ export default function AgentAvatar({
         style={{ width: size, height: size }}
       >
         <img
-          src={usePortrait ? portraitUrl((agent && buildLookMap(map).get(agent.id)) ?? lookForSprite(spriteNum)) : `/sprites/${spriteNum}-D-1.png`}
+          src={
+            usePortrait
+              ? portraitUrl((agent && buildLookMap(map).get(agent.id)) ?? lookForSprite(spriteNum))
+              : `/sprites/${spriteNum}-D-1.png`
+          }
           alt={agent?.name ?? ""}
           className={`w-full h-full ${usePortrait || imageFit !== "contain" ? "object-cover" : "object-contain"}`}
-          style={usePortrait ? { objectPosition: "center" } : { imageRendering: "pixelated", objectPosition: imagePosition }}
+          style={
+            usePortrait ? { objectPosition: "center" } : { imageRendering: "pixelated", objectPosition: imagePosition }
+          }
           onError={usePortrait ? () => setPortraitFailed(spriteNum) : undefined}
         />
       </div>

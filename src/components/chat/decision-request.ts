@@ -9,7 +9,7 @@ export interface ParsedDecisionRequest {
 }
 
 const NUMBERED_OPTION_RE = /^\s*(\d{1,2})\s*[.)]?\s*(.*)$/;
-const DECISION_HINT_RE = /(의사결정|진행\s*옵션|옵션|선택|방향|decision|options?|choose|proceed)/i;
+const DECISION_HINT_RE = /(decision|options?|choose|proceed)/i;
 
 export function parseDecisionRequest(content: string): ParsedDecisionRequest | null {
   if (!content) return null;

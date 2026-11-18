@@ -178,15 +178,7 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
     if (reporter) {
       sendAgentMessage(
         reporter,
-        pickL(
-          l(
-            [`대표님, '${task.title}' 보고 업무를 검토 회의 없이 완료 처리했습니다.`],
-            [`CEO, '${task.title}' report work was completed without review meeting.`],
-            [`CEO、'${task.title}' の報告業務をレビュー会議なしで完了処理しました。`],
-            [`CEO，'${task.title}' 报告任务已在无评审会议情况下完成。`],
-          ),
-          lang,
-        ),
+        pickL(l([`CEO, '${task.title}' report work was completed without review meeting.`]), lang),
         "report",
         "all",
         null,
@@ -195,19 +187,9 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
     }
 
     const leader = findTeamLeader(task.department_id);
-    const leaderName = leader
-      ? getAgentDisplayName(leader, lang)
-      : pickL(l(["팀장"], ["Team Lead"], ["チームリーダー"], ["组长"]), lang);
+    const leaderName = leader ? getAgentDisplayName(leader, lang) : pickL(l(["Team Lead"]), lang);
     notifyCeo(
-      pickL(
-        l(
-          [`${leaderName}: '${task.title}' 보고 업무를 검토 회의 없이 마감했습니다.`],
-          [`${leaderName}: '${task.title}' report task was closed without review meeting.`],
-          [`${leaderName}: '${task.title}' の報告業務をレビュー会議なしでクローズしました。`],
-          [`${leaderName}：'${task.title}' 报告任务已无评审会议直接关闭。`],
-        ),
-        lang,
-      ),
+      pickL(l([`${leaderName}: '${task.title}' report task was closed without review meeting.`]), lang),
       task.id,
     );
 
@@ -293,7 +275,7 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
 `,
     ).run(
       childTaskId,
-      `[디자인 컨펌] ${task.title.length > 48 ? `${task.title.slice(0, 45).trimEnd()}...` : task.title}`,
+      `[Design review] ${task.title.length > 48 ? `${task.title.slice(0, 45).trimEnd()}...` : task.title}`,
       designDescription,
       designAgent.id,
       task.project_id ?? null,
@@ -304,7 +286,7 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
     );
     recordTaskCreationAudit({
       taskId: childTaskId,
-      taskTitle: `[디자인 컨펌] ${task.title.length > 48 ? `${task.title.slice(0, 45).trimEnd()}...` : task.title}`,
+      taskTitle: `[Design review] ${task.title.length > 48 ? `${task.title.slice(0, 45).trimEnd()}...` : task.title}`,
       taskStatus: "planned",
       departmentId: "design",
       assignedAgentId: designAgent.id,
@@ -353,18 +335,9 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
 
     notifyCeo(
       pickL(
-        l(
-          [
-            `[REPORT FLOW] '${task.title}' 디자인 컨펌 1차를 위해 디자인팀(${designAgent.name})에게 HTML 점검 태스크를 위임했습니다.`,
-          ],
-          [
-            `[REPORT FLOW] Delegated one-pass HTML design checkpoint for '${task.title}' to Design (${designAgent.name}).`,
-          ],
-          [
-            `[REPORT FLOW] '${task.title}' の1回目デザイン確認として、Design (${designAgent.name}) にHTML点検タスクを委任しました。`,
-          ],
-          [`[REPORT FLOW] 已将 '${task.title}' 的一次性 HTML 设计确认任务委派给设计团队（${designAgent.name}）。`],
-        ),
+        l([
+          `[REPORT FLOW] Delegated one-pass HTML design checkpoint for '${task.title}' to Design (${designAgent.name}).`,
+        ]),
         lang,
       ),
       task.id,
@@ -409,20 +382,9 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
       );
       notifyCeo(
         pickL(
-          l(
-            [
-              `[REPORT FLOW] '${parent.title}' 최종 재생성은 담당자 ${assignee.name}가 현재 다른 작업(${assignee.current_task_id})을 수행 중이라 대기합니다.`,
-            ],
-            [
-              `[REPORT FLOW] Final regeneration for '${parent.title}' is waiting because assignee ${assignee.name} is busy with another task (${assignee.current_task_id}).`,
-            ],
-            [
-              `[REPORT FLOW] '${parent.title}' の最終再生成は、担当者 ${assignee.name} が別タスク(${assignee.current_task_id})を実行中のため待機します。`,
-            ],
-            [
-              `[REPORT FLOW] '${parent.title}' 最终重生成需等待，因负责人 ${assignee.name} 正在处理其他任务（${assignee.current_task_id}）。`,
-            ],
-          ),
+          l([
+            `[REPORT FLOW] Final regeneration for '${parent.title}' is waiting because assignee ${assignee.name} is busy with another task (${assignee.current_task_id}).`,
+          ]),
           resolveLang(parent.description ?? parent.title),
         ),
         parent.id,
@@ -452,20 +414,9 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
     const lang = resolveLang(parent.description ?? parent.title);
     notifyCeo(
       pickL(
-        l(
-          [
-            `[REPORT FLOW] 디자인팀 1차 컨펌이 완료되어 '${parent.title}' 최종 PPT 재생성을 시작합니다. 이번 실행 완료 시 2차 컨펌 없이 마감합니다.${htmlWorkspace ? ` HTML 작업 경로: ${htmlWorkspace}.` : ""}${handoffNotePath ? ` 핸드오프 노트: ${handoffNotePath}.` : ""}`,
-          ],
-          [
-            `[REPORT FLOW] Design checkpoint is complete; restarting final PPT regeneration for '${parent.title}'. This run will close without a second design approval.${htmlWorkspace ? ` HTML workspace: ${htmlWorkspace}.` : ""}${handoffNotePath ? ` Handoff note: ${handoffNotePath}.` : ""}`,
-          ],
-          [
-            `[REPORT FLOW] デザイン確認が完了したため、'${parent.title}' の最終PPT再生成を再開します。今回は2次確認なしでクローズします。${htmlWorkspace ? ` HTML作業パス: ${htmlWorkspace}。` : ""}${handoffNotePath ? ` 引き継ぎノート: ${handoffNotePath}。` : ""}`,
-          ],
-          [
-            `[REPORT FLOW] 设计确认已完成，开始重新生成 '${parent.title}' 的最终 PPT。本轮完成后将不再进行二次确认。${htmlWorkspace ? ` HTML 工作路径：${htmlWorkspace}。` : ""}${handoffNotePath ? ` 交接说明：${handoffNotePath}。` : ""}`,
-          ],
-        ),
+        l([
+          `[REPORT FLOW] Design checkpoint is complete; restarting final PPT regeneration for '${parent.title}'. This run will close without a second design approval.${htmlWorkspace ? ` HTML workspace: ${htmlWorkspace}.` : ""}${handoffNotePath ? ` Handoff note: ${handoffNotePath}.` : ""}`,
+        ]),
         lang,
       ),
       parent.id,

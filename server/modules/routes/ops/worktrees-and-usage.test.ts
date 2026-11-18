@@ -78,7 +78,7 @@ function createHarness(taskWorktrees: Map<string, { worktreePath: string; branch
     },
     resolveLang: () => "en",
     pickL: (value: string) => value,
-    l: (_ko: string[], en: string[]) => en.join(""),
+    l: (en: string[]) => en.join(""),
     notifyCeo: () => {},
     db: db as any,
     nowMs: () => Date.now(),
@@ -103,7 +103,7 @@ afterEach(() => {
 });
 
 describe("worktree verify-commit route", () => {
-  it("worktree가 없으면 no_worktree 판정을 돌려준다", () => {
+  it("returns no_worktree when there is no worktree", () => {
     const { db, getRoutes } = createHarness(new Map());
     try {
       const handler = getRoutes.get("/api/tasks/:id/verify-commit");
@@ -124,7 +124,7 @@ describe("worktree verify-commit route", () => {
     }
   });
 
-  it("커밋 없이 변경만 있으면 dirty_without_commit 판정을 돌려준다", () => {
+  it("returns dirty_without_commit for changes with no commit", () => {
     const repo = initRepo("climpire-verify-dirty-");
     tempDirs.push(repo);
     const taskId = "verify-dirty-0000-0000-0000-000000000000";
@@ -157,7 +157,7 @@ describe("worktree verify-commit route", () => {
     }
   });
 
-  it("커밋된 코드 변경이 있으면 ok 판정을 돌려준다", () => {
+  it("returns ok when code changes are committed", () => {
     const repo = initRepo("climpire-verify-ok-");
     tempDirs.push(repo);
     const taskId = "verify-okay-0000-0000-0000-000000000000";
@@ -196,7 +196,7 @@ describe("worktree verify-commit route", () => {
     }
   });
 
-  it("수동 merge 전에 최종 브랜치 검증 통과 로그를 남긴다", () => {
+  it("logs the final branch check before a manual merge", () => {
     const repo = initRepo("climpire-verify-merge-");
     tempDirs.push(repo);
     const taskId = "verify-merge-0000-0000-0000-000000000000";

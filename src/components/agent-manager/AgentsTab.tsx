@@ -7,7 +7,6 @@ import type { Translator } from "./types";
 interface AgentsTabProps {
   tr: Translator;
   locale: string;
-  isKo: boolean;
   agents: Agent[];
   departments: Department[];
   deptTab: string;
@@ -30,7 +29,6 @@ interface AgentsTabProps {
 export default function AgentsTab({
   tr,
   locale,
-  isKo,
   agents,
   departments,
   deptTab,
@@ -60,9 +58,9 @@ export default function AgentsTab({
     <>
       <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
         {[
-          { label: tr("전체 인원", "Agents"), value: agents.length, live: false },
-          { label: tr("근무 중", "Working now"), value: workingCount, live: workingCount > 0 },
-          { label: tr("부서", "Departments"), value: departments.length, live: false },
+          { label: tr("Agents"), value: agents.length, live: false },
+          { label: tr("Working now"), value: workingCount, live: workingCount > 0 },
+          { label: tr("Departments"), value: departments.length, live: false },
         ].map((summary) => (
           <div key={summary.label} className="flex items-baseline gap-2">
             <span
@@ -81,7 +79,7 @@ export default function AgentsTab({
 
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setDeptTab("all")} className="ax-chip" aria-pressed={deptTab === "all"}>
-          {tr("전체", "All")}
+          {tr("All")}
           <span className="ax-chip-count">{agents.length}</span>
         </button>
         {departments.map((department) => {
@@ -95,7 +93,7 @@ export default function AgentsTab({
                 e.preventDefault();
                 onEditDepartment(department);
               }}
-              title={tr("더블클릭: 부서 편집", "Double-click to edit department")}
+              title={tr("Double-click to edit department")}
               className="ax-chip"
               aria-pressed={deptTab === department.id}
             >
@@ -115,7 +113,7 @@ export default function AgentsTab({
           />
           <input
             type="text"
-            placeholder={tr("검색", "Search agents")}
+            placeholder={tr("Search agents")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 w-44 rounded-[7px] pl-8 pr-3 text-[13px] outline-none"
@@ -130,7 +128,7 @@ export default function AgentsTab({
 
       {sortedAgents.length === 0 ? (
         <div className="text-center py-16" style={{ color: "var(--th-text-muted)" }}>
-          {tr("검색 결과 없음", "No agents match this search.")}
+          {tr("No agents match this search.")}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -139,7 +137,6 @@ export default function AgentsTab({
               key={agent.id}
               agent={agent}
               spriteMap={spriteMap}
-              isKo={isKo}
               locale={locale}
               tr={tr}
               departments={departments}

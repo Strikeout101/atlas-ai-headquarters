@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { parseDecisionRequest } from "./decision-request";
 
 describe("parseDecisionRequest", () => {
-  it("parses Korean multiline options where text continues on next line", () => {
+  it("parses multiline options where text continues on next line", () => {
     const content = [
-      "작업 중 충돌이 확인됐습니다. 진행 옵션:",
+      "A conflict was found during the work. Options to proceed:",
       "1.",
-      "현재 상태 그대로 QA 검증 계속",
+      "Continue QA on the current state",
       "2.",
-      "기준 커밋/브랜치 정리 후 QA 진행",
+      "Clean up the base commit/branch, then run QA",
     ].join("\n");
 
     const parsed = parseDecisionRequest(content);
     expect(parsed).not.toBeNull();
     expect(parsed?.options).toEqual([
-      { number: 1, label: "현재 상태 그대로 QA 검증 계속" },
-      { number: 2, label: "기준 커밋/브랜치 정리 후 QA 진행" },
+      { number: 1, label: "Continue QA on the current state" },
+      { number: 2, label: "Clean up the base commit/branch, then run QA" },
     ]);
   });
 
@@ -34,7 +34,7 @@ describe("parseDecisionRequest", () => {
   });
 
   it("returns null for normal numbered notes without decision hints", () => {
-    const content = ["오늘 TODO", "1. lint 실행", "2. test 실행", "3. 빌드 확인"].join("\n");
+    const content = ["Today TODO", "1. run lint", "2. run tests", "3. check the build"].join("\n");
 
     expect(parseDecisionRequest(content)).toBeNull();
   });

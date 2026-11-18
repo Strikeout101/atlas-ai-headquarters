@@ -399,17 +399,14 @@ export default function KnowledgeTab() {
   const { t } = useI18n();
   const [section, setSection] = useState<Section>("memory");
   const sections: Array<{ key: Section; label: string }> = [
-    { key: "memory", label: t({ ko: "메모리", en: "Memory", ja: "メモリー", zh: "记忆" }) },
-    { key: "systems", label: t({ ko: "시스템", en: "Systems", ja: "システム", zh: "系统" }) },
-    { key: "checklist", label: t({ ko: "체크리스트", en: "Checklist", ja: "チェックリスト", zh: "清单" }) },
+    { key: "memory", label: t({ en: "Memory" }) },
+    { key: "systems", label: t({ en: "Systems" }) },
+    { key: "checklist", label: t({ en: "Checklist" }) },
   ];
   return (
-    <section
-      className="mx-auto w-full max-w-7xl pb-8"
-      aria-label={t({ ko: "지식", en: "Knowledge", ja: "ナレッジ", zh: "知识" })}
-    >
+    <section className="mx-auto w-full max-w-7xl pb-8" aria-label={t({ en: "Knowledge" })}>
       <h1 className="text-lg font-semibold" style={{ color: "var(--th-text-heading)" }}>
-        {t({ ko: "지식", en: "Knowledge", ja: "ナレッジ", zh: "知识" })}
+        {t({ en: "Knowledge" })}
       </h1>
       <div role="tablist" aria-label="Knowledge sections" className="mt-3 mb-4 flex flex-wrap gap-1">
         {sections.map(({ key, label }) => (

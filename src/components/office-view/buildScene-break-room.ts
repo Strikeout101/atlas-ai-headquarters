@@ -205,7 +205,7 @@ export function buildBreakRoom({
       const spotX = spot.x >= 0 ? brx + spot.x + ((seed % 7) - 3) : brx + brw - 16 + spot.x + ((seed % 7) - 3);
       const spotY = bry + spot.y + ((seed % 5) - 2) * 0.6;
 
-      const chatPool = BREAK_CHAT_MESSAGES[activeLocale] || BREAK_CHAT_MESSAGES.ko;
+      const chatPool = BREAK_CHAT_MESSAGES[activeLocale] || BREAK_CHAT_MESSAGES.en;
       const msg = chatPool[(seed + phase) % chatPool.length];
       const bubbleText = new Text({
         text: msg,

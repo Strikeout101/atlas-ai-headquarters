@@ -86,7 +86,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
       project_id: projectId,
       snapshot_hash: decisionSnapshotHash,
       event_type: "representative_pick",
-      summary: `대표 선택: ${targetTask.title}`,
+      summary: `Owner picked: ${targetTask.title}`,
       selected_options_json: JSON.stringify([
         {
           number: optionNumber,
@@ -118,10 +118,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
       return true;
     }
     const lang = getPreferredLanguage();
-    const followupTitlePrefix = pickL(
-      l(["[의사결정 추가요청]"], ["[Decision Follow-up]"], ["[意思決定追加要請]"], ["[决策追加请求]"]),
-      lang,
-    );
+    const followupTitlePrefix = pickL(l(["[Decision Follow-up]"]), lang);
     const targetTaskIdInput = normalizeTextField(req.body?.target_task_id);
     const targetTask = targetTaskIdInput
       ? (db
@@ -189,7 +186,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
       project_id: projectId,
       snapshot_hash: decisionSnapshotHash,
       event_type: "followup_request",
-      summary: selectedOption.label || "추가요청 입력",
+      summary: selectedOption.label || "Additional request entered",
       selected_options_json: JSON.stringify([
         {
           number: optionNumber,
@@ -330,7 +327,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
     }
 
     if (blockedTasks.length > 0) {
-      const blockedSummary = `팀장 회의 시작 보류 (${blockedTasks.length}건): ${blockedTasks.map((task) => task.title).join(", ")}`;
+      const blockedSummary = `Team lead meeting on hold (${blockedTasks.length}): ${blockedTasks.map((task) => task.title).join(", ")}`;
       recordProjectReviewDecisionEvent({
         project_id: projectId,
         snapshot_hash: decisionSnapshotHash,
@@ -362,7 +359,7 @@ export function handleProjectReviewDecisionReply(input: ProjectReviewReplyInput)
       project_id: projectId,
       snapshot_hash: decisionSnapshotHash,
       event_type: "start_review_meeting",
-      summary: selectedOption.label || "팀장 회의 진행",
+      summary: selectedOption.label || "Hold team lead meeting",
       selected_options_json: JSON.stringify([
         {
           number: optionNumber,

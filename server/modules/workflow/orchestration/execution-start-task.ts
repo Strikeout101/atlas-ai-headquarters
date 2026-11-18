@@ -96,7 +96,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       appendTaskLog(taskId, "system", `Not started: ${blocked}`);
       return;
     }
-    const execName = execAgent.name_ko || execAgent.name;
+    const execName = execAgent.name;
     const t = nowMs();
     db.prepare(
       "UPDATE tasks SET status = 'in_progress', assigned_agent_id = ?, started_at = ?, updated_at = ? WHERE id = ?",
@@ -174,20 +174,9 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       notifyTaskStatus(taskId, taskData.title, "pending", taskLang);
       notifyCeo(
         pickL(
-          l(
-            [
-              `[WORKTREE REQUIRED] '${taskData.title}' 실행을 차단했습니다. 격리 worktree 생성에 실패해 프로젝트 루트 오염을 방지하기 위해 중단되었습니다.`,
-            ],
-            [
-              `[WORKTREE REQUIRED] Blocked execution for '${taskData.title}'. Isolated worktree creation failed, so run was aborted to protect the project root.`,
-            ],
-            [
-              `[WORKTREE REQUIRED] '${taskData.title}' の実行を停止しました。分離 worktree 作成に失敗したため、プロジェクトルート保護のため中断しました。`,
-            ],
-            [
-              `[WORKTREE REQUIRED] 已阻止 '${taskData.title}' 的执行。由于隔离 worktree 创建失败，为保护项目根目录已中止。`,
-            ],
-          ),
+          l([
+            `[WORKTREE REQUIRED] Blocked execution for '${taskData.title}'. Isolated worktree creation failed, so run was aborted to protect the project root.`,
+          ]),
           taskLang,
         ),
         taskId,
@@ -223,34 +212,16 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     }
     const continuationInstruction = continuationCtx
       ? pickL(
-          l(
-            ["연속 실행: 소유 컨텍스트를 유지하고 인사/착수 멘트 없이 미해결 검토 항목을 즉시 반영하세요."],
-            [
-              "Continuation run: keep ownership, skip greetings/kickoff narration, and execute unresolved review items immediately.",
-            ],
-            ["継続実行: オーナーシップを維持し、挨拶/開始ナレーションなしで未解決レビュー項目を即時反映してください。"],
-            ["连续执行：保持责任上下文，跳过问候/开场说明，立即处理未解决评审项。"],
-          ),
+          l([
+            "Continuation run: keep ownership, skip greetings/kickoff narration, and execute unresolved review items immediately.",
+          ]),
           taskLang,
         )
-      : pickL(
-          l(
-            ["긴 서론 없이 바로 실행하고, 메시지는 간결하게 유지하세요."],
-            ["Execute directly without long preamble and keep messages concise."],
-            ["長い前置きなしで直ちに実行し、メッセージは簡潔にしてください。"],
-            ["无需冗长前言，直接执行并保持消息简洁。"],
-          ),
-          taskLang,
-        );
+      : pickL(l(["Execute directly without long preamble and keep messages concise."]), taskLang);
     const runInstruction = pickL(
-      l(
-        ["위 작업을 충분히 완수하세요. 필요 시 연속 실행 요약과 대화 맥락을 참고하세요."],
-        [
-          "Please complete the task above thoroughly. Use the continuation brief and conversation context above if relevant.",
-        ],
-        ["上記タスクを丁寧に完了してください。必要に応じて継続要約と会話コンテキストを参照してください。"],
-        ["请完整地完成上述任务。可按需参考连续执行摘要与会话上下文。"],
-      ),
+      l([
+        "Please complete the task above thoroughly. Use the continuation brief and conversation context above if relevant.",
+      ]),
       taskLang,
     );
     let availableSkillsPromptBlock = buildAvailableSkillsPromptBlock(provider);
@@ -396,27 +367,8 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       });
     }
 
-    const worktreeNote = pickL(
-      l(
-        [` (격리 브랜치: climpire/${taskId.slice(0, 8)})`],
-        [` (isolated branch: climpire/${taskId.slice(0, 8)})`],
-        [` (分離ブランチ: climpire/${taskId.slice(0, 8)})`],
-        [`（隔离分支: climpire/${taskId.slice(0, 8)}）`],
-      ),
-      taskLang,
-    );
-    notifyCeo(
-      pickL(
-        l(
-          [`${execName}가 '${taskData.title}' 작업을 시작했습니다.${worktreeNote}`],
-          [`${execName} started work on '${taskData.title}'.${worktreeNote}`],
-          [`${execName}が '${taskData.title}' の作業を開始しました。${worktreeNote}`],
-          [`${execName} 已开始处理 '${taskData.title}'。${worktreeNote}`],
-        ),
-        taskLang,
-      ),
-      taskId,
-    );
+    const worktreeNote = pickL(l([` (isolated branch: climpire/${taskId.slice(0, 8)})`]), taskLang);
+    notifyCeo(pickL(l([`${execName} started work on '${taskData.title}'.${worktreeNote}`]), taskLang), taskId);
     startProgressTimer(taskId, taskData.title, deptId);
   }
 

@@ -42,4 +42,4 @@ Kept for context; check against the code before relying on them. Upstream claw-e
 | [agent-access-review-2026-11-14.md](agent-access-review-2026-11-14.md)                 | Access gap review from 2026-11-14; several gaps since closed.      |
 | [DESIGN_SKILLS.md](DESIGN_SKILLS.md)                                                   | Upstream design for skill learning history.                        |
 | [architecture/](architecture/)                                                         | Generated upstream diagrams from 2026-02-18; out of date.          |
-| `reports/`, `art/`                                                                     | Sample outputs and art credits.                                    |
+| `art/`                                                                                 | Art credits.                                                       |

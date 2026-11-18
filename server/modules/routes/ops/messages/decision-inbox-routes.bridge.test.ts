@@ -51,8 +51,8 @@ function createRouteBridge() {
     getAgentDisplayName: vi.fn(() => "Agent"),
     getDeptName: vi.fn(() => "Department"),
     getPreferredLanguage: vi.fn(() => "en"),
-    l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => ({ ko, en, ja, zh }),
-    pickL: (pool: Record<string, string[]>, lang: string) => pool[lang]?.[0] ?? pool.en?.[0] ?? pool.ko?.[0] ?? "",
+    l: (en: string[]) => ({ en }),
+    pickL: (pool: Record<string, string[]>, lang: string) => pool[lang]?.[0] ?? pool.en?.[0] ?? "",
     findTeamLeader: vi.fn(() => null),
     normalizeTextField: (value: unknown) => {
       if (typeof value !== "string") return null;
@@ -115,7 +115,7 @@ describe("decision inbox bridge characterization", () => {
     const { bridge } = createRouteBridge();
 
     const result = await bridge.tryHandleInboxDecisionReply({
-      text: "[DECISION:abc123] 승인",
+      text: "[DECISION:abc123] approve",
       channel: "telegram",
       targetId: "-100123",
     });

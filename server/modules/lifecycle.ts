@@ -265,7 +265,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
       const ageMs = lastTouchedAt > 0 ? Math.max(0, now - lastTouchedAt) : IN_PROGRESS_ORPHAN_GRACE_MS + 1;
       if (ageMs < IN_PROGRESS_ORPHAN_GRACE_MS) continue;
 
-      // 추가 안전장치 1: task_logs 활동이 최근 윈도우 내에 있으면 아직 활성 상태로 간주
+      // Safeguard 1: recent task_logs activity means the task is still active
       const recentLog = db
         .prepare(
           `
@@ -279,8 +279,8 @@ export function startLifecycle(ctx: RuntimeContext): void {
         continue;
       }
 
-      // 추가 안전장치 2: 터미널 로그 파일이 최근까지 갱신됐다면 여전히 출력이 진행 중인 것으로 간주
-      // (예: 서버 리로드/재시작으로 in-memory process handle만 유실된 경우)
+      // Safeguard 2: a recently updated terminal log means output is still flowing
+      // (e.g. only the in-memory process handle was lost in a server reload or restart)
       try {
         const logPath = path.join(logsDir, `${task.id}.log`);
         const stat = fs.statSync(logPath);
@@ -289,7 +289,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
           continue;
         }
       } catch {
-        // 로그 파일이 없거나 접근 불가하면 기존 복구 로직 진행
+        // No readable log file: fall through to normal recovery
       }
 
       const contextRollover = getContextRollover(db, task.id);
@@ -373,14 +373,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
       broadcast("task_update", updatedTask);
       const lang = resolveLang(task.title);
       notifyTaskStatus(task.id, task.title, "inbox", lang);
-      const watchdogMessage =
-        lang === "en"
-          ? `[WATCHDOG] '${task.title}' was in progress but had no active process. Recovered to inbox.`
-          : lang === "ja"
-            ? `[WATCHDOG] '${task.title}' は in_progress でしたが実行プロセスが存在しないため inbox に復旧しました。`
-            : lang === "zh"
-              ? `[WATCHDOG] '${task.title}' 处于 in_progress，但未发现执行进程，已恢复到 inbox。`
-              : `[WATCHDOG] '${task.title}' 작업이 in_progress 상태였지만 실행 프로세스가 없어 inbox로 복구했습니다.`;
+      const watchdogMessage = `[WATCHDOG] '${task.title}' was in progress but had no active process. Recovered to inbox.`;
       notifyCeo(watchdogMessage, task.id);
     }
   }

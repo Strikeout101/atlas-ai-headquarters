@@ -40,7 +40,7 @@ async function run() {
 
   const announcementButton = page
     .getByRole("button", {
-      name: /Announcement|전사 공지|全社告知|全员公告/i,
+      name: /Announcement/i,
     })
     .first();
   const announcementButtonVisible = await announcementButton.isVisible().catch(() => false);
@@ -56,7 +56,7 @@ async function run() {
     await page.waitForTimeout(400);
   }
 
-  const announcementHeader = page.getByText(/Company Announcement|전사 공지|全体告知|全员公告/i).first();
+  const announcementHeader = page.getByText(/Company Announcement/i).first();
   const announcementHeaderVisible = await announcementHeader.isVisible().catch(() => false);
   checks.push(
     buildCheck("announcement_panel_opened", announcementHeaderVisible, {
@@ -66,7 +66,7 @@ async function run() {
 
   const officeManagementButton = page
     .getByRole("button", {
-      name: /Office Management|사무실 관리|オフィス管理|办公室管理/i,
+      name: /Office Management/i,
     })
     .first();
   const officeManagementVisible = await officeManagementButton.isVisible().catch(() => false);
@@ -102,7 +102,7 @@ async function run() {
     colorInputsCount = await page.locator('input[type="color"]').count();
     const rangeCount = await page.locator('input[type="range"]').count();
     const toneTextVisible = await page
-      .getByText(/Tone|톤|トーン|色调/i)
+      .getByText(/Tone/i)
       .first()
       .isVisible()
       .catch(() => false);

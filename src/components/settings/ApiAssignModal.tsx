@@ -30,18 +30,18 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
   const validWindow = windowValue === null || (Number.isSafeInteger(windowValue) && windowValue > 0);
 
   const spriteMap = buildSpriteMap(apiAssignAgents);
-  const localName = (nameEn: string, nameKo: string) => (localeTag === "ko" ? nameKo || nameEn : nameEn || nameKo);
+  const localName = (nameEn: string, nameKo: string) => nameEn || nameKo;
   const ROLE_LABELS: Record<string, Record<string, string>> = {
-    vp: { ko: "부사장", en: "VP", ja: "副社長", zh: "副总裁" },
-    team_leader: { ko: "팀장", en: "Team Leader", ja: "チームリーダー", zh: "组长" },
-    senior: { ko: "시니어", en: "Senior", ja: "シニア", zh: "高级" },
-    junior: { ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" },
-    intern: { ko: "인턴", en: "Intern", ja: "インターン", zh: "实习生" },
+    vp: { en: "VP" },
+    team_leader: { en: "Team Leader" },
+    senior: { en: "Senior" },
+    junior: { en: "Junior" },
+    intern: { en: "Intern" },
   };
 
   const roleBadge = (role: string) => {
     const label = ROLE_LABELS[role];
-    const text = label ? t(label as Record<"ko" | "en" | "ja" | "zh", string>) : role;
+    const text = label ? t(label as Record<"en", string>) : role;
     const color =
       role === "team_leader"
         ? "text-amber-400 bg-amber-500/15"
@@ -104,10 +104,7 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
         <div className="px-4 py-3 border-b border-slate-700">
           <h4 className="text-sm font-semibold text-white">
             {t({
-              ko: "에이전트에 모델 배정",
               en: "Assign Model to Agent",
-              ja: "エージェントにモデル割当",
-              zh: "分配模型给代理",
             })}
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">{apiAssignTarget.model}</p>
@@ -115,10 +112,7 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
             <div className="mt-3">
               <label htmlFor="ollama-context-window" className="block text-[11px] text-slate-300 mb-1">
                 {t({
-                  ko: "컨텍스트 창 (토큰)",
                   en: "Context window (tokens)",
-                  ja: "コンテキスト窓（トークン）",
-                  zh: "上下文窗口（令牌）",
                 })}
               </label>
               <input
@@ -128,25 +122,19 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
                 step="1"
                 value={contextWindowTokensInput}
                 onChange={(event) => setContextWindowTokensInput(event.target.value)}
-                placeholder={t({ ko: "미설정", en: "Unknown", ja: "未設定", zh: "未设置" })}
+                placeholder={t({ en: "Unknown" })}
                 aria-invalid={!validWindow}
                 className="w-full rounded border border-slate-600 bg-slate-700 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
               />
               <p className="mt-1 text-[10px] text-slate-400">
                 {t({
-                  ko: "80%에서 자동으로 새 컨텍스트로 이어갑니다. 비워두면 한도 오류가 발생했을 때 복구합니다.",
                   en: "Roll over at 80%. Leave blank to recover only after a context error.",
-                  ja: "80%で新しいコンテキストに切り替えます。空欄なら上限エラー時に復旧します。",
-                  zh: "达到 80% 时切换到新上下文。留空则仅在超限错误后恢复。",
                 })}
               </p>
               {!validWindow && (
                 <p className="mt-1 text-[10px] text-rose-400">
                   {t({
-                    ko: "양의 정수를 입력하세요.",
                     en: "Enter a positive whole number.",
-                    ja: "正の整数を入力してください。",
-                    zh: "请输入正整数。",
                   })}
                 </p>
               )}
@@ -158,10 +146,7 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
           {apiAssignAgents.length === 0 ? (
             <p className="text-xs text-slate-500 text-center py-4">
               {t({
-                ko: "에이전트를 불러오는 중...",
                 en: "Loading agents...",
-                ja: "エージェント読み込み中...",
-                zh: "正在加载代理...",
               })}
             </p>
           ) : (
@@ -183,7 +168,7 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
                   <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-slate-700/40">
                     <span className="text-sm">📁</span>
                     <span className="text-[11px] font-semibold text-slate-500 tracking-wide">
-                      {t({ ko: "미배정", en: "Unassigned", ja: "未配属", zh: "未分配" })}
+                      {t({ en: "Unassigned" })}
                     </span>
                   </div>
                   {unassigned.map(renderAgentRow)}
@@ -198,7 +183,7 @@ export default function ApiAssignModal({ t, localeTag, apiState }: ApiAssignModa
             onClick={() => setApiAssignTarget(null)}
             className="text-xs px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded-lg transition-colors"
           >
-            {t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+            {t({ en: "Close" })}
           </button>
         </div>
       </div>

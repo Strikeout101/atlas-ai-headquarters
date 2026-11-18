@@ -34,7 +34,7 @@ type MeetingMinutesDeps = {
   getRoleLabel: (role: string, lang: Lang) => string;
   getAgentDisplayName: (agent: AgentRow, lang: string) => string;
   pickL: (choices: any, lang: string) => string;
-  l: (ko: string[], en: string[], ja: string[], zh: string[]) => any;
+  l: (en: string[]) => any;
   summarizeForMeetingBubble: (text: string, maxChars: number, lang?: Lang) => string;
   appendTaskLog: (taskId: string | null, kind: string, message: string) => void;
   broadcast: (event: string, payload: unknown) => void;
@@ -186,9 +186,7 @@ export function createMeetingMinutesTools(deps: MeetingMinutesDeps) {
     const seen = new Set<string>();
     const perDept = new Map<string, number>();
     const isIssue = (text: string) =>
-      /보완|보류|리스크|미첨부|미구축|미완료|불가|부족|0%|hold|revise|revision|required|pending|risk|block|missing|not attached|incomplete|保留|修正|补充|未完成|未附|风险/i.test(
-        text,
-      );
+      /0%|hold|revise|revision|required|pending|risk|block|missing|not attached|incomplete/i.test(text);
 
     for (const row of transcript) {
       const base = row.content.replace(/\s+/g, " ").trim();
@@ -243,22 +241,8 @@ export function createMeetingMinutesTools(deps: MeetingMinutesDeps) {
 
     const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
     const phaseLabel = phase === "planned" ? "Planned Kickoff" : "Review";
-    const header =
-      lang === "en"
-        ? `[PROJECT MEMO] ${phaseLabel} round ${round} unresolved improvement items (${stamp})`
-        : lang === "ja"
-          ? `[PROJECT MEMO] ${phaseLabel} ラウンド ${round} 未解決の補完項目 (${stamp})`
-          : lang === "zh"
-            ? `[PROJECT MEMO] ${phaseLabel} 第 ${round} 轮未解决改进项 (${stamp})`
-            : `[PROJECT MEMO] ${phaseLabel} 라운드 ${round} 미해결 보완 항목 (${stamp})`;
-    const fallbackLine =
-      lang === "en"
-        ? "- No explicit issue line captured; follow-up verification is still required."
-        : lang === "ja"
-          ? "- 明示的な課題行は抽出されませんでしたが、後続検証は継続が必要です。"
-          : lang === "zh"
-            ? "- 未捕获到明确问题行，但后续验证仍需继续。"
-            : "- 명시적 이슈 문장을 추출하지 못했지만 후속 검증은 계속 필요합니다.";
+    const header = `[PROJECT MEMO] ${phaseLabel} round ${round} unresolved improvement items (${stamp})`;
+    const fallbackLine = "- No explicit issue line captured; follow-up verification is still required.";
     const body = notes.length > 0 ? notes.map((note) => `- ${note}`).join("\n") : fallbackLine;
 
     const block = `${header}\n${body}`;
@@ -286,33 +270,10 @@ export function createMeetingMinutesTools(deps: MeetingMinutesDeps) {
     if (!current) return;
 
     const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const header =
-      lang === "en"
-        ? `[PROJECT MEMO] Review round ${round} final package (${stamp})`
-        : lang === "ja"
-          ? `[PROJECT MEMO] Review ラウンド ${round} 最終パッケージ (${stamp})`
-          : lang === "zh"
-            ? `[PROJECT MEMO] Review 第 ${round} 轮最终输出包 (${stamp})`
-            : `[PROJECT MEMO] Review 라운드 ${round} 최종 결과 패키지 (${stamp})`;
+    const header = `[PROJECT MEMO] Review round ${round} final package (${stamp})`;
     const decisionLine = hasResidualRisk
-      ? pickL(
-          l(
-            ["잔여 리스크를 문서화한 조건부 최종 승인으로 종료합니다."],
-            ["Finalized with conditional approval and documented residual risks."],
-            ["残余リスクを文書化した条件付き最終承認で締結します。"],
-            ["以记录剩余风险的条件性最终批准完成收口。"],
-          ),
-          lang as Lang,
-        )
-      : pickL(
-          l(
-            ["전원 승인 기준으로 최종 승인 및 머지 준비를 완료했습니다."],
-            ["Final approval completed based on full leader alignment and merge readiness."],
-            ["全リーダー承認に基づき最終承認とマージ準備を完了しました。"],
-            ["已基于全体负责人一致意见完成最终批准与合并准备。"],
-          ),
-          lang as Lang,
-        );
+      ? pickL(l(["Finalized with conditional approval and documented residual risks."]), lang as Lang)
+      : pickL(l(["Final approval completed based on full leader alignment and merge readiness."]), lang as Lang);
 
     const evidence: string[] = [];
     const seen = new Set<string>();

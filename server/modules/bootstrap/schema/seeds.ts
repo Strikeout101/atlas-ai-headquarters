@@ -3,24 +3,6 @@ import type { DatabaseSync } from "node:sqlite";
 
 type DbLike = Pick<DatabaseSync, "exec" | "prepare">;
 
-/** Original Korean seed personalities and their English replacements. */
-export const LEGACY_KOREAN_SEED_PERSONALITIES: ReadonlyArray<readonly [string, string]> = [
-  ["꼼꼼한 시니어 개발자", "Meticulous senior developer"],
-  ["빠른 코딩 전문가", "Fast coding specialist"],
-  ["창의적인 주니어", "Creative junior"],
-  ["디자인 리더", "Design leader"],
-  ["감성적인 UI 디자이너", "Empathetic UI designer"],
-  ["전략 분석가", "Strategic analyst"],
-  ["데이터 기반 기획자", "Data-driven planner"],
-  ["운영의 달인", "Operations expert"],
-  ["자동화 전문가", "Automation specialist"],
-  ["날카로운 품질 감시자", "Sharp-eyed quality guardian"],
-  ["꼼꼼한 테스트 전문가", "Meticulous testing specialist"],
-  ["보안 아키텍트", "Security architect"],
-  ["CI/CD 파이프라인 전문가", "CI/CD pipeline specialist"],
-  ["꼼꼼한 품질관리 주니어", "Meticulous junior QA"],
-];
-
 interface DefaultAgent {
   name: string;
   nameKo: string;
@@ -46,9 +28,9 @@ interface DefaultAgent {
 export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   {
     name: "Marcus",
-    nameKo: "마커스",
-    nameJa: "マーカス",
-    nameZh: "马库斯",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Aria",
     department: "dev",
     role: "team_leader",
@@ -59,9 +41,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Elena",
-    nameKo: "엘레나",
-    nameJa: "エレナ",
-    nameZh: "埃琳娜",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Bolt",
     department: "dev",
     role: "senior",
@@ -72,9 +54,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Owen",
-    nameKo: "오웬",
-    nameJa: "オーウェン",
-    nameZh: "欧文",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Nova",
     department: "dev",
     role: "junior",
@@ -85,9 +67,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Iris",
-    nameKo: "아이리스",
-    nameJa: "アイリス",
-    nameZh: "艾丽丝",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Pixel",
     department: "design",
     role: "team_leader",
@@ -98,9 +80,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Felix",
-    nameKo: "펠릭스",
-    nameJa: "フェリックス",
-    nameZh: "费利克斯",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Luna",
     department: "design",
     role: "junior",
@@ -111,9 +93,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Adrian",
-    nameKo: "에이드리언",
-    nameJa: "エイドリアン",
-    nameZh: "阿德里安",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Sage",
     department: "planning",
     role: "team_leader",
@@ -124,9 +106,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Claire",
-    nameKo: "클레어",
-    nameJa: "クレア",
-    nameZh: "克莱尔",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Clio",
     department: "planning",
     role: "senior",
@@ -137,9 +119,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Diana",
-    nameKo: "다이애나",
-    nameJa: "ダイアナ",
-    nameZh: "黛安娜",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Atlas",
     department: "operations",
     role: "team_leader",
@@ -150,9 +132,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Priya",
-    nameKo: "프리야",
-    nameJa: "プリヤ",
-    nameZh: "普丽娅",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Turbo",
     department: "operations",
     role: "senior",
@@ -163,9 +145,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Victor",
-    nameKo: "빅터",
-    nameJa: "ビクター",
-    nameZh: "维克多",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Hawk",
     department: "qa",
     role: "team_leader",
@@ -176,9 +158,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Hannah",
-    nameKo: "해나",
-    nameJa: "ハンナ",
-    nameZh: "汉娜",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Lint",
     department: "qa",
     role: "senior",
@@ -189,9 +171,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Leo",
-    nameKo: "레오",
-    nameJa: "レオ",
-    nameZh: "利奥",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "DORO",
     department: "qa",
     role: "junior",
@@ -203,9 +185,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Rafael",
-    nameKo: "라파엘",
-    nameJa: "ラファエル",
-    nameZh: "拉斐尔",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Vault",
     department: "devsecops",
     role: "team_leader",
@@ -216,9 +198,9 @@ export const DEFAULT_AGENTS: ReadonlyArray<DefaultAgent> = [
   },
   {
     name: "Nadia",
-    nameKo: "나디아",
-    nameJa: "ナディア",
-    nameZh: "娜迪亚",
+    nameKo: "",
+    nameJa: "",
+    nameZh: "",
     legacyName: "Pipe",
     department: "devsecops",
     role: "senior",
@@ -236,22 +218,13 @@ export function applyDefaultSeeds(db: DbLike): void {
     const insertDept = db.prepare(
       "INSERT INTO departments (id, name, name_ko, name_ja, name_zh, icon, color, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
-    // Workflow order: 기획 → 개발 → 디자인 → QA → 인프라보안 → 운영
-    insertDept.run("planning", "Planning", "기획팀", "企画チーム", "企划组", "📊", "#f59e0b", 1);
-    insertDept.run("dev", "Development", "개발팀", "開発チーム", "开发组", "💻", "#3b82f6", 2);
-    insertDept.run("design", "Design", "디자인팀", "デザインチーム", "设计组", "🎨", "#8b5cf6", 3);
-    insertDept.run("qa", "QA/QC", "품질관리팀", "品質管理チーム", "质量管理组", "🔍", "#ef4444", 4);
-    insertDept.run(
-      "devsecops",
-      "DevSecOps",
-      "인프라보안팀",
-      "インフラセキュリティチーム",
-      "基础安全组",
-      "🛡️",
-      "#f97316",
-      5,
-    );
-    insertDept.run("operations", "Operations", "운영팀", "運営チーム", "运营组", "⚙️", "#10b981", 6);
+    // Workflow order: planning → dev → design → QA → infra security → operations
+    insertDept.run("planning", "Planning", "", "", "", "📊", "#f59e0b", 1);
+    insertDept.run("dev", "Development", "", "", "", "💻", "#3b82f6", 2);
+    insertDept.run("design", "Design", "", "", "", "🎨", "#8b5cf6", 3);
+    insertDept.run("qa", "QA/QC", "", "", "", "🔍", "#ef4444", 4);
+    insertDept.run("devsecops", "DevSecOps", "", "", "", "🛡️", "#f97316", 5);
+    insertDept.run("operations", "Operations", "", "", "", "⚙️", "#10b981", 6);
     console.log("[ATLAS] Seeded default departments");
   }
 
@@ -302,11 +275,16 @@ export function applyDefaultSeeds(db: DbLike): void {
     }
   }
 
-  // Earlier installs seeded these personalities in Korean. They are part of every agent prompt, so a Korean
-  // personality pulls replies toward Korean whatever the UI language is. Translate only untouched seed values.
-  {
-    const translate = db.prepare("UPDATE agents SET personality = ? WHERE personality = ?");
-    for (const [korean, english] of LEGACY_KOREAN_SEED_PERSONALITIES) translate.run(english, korean);
+  // ATLAS is English-only: clear the translated name columns that older installs filled in.
+  // (Skipped quietly on a very old database whose name_ja/name_zh columns are added by a later migration.)
+  for (const table of ["agents", "departments"]) {
+    try {
+      db.exec(
+        `UPDATE ${table} SET name_ko = '', name_ja = '', name_zh = '' WHERE name_ko <> '' OR name_ja <> '' OR name_zh <> ''`,
+      );
+    } catch {
+      // columns not there yet
+    }
   }
 
   // Seed default settings if none exist
@@ -429,7 +407,7 @@ export function applyDefaultSeeds(db: DbLike): void {
       /* already exists */
     }
 
-    // UNIQUE 인덱스 일시 제거 → 값 갱신 → 인덱스 재생성 (충돌 방지)
+    // Drop the UNIQUE index, update values, recreate it (avoids conflicts)
     try {
       db.exec("DROP INDEX IF EXISTS idx_departments_sort_order");
     } catch {
@@ -440,8 +418,8 @@ export function applyDefaultSeeds(db: DbLike): void {
     const insertDeptIfMissing = db.prepare(
       "INSERT OR IGNORE INTO departments (id, name, name_ko, icon, color, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
     );
-    insertDeptIfMissing.run("qa", "QA/QC", "품질관리팀", "🔍", "#ef4444", 4);
-    insertDeptIfMissing.run("devsecops", "DevSecOps", "인프라보안팀", "🛡️", "#f97316", 5);
+    insertDeptIfMissing.run("qa", "QA/QC", "", "🔍", "#ef4444", 4);
+    insertDeptIfMissing.run("devsecops", "DevSecOps", "", "🛡️", "#f97316", 5);
 
     const updateOrder = db.prepare("UPDATE departments SET sort_order = ? WHERE id = ?");
     for (const [id, order] of Object.entries(DEPT_ORDER)) {

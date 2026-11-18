@@ -23,7 +23,7 @@ const AGENTS: Agent[] = [
   {
     id: "agent-1",
     name: "Atlas",
-    name_ko: "아틀라스",
+    name_ko: "",
     department_id: "planning",
     role: "team_leader",
     cli_provider: "claude",
@@ -38,8 +38,7 @@ const AGENTS: Agent[] = [
 ];
 
 describe("decision inbox helpers", () => {
-  it("detects localized decision reply prefixes", () => {
-    expect(isDecisionReplyContent("[의사결정 회신] 1번")).toBe(true);
+  it("detects decision reply prefixes", () => {
     expect(isDecisionReplyContent("[Decision Reply] option 2")).toBe(true);
     expect(isDecisionReplyContent("normal chat")).toBe(false);
   });
@@ -50,7 +49,7 @@ describe("decision inbox helpers", () => {
         id: "req-1",
         sender_type: "agent",
         sender_id: "agent-1",
-        content: "진행 옵션\n1. A\n2. B",
+        content: "Options to proceed\n1. A\n2. B",
         created_at: 1000,
       }),
       createMessage({
@@ -58,14 +57,14 @@ describe("decision inbox helpers", () => {
         sender_type: "ceo",
         receiver_type: "agent",
         receiver_id: "agent-1",
-        content: "[의사결정 회신] 1번",
+        content: "[Decision Reply] option 1",
         created_at: 2000,
       }),
       createMessage({
         id: "req-2",
         sender_type: "agent",
         sender_id: "agent-1",
-        content: "진행 옵션\n1. C\n2. D",
+        content: "Options to proceed\n1. C\n2. D",
         created_at: 3000,
       }),
     ];
@@ -82,17 +81,17 @@ describe("decision inbox helpers", () => {
         id: "req-fallback",
         sender_type: "agent",
         sender_id: "agent-unknown",
-        sender_name: "리안",
+        sender_name: "Rian",
         sender_avatar: "🎬",
-        content: "진행 옵션\n1. A\n2. B",
+        content: "Options to proceed\n1. A\n2. B",
         created_at: 4000,
       }),
     ];
 
     const items = buildDecisionInboxItems(messages, AGENTS);
     expect(items).toHaveLength(1);
-    expect(items[0]?.agentName).toBe("리안");
-    expect(items[0]?.agentNameKo).toBe("리안");
+    expect(items[0]?.agentName).toBe("Rian");
+    expect(items[0]?.agentNameKo).toBe("Rian");
     expect(items[0]?.agentAvatar).toBe("🎬");
   });
 });

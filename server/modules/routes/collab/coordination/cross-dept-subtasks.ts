@@ -42,10 +42,7 @@ export function createCrossDeptSubtaskTools(deps: CrossDeptSubtaskDeps) {
       AND status != 'done'
       AND (delegated_task_id IS NULL OR delegated_task_id = '')
       AND (
-        title LIKE '[협업]%'
-        OR title LIKE '[Collaboration]%'
-        OR title LIKE '[協業]%'
-        OR title LIKE '[协作]%'
+        title LIKE '[Collaboration]%'
       )
     ORDER BY created_at ASC
     LIMIT 1

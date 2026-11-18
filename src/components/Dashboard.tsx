@@ -60,17 +60,11 @@ export default function Dashboard({
   const summary = (() => {
     if (inProgress === 0 && inReview === 0) {
       return t({
-        ko: "진행 중인 작업이 없습니다.",
         en: "Nothing in progress right now.",
-        ja: "進行中のタスクはありません。",
-        zh: "目前没有进行中的任务。",
       });
     }
     return t({
-      ko: `진행 중 ${inProgress}건, 검토 대기 ${inReview}건.`,
       en: `${inProgress} ${inProgress === 1 ? "task" : "tasks"} in progress, ${inReview} waiting for review.`,
-      ja: `進行中 ${inProgress} 件、レビュー待ち ${inReview} 件。`,
-      zh: `进行中 ${inProgress} 项，待审核 ${inReview} 项。`,
     });
   })();
 
@@ -144,19 +138,12 @@ export default function Dashboard({
   const pipelineAside = (
     <span>
       {t({
-        ko: `완료율 ${completionRate}%`,
         en: `${completionRate}% complete`,
-        ja: `完了率 ${completionRate}%`,
-        zh: `完成率 ${completionRate}%`,
       })}
-      {onHold > 0 &&
-        t({ ko: `, 보류 ${onHold}`, en: `, ${onHold} on hold`, ja: `、保留 ${onHold}`, zh: `，待处理 ${onHold}` })}
+      {onHold > 0 && t({ en: `, ${onHold} on hold` })}
       {cancelled > 0 &&
         t({
-          ko: `, 취소 ${cancelled}`,
           en: `, ${cancelled} cancelled`,
-          ja: `、キャンセル ${cancelled}`,
-          zh: `，已取消 ${cancelled}`,
         })}
     </span>
   );
@@ -194,7 +181,7 @@ export default function Dashboard({
             className="header-action-btn header-action-btn-primary !h-9 !px-4"
           >
             <Plus size={16} strokeWidth={2} />
-            {t({ ko: "새 작업", en: "New task", ja: "新しいタスク", zh: "新建任务" })}
+            {t({ en: "New task" })}
           </button>
         </div>
       </header>

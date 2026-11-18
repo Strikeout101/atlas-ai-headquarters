@@ -1,7 +1,7 @@
 import { ListChecks, Megaphone, FileBarChart } from "lucide-react";
 type ChatMode = "chat" | "task" | "announcement" | "report";
 
-type Tr = (ko: string, en: string, ja?: string, zh?: string) => string;
+type Tr = (en: string) => string;
 
 interface ChatModeHintProps {
   mode: ChatMode;
@@ -15,47 +15,25 @@ export default function ChatModeHint({ mode, isDirectiveMode, tr }: ChatModeHint
   return (
     <div className="px-4 py-1 flex-shrink-0">
       {isDirectiveMode ? (
-        <p className="text-xs text-red-400 font-medium">
-          {tr(
-            "업무지시 모드 — 기획팀이 자동으로 주관합니다",
-            "Directive mode - Planning team auto-coordinates",
-            "業務指示モード — 企画チームが自動的に主管します",
-            "业务指示模式 — 企划组自动主管",
-          )}
-        </p>
+        <p className="text-xs text-red-400 font-medium">{tr("Directive mode - Planning team auto-coordinates")}</p>
       ) : (
         <>
           {mode === "task" && (
             <p className="text-xs text-blue-400">
               <ListChecks size={13} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
-              {tr(
-                "업무 지시 모드 — 에이전트에게 작업을 할당합니다",
-                "Task mode - assign work to the agent",
-                "タスク指示モード — エージェントに作業を割り当てます",
-                "任务指示模式 — 向代理分配工作",
-              )}
+              {tr("Task mode - assign work to the agent")}
             </p>
           )}
           {mode === "announcement" && (
             <p className="text-xs text-yellow-400">
               <Megaphone size={13} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
-              {tr(
-                "전사 공지 모드 — 모든 에이전트에게 전달됩니다",
-                "Announcement mode - sent to all agents",
-                "全体告知モード — すべてのエージェントに送信",
-                "全员公告模式 — 将发送给所有代理",
-              )}
+              {tr("Announcement mode - sent to all agents")}
             </p>
           )}
           {mode === "report" && (
             <p className="text-xs text-emerald-400">
               <FileBarChart size={13} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
-              {tr(
-                "보고 요청 모드 — 보고서/발표자료 작성 작업을 요청합니다",
-                "Report mode - request report/deck authoring",
-                "レポート依頼モード — レポート/資料作成を依頼します",
-                "报告请求模式 — 请求撰写报告/演示资料",
-              )}
+              {tr("Report mode - request report/deck authoring")}
             </p>
           )}
         </>

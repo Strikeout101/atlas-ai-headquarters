@@ -32,18 +32,18 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 
 export const STATUS_LABELS: Record<string, LangText> = {
-  idle: { ko: "대기중", en: "Idle", ja: "待機中", zh: "待机中" },
-  working: { ko: "작업중", en: "Working", ja: "作業中", zh: "工作中" },
-  break: { ko: "휴식", en: "Break", ja: "休憩中", zh: "休息中" },
-  offline: { ko: "오프라인", en: "Offline", ja: "オフライン", zh: "离线" },
+  idle: { en: "Idle" },
+  working: { en: "Working" },
+  break: { en: "Break" },
+  offline: { en: "Offline" },
 };
 
 export const ROLE_LABELS: Record<string, LangText> = {
-  vp: { ko: "부사장", en: "VP", ja: "副社長", zh: "副总裁" },
-  team_leader: { ko: "팀장", en: "Team Leader", ja: "チームリーダー", zh: "组长" },
-  senior: { ko: "시니어", en: "Senior", ja: "シニア", zh: "高级" },
-  junior: { ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" },
-  intern: { ko: "인턴", en: "Intern", ja: "インターン", zh: "实习生" },
+  vp: { en: "VP" },
+  team_leader: { en: "Team Leader" },
+  senior: { en: "Senior" },
+  junior: { en: "Junior" },
+  intern: { en: "Intern" },
 };
 
 export function isPromiseLike(value: unknown): value is Promise<void> {

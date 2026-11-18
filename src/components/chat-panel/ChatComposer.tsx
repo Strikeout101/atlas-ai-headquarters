@@ -4,7 +4,7 @@ import type { Agent } from "../../types";
 import ChatModeHint from "./ChatModeHint";
 
 type ChatMode = "chat" | "task" | "announcement" | "report";
-type Tr = (ko: string, en: string, ja?: string, zh?: string) => string;
+type Tr = (en: string) => string;
 
 interface ChatComposerProps {
   mode: ChatMode;
@@ -48,7 +48,7 @@ export default function ChatComposer({
           }`}
         >
           <ListChecks size={14} strokeWidth={1.75} />
-          <span>{tr("업무 지시", "Task", "タスク指示", "任务指示")}</span>
+          <span>{tr("Task")}</span>
         </button>
 
         <button
@@ -58,7 +58,7 @@ export default function ChatComposer({
           }`}
         >
           <Megaphone size={14} strokeWidth={1.75} />
-          <span>{tr("전사 공지", "Announcement", "全体告知", "全员公告")}</span>
+          <span>{tr("Announcement")}</span>
         </button>
 
         <button
@@ -71,7 +71,7 @@ export default function ChatComposer({
           }`}
         >
           <FileBarChart size={14} strokeWidth={1.75} />
-          <span>{tr("보고 요청", "Report", "レポート依頼", "报告请求")}</span>
+          <span>{tr("Report")}</span>
         </button>
       </div>
 
@@ -98,39 +98,14 @@ export default function ChatComposer({
             onKeyDown={onKeyDown}
             placeholder={
               isAnnouncementMode
-                ? tr(
-                    "전사 공지 내용을 입력하세요...",
-                    "Write an announcement...",
-                    "全体告知内容を入力してください...",
-                    "请输入公告内容...",
-                  )
+                ? tr("Write an announcement...")
                 : mode === "task"
-                  ? tr(
-                      "업무 지시 내용을 입력하세요...",
-                      "Write a task instruction...",
-                      "タスク指示内容を入力してください...",
-                      "请输入任务指示内容...",
-                    )
+                  ? tr("Write a task instruction...")
                   : mode === "report"
-                    ? tr(
-                        "보고 요청 내용을 입력하세요...",
-                        "Write a report request...",
-                        "レポート依頼内容を入力してください...",
-                        "请输入报告请求内容...",
-                      )
+                    ? tr("Write a report request...")
                     : selectedAgent
-                      ? tr(
-                          `${getAgentName(selectedAgent)}에게 메시지 보내기...`,
-                          `Send a message to ${getAgentName(selectedAgent)}...`,
-                          `${getAgentName(selectedAgent)}にメッセージを送る...`,
-                          `向 ${getAgentName(selectedAgent)} 发送消息...`,
-                        )
-                      : tr(
-                          "메시지를 입력하세요...",
-                          "Type a message...",
-                          "メッセージを入力してください...",
-                          "请输入消息...",
-                        )
+                      ? tr(`Send a message to ${getAgentName(selectedAgent)}...`)
+                      : tr("Type a message...")
             }
             rows={1}
             className="min-h-[44px] max-h-32 flex-1 resize-none overflow-y-auto bg-transparent px-4 py-3 text-sm leading-relaxed text-gray-100 placeholder-gray-500 focus:outline-none"
@@ -157,21 +132,14 @@ export default function ChatComposer({
                         : "bg-blue-600 text-white hover:bg-blue-500"
                 : "cursor-not-allowed bg-gray-700 text-gray-600"
             }`}
-            aria-label={tr("전송", "Send", "送信", "发送")}
+            aria-label={tr("Send")}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
               <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
             </svg>
           </button>
         </div>
-        <p className="mt-1.5 px-1 text-xs text-gray-600">
-          {tr(
-            "Enter로 전송, Shift+Enter로 줄바꿈",
-            "Press Enter to send, Shift+Enter for a new line",
-            "Enterで送信、Shift+Enterで改行",
-            "按 Enter 发送，Shift+Enter 换行",
-          )}
-        </p>
+        <p className="mt-1.5 px-1 text-xs text-gray-600">{tr("Press Enter to send, Shift+Enter for a new line")}</p>
       </div>
     </>
   );

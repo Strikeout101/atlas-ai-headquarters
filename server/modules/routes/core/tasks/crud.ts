@@ -490,7 +490,7 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
       try {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       } catch {
-        // 로그 파일 정리는 베스트 에포트
+        // Log file cleanup is best effort
       }
     }
 

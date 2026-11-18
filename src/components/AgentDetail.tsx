@@ -104,17 +104,14 @@ export default function AgentDetail({
     (effort: string, fallback?: string) => {
       switch (effort) {
         case "low":
-          return t({ ko: "빠름, 낮은 깊이", en: "Faster, lower depth", ja: "高速・浅い推論", zh: "更快，较浅推理" });
+          return t({ en: "Faster, lower depth" });
         case "medium":
-          return t({ ko: "균형 기본값", en: "Balanced default", ja: "バランス既定", zh: "均衡默认" });
+          return t({ en: "Balanced default" });
         case "high":
-          return t({ ko: "높은 추론 깊이", en: "Higher reasoning depth", ja: "高い推論深度", zh: "更高推理深度" });
+          return t({ en: "Higher reasoning depth" });
         case "xhigh":
           return t({
-            ko: "최대 추론 깊이",
             en: "Maximum reasoning depth",
-            ja: "最大推論深度",
-            zh: "最高推理深度",
           });
         default:
           return fallback || "";
@@ -273,17 +270,10 @@ export default function AgentDetail({
           const details = (error.details ?? {}) as {
             existing_leader?: { name?: string | null; name_ko?: string | null };
           };
-          const existingLeaderName = String(
-            details.existing_leader?.name_ko ||
-              details.existing_leader?.name ||
-              t({ ko: "기존 리더", en: "current leader" }),
-          ).trim();
+          const existingLeaderName = String(details.existing_leader?.name || t({ en: "current leader" })).trim();
           const confirmed = window.confirm(
             t({
-              ko: `이미 ${existingLeaderName}가 기획 리더입니다. 변경하시겠습니까?`,
               en: `${existingLeaderName} is already the planning lead. Change leader?`,
-              ja: `${existingLeaderName}さんが既に企画リーダーです。変更しますか？`,
-              zh: `${existingLeaderName} 已是企划负责人。要变更吗？`,
             }),
           );
           if (confirmed) {
@@ -370,17 +360,10 @@ export default function AgentDetail({
                   />
                   <span>
                     {t({
-                      ko: "Lead (기획 리더)",
                       en: "Lead (Planning lead)",
-                      ja: "Lead（企画リード）",
-                      zh: "Lead（企划负责人）",
                     })}
                   </span>
-                  {savingPlanningLead && (
-                    <span className="text-[10px] text-slate-400">
-                      {t({ ko: "저장중...", en: "Saving...", ja: "保存中...", zh: "保存中..." })}
-                    </span>
-                  )}
+                  {savingPlanningLead && <span className="text-[10px] text-slate-400">{t({ en: "Saving..." })}</span>}
                 </label>
               )}
               <div className="text-xs text-slate-500 mt-0.5">
@@ -407,10 +390,7 @@ export default function AgentDetail({
                         {cliModelsLoading ? (
                           <span className="text-[10px] text-slate-400">
                             {t({
-                              ko: "모델 로딩...",
                               en: "Loading models...",
-                              ja: "モデル読み込み中...",
-                              zh: "正在加载模型...",
                             })}
                           </span>
                         ) : selectedCliModelOptions.length > 0 ? (
@@ -427,10 +407,7 @@ export default function AgentDetail({
                             >
                               <option value="">
                                 {t({
-                                  ko: "기본값(설정창 모델)",
                                   en: "Default (Settings model)",
-                                  ja: "デフォルト（設定モデル）",
-                                  zh: "默认（设置中的模型）",
                                 })}
                               </option>
                               {selectedCliModelOptions.map((model) => (
@@ -447,10 +424,7 @@ export default function AgentDetail({
                               >
                                 <option value="">
                                   {t({
-                                    ko: "기본값(설정창 추론)",
                                     en: "Default (Settings reasoning)",
-                                    ja: "デフォルト（設定推論）",
-                                    zh: "默认（设置中的推理）",
                                   })}
                                 </option>
                                 {codexReasoningOptions.map((level) => (
@@ -467,10 +441,7 @@ export default function AgentDetail({
                         ) : (
                           <span className="text-[10px] text-slate-400">
                             {t({
-                              ko: "모델 목록이 없습니다",
                               en: "No model list available",
-                              ja: "モデル一覧がありません",
-                              zh: "暂无模型列表",
                             })}
                           </span>
                         )}
@@ -478,10 +449,7 @@ export default function AgentDetail({
                       <div className="flex flex-wrap items-center gap-1">
                         <span className="text-[10px] text-slate-400">
                           {t({
-                            ko: "알바생 모델은 설정창 값을 따릅니다",
                             en: "Sub-agent model follows Settings",
-                            ja: "サブエージェントモデルは設定値を使用",
-                            zh: "子代理模型沿用设置值",
                           })}
                         </span>
                         <button
@@ -491,13 +459,13 @@ export default function AgentDetail({
                           }}
                           className="text-[10px] px-1.5 py-0.5 ax-btn-primary rounded transition-colors disabled:opacity-50"
                         >
-                          {savingCli ? "..." : t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
+                          {savingCli ? "..." : t({ en: "Save" })}
                         </button>
                         <button
                           onClick={handleCancelCliEdit}
                           className="text-[10px] px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded transition-colors"
                         >
-                          {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
+                          {t({ en: "Cancel" })}
                         </button>
                       </div>
                     </div>
@@ -523,10 +491,7 @@ export default function AgentDetail({
                         (oauthLoading ? (
                           <span className="text-[10px] text-slate-400">
                             {t({
-                              ko: "계정 로딩...",
                               en: "Loading accounts...",
-                              ja: "アカウント読み込み中...",
-                              zh: "正在加载账号...",
                             })}
                           </span>
                         ) : activeOAuthAccounts.length > 0 ? (
@@ -544,20 +509,14 @@ export default function AgentDetail({
                         ) : (
                           <span className="text-[10px] text-amber-300">
                             {t({
-                              ko: "활성 OAuth 계정 없음",
                               en: "No active OAuth account",
-                              ja: "有効な OAuth アカウントなし",
-                              zh: "没有可用的 OAuth 账号",
                             })}
                           </span>
                         ))}
                       {requiresApiProvider && (
                         <span className="text-[10px] text-amber-300">
                           {t({
-                            ko: "설정 > API 탭에서 모델을 배정하세요",
                             en: "Assign models in Settings > API",
-                            ja: "設定 > API タブでモデルを割り当ててください",
-                            zh: "请在设置 > API 标签页中分配模型",
                           })}
                         </span>
                       )}
@@ -565,10 +524,7 @@ export default function AgentDetail({
                         (cliModelsLoading ? (
                           <span className="text-[10px] text-slate-400">
                             {t({
-                              ko: "모델 로딩...",
                               en: "Loading models...",
-                              ja: "モデル読み込み中...",
-                              zh: "正在加载模型...",
                             })}
                           </span>
                         ) : selectedCliModelOptions.length > 0 ? (
@@ -583,10 +539,7 @@ export default function AgentDetail({
                             >
                               <option value="">
                                 {t({
-                                  ko: "기본값(설정창 모델)",
                                   en: "Default (Settings model)",
-                                  ja: "デフォルト（設定モデル）",
-                                  zh: "默认（设置中的模型）",
                                 })}
                               </option>
                               {selectedCliModelOptions.map((model) => (
@@ -597,20 +550,14 @@ export default function AgentDetail({
                             </select>
                             <span className="text-[10px] text-slate-400">
                               {t({
-                                ko: "알바생 모델은 설정창 값을 따릅니다",
                                 en: "Sub-agent model follows Settings",
-                                ja: "サブエージェントモデルは設定値を使用",
-                                zh: "子代理模型沿用设置值",
                               })}
                             </span>
                           </>
                         ) : (
                           <span className="text-[10px] text-slate-400">
                             {t({
-                              ko: "모델 목록이 없습니다",
                               en: "No model list available",
-                              ja: "モデル一覧がありません",
-                              zh: "暂无模型列表",
                             })}
                           </span>
                         ))}
@@ -621,13 +568,13 @@ export default function AgentDetail({
                         }}
                         className="text-[10px] px-1.5 py-0.5 ax-btn-primary rounded transition-colors disabled:opacity-50"
                       >
-                        {savingCli ? "..." : t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
+                        {savingCli ? "..." : t({ en: "Save" })}
                       </button>
                       <button
                         onClick={handleCancelCliEdit}
                         className="text-[10px] px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded transition-colors"
                       >
-                        {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
+                        {t({ en: "Cancel" })}
                       </button>
                     </div>
                   )
@@ -636,10 +583,7 @@ export default function AgentDetail({
                     onClick={() => setEditingCli(true)}
                     className="flex items-center gap-1 hover:text-slate-300 transition-colors"
                     title={t({
-                      ko: "클릭하여 CLI 변경",
                       en: "Click to change CLI",
-                      ja: "クリックして CLI を変更",
-                      zh: "点击更改 CLI",
                     })}
                   >
                     🔧{" "}
@@ -673,14 +617,14 @@ export default function AgentDetail({
 
         <div className="flex border-b border-slate-700">
           {[
-            { key: "info", label: t({ ko: "정보", en: "Info", ja: "情報", zh: "信息" }) },
+            { key: "info", label: t({ en: "Info" }) },
             {
               key: "tasks",
-              label: `${t({ ko: "업무", en: "Tasks", ja: "タスク", zh: "任务" })} (${agentTasks.length})`,
+              label: `${t({ en: "Tasks" })} (${agentTasks.length})`,
             },
             {
               key: "alba",
-              label: `${t({ ko: "알바생", en: "Sub-agents", ja: "サブエージェント", zh: "子代理" })} (${agentSubAgents.length})`,
+              label: `${t({ en: "Sub-agents" })} (${agentSubAgents.length})`,
             },
           ].map((tabItem) => (
             <button

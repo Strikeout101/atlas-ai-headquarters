@@ -9,7 +9,7 @@ import { ensureTheme, waitForAppSettled } from "./theme-helpers.mjs";
 export async function collectCurrentViewContrast(page, minimumContrast, maxSamplesPerView) {
   return page.evaluate(
     ({ minContrast, maxSamples, maxDomElements }) => {
-      const textSignalRe = /[A-Za-z0-9가-힣ぁ-んァ-ヶ一-龯]/;
+      const textSignalRe = /[A-Za-z0-9]/;
       const skipTagSet = new Set(["script", "style", "noscript"]);
 
       const parseColor = (raw) => {
@@ -324,7 +324,7 @@ export async function collectScopedContrastFromRoot(rootHandle, minimumContrast,
   return rootHandle.evaluate(
     (root, payload) => {
       const { minContrast, maxSamples, maxDomElements } = payload;
-      const textSignalRe = /[A-Za-z0-9가-힣ぁ-んァ-ヶ一-龯]/;
+      const textSignalRe = /[A-Za-z0-9]/;
       const skipTagSet = new Set(["script", "style", "noscript"]);
 
       const parseColor = (raw) => {

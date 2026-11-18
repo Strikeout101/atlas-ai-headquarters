@@ -9,7 +9,7 @@ import { areRunsAllowed } from "../../control-state.ts";
 
 interface SubtaskDelegationDeps {
   db: any;
-  l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
+  l: (en: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   resolveLang: (text?: string, fallback?: Lang) => Lang;
   getPreferredLanguage: () => Lang;
@@ -256,14 +256,9 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
 
     notifyCeo(
       pickL(
-        l(
-          [`'${parentTask.title}' 의 외부 부서 서브태스크 ${eligible.length}건을 부서별 배치로 순차 위임합니다.`],
-          [
-            `Delegating ${eligible.length} external-department subtasks for '${parentTask.title}' sequentially by department, one batched request at a time.`,
-          ],
-          [`'${parentTask.title}' の他部門サブタスク${eligible.length}件を、部門ごとにバッチ化して順次委任します。`],
-          [`将把'${parentTask.title}'的${eligible.length}个外部门 SubTask 按部门批量后顺序委派。`],
-        ),
+        l([
+          `Delegating ${eligible.length} external-department subtasks for '${parentTask.title}' sequentially by department, one batched request at a time.`,
+        ]),
         lang,
       ),
       taskId,
@@ -318,18 +313,13 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
     subtaskDelegationCompletionNoticeSent.add(parentTaskId);
     const subtaskProgressSummary = formatTaskSubtaskProgressSummary(parentTaskId, lang);
     const progressSuffix = subtaskProgressSummary
-      ? `\n${pickL(l(["보완/협업 완료 현황"], ["Remediation/Collaboration completion"], ["補完/協業 完了状況"], ["整改/协作完成情况"]), lang)}\n${subtaskProgressSummary}`
+      ? `\n${pickL(l(["Remediation/Collaboration completion"]), lang)}\n${subtaskProgressSummary}`
       : "";
     notifyCeo(
       pickL(
-        l(
-          [`'${parentTask.title}' 의 모든 서브태스크(부서간 협업 포함)가 완료되었습니다. ✅${progressSuffix}`],
-          [
-            `All subtasks for '${parentTask.title}' (including cross-department collaboration) are complete. ✅${progressSuffix}`,
-          ],
-          [`'${parentTask.title}' の全サブタスク（部門間協業含む）が完了しました。✅${progressSuffix}`],
-          [`'${parentTask.title}'的全部 SubTask（含跨部门协作）已完成。✅${progressSuffix}`],
-        ),
+        l([
+          `All subtasks for '${parentTask.title}' (including cross-department collaboration) are complete. ✅${progressSuffix}`,
+        ]),
         lang,
       ),
       parentTaskId,
@@ -368,10 +358,7 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
     handleTaskRunComplete(delegatedTaskId, exitCode);
 
     const lang = getPreferredLanguage();
-    const blockedReason = pickL(
-      l(["위임 작업 실패"], ["Delegated task failed"], ["委任タスク失敗"], ["委派任务失败"]),
-      lang,
-    );
+    const blockedReason = pickL(l(["Delegated task failed"]), lang);
     const doneAt = nowMs();
     const touchedParentTaskIds = new Set<string>();
 

@@ -252,18 +252,7 @@ export function registerWorktreeAndUsageRoutes(ctx: RuntimeContext): {
     if (result.success) {
       cleanupWorktree(wtInfo.projectPath, id);
       appendTaskLog(id, "system", `Manual merge completed: ${result.message}`);
-      notifyCeo(
-        pickL(
-          l(
-            [`수동 병합 완료: ${result.message}`],
-            [`Manual merge completed: ${result.message}`],
-            [`手動マージ完了: ${result.message}`],
-            [`手动合并完成: ${result.message}`],
-          ),
-          lang,
-        ),
-        id,
-      );
+      notifyCeo(pickL(l([`Manual merge completed: ${result.message}`]), lang), id);
     } else {
       appendTaskLog(id, "system", `Manual merge failed: ${result.message}`);
     }
@@ -281,18 +270,7 @@ export function registerWorktreeAndUsageRoutes(ctx: RuntimeContext): {
     cleanupWorktree(wtInfo.projectPath, id);
     appendTaskLog(id, "system", "Worktree discarded (changes abandoned)");
     const lang = resolveLang();
-    notifyCeo(
-      pickL(
-        l(
-          [`작업 브랜치가 폐기되었습니다: climpire/${id.slice(0, 8)}`],
-          [`Task branch discarded: climpire/${id.slice(0, 8)}`],
-          [`タスクブランチを破棄しました: climpire/${id.slice(0, 8)}`],
-          [`任务分支已丢弃: climpire/${id.slice(0, 8)}`],
-        ),
-        lang,
-      ),
-      id,
-    );
+    notifyCeo(pickL(l([`Task branch discarded: climpire/${id.slice(0, 8)}`]), lang), id);
 
     res.json({ ok: true, message: "Worktree discarded" });
   });

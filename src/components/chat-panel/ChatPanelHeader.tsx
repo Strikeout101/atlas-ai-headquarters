@@ -2,7 +2,7 @@ import { Megaphone } from "lucide-react";
 import AgentAvatar from "../AgentAvatar";
 import type { Agent } from "../../types";
 
-type Tr = (ko: string, en: string, ja?: string, zh?: string) => string;
+type Tr = (en: string) => string;
 
 interface ChatPanelHeaderProps {
   selectedAgent: Agent | null;
@@ -67,17 +67,8 @@ export default function ChatPanelHeader({
               <Megaphone size={18} strokeWidth={1.75} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-white">
-                {tr("전사 공지", "Company Announcement", "全体告知", "全员公告")}
-              </div>
-              <div className="mt-0.5 text-xs text-gray-400">
-                {tr(
-                  "모든 에이전트에게 전달됩니다",
-                  "Sent to all agents",
-                  "すべてのエージェントに送信されます",
-                  "将发送给所有代理",
-                )}
-              </div>
+              <div className="text-sm font-semibold text-white">{tr("Company Announcement")}</div>
+              <div className="mt-0.5 text-xs text-gray-400">{tr("Sent to all agents")}</div>
             </div>
           </>
         )}
@@ -89,26 +80,16 @@ export default function ChatPanelHeader({
                 if (
                   window.confirm(
                     selectedAgent
-                      ? tr(
-                          `${getAgentName(selectedAgent)}와의 대화를 삭제하시겠습니까?`,
-                          `Delete conversation with ${getAgentName(selectedAgent)}?`,
-                          `${getAgentName(selectedAgent)}との会話を削除しますか？`,
-                          `要删除与 ${getAgentName(selectedAgent)} 的对话吗？`,
-                        )
-                      : tr(
-                          "전사 공지 내역을 삭제하시겠습니까?",
-                          "Delete announcement history?",
-                          "全体告知履歴を削除しますか？",
-                          "要删除全员公告记录吗？",
-                        ),
+                      ? tr(`Delete conversation with ${getAgentName(selectedAgent)}?`)
+                      : tr("Delete announcement history?"),
                   )
                 ) {
                   onClearMessages(selectedAgent?.id);
                 }
               }}
               className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-700 hover:text-red-400"
-              aria-label={tr("대화 내역 삭제", "Clear message history", "会話履歴を削除", "清除消息记录")}
-              title={tr("대화 내역 삭제", "Clear message history", "会話履歴を削除", "清除消息记录")}
+              aria-label={tr("Clear message history")}
+              title={tr("Clear message history")}
             >
               <svg
                 className="block h-4 w-4"
@@ -129,7 +110,7 @@ export default function ChatPanelHeader({
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
-            aria-label={tr("닫기", "Close", "閉じる", "关闭")}
+            aria-label={tr("Close")}
           >
             ✕
           </button>
@@ -140,12 +121,7 @@ export default function ChatPanelHeader({
         <div className="flex flex-shrink-0 items-center gap-2 border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2">
           <span className="text-sm font-medium text-yellow-400">
             <Megaphone size={14} strokeWidth={1.75} className="mr-1 inline -mt-0.5" />
-            {tr(
-              "전사 공지 모드 - 모든 에이전트에게 전달됩니다",
-              "Announcement mode - sent to all agents",
-              "全体告知モード - すべてのエージェントに送信",
-              "全员公告模式 - 将发送给所有代理",
-            )}
+            {tr("Announcement mode - sent to all agents")}
           </span>
         </div>
       )}

@@ -44,7 +44,7 @@ export default function Sidebar({
   const workingCount = agents.filter((a) => a.status === "working").length;
   const totalAgents = agents.length;
 
-  const tr = (ko: string, en: string, ja = en, zh = en) => t({ ko, en, ja, zh });
+  const tr = (en: string) => t({ en });
 
   const CollapseIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
@@ -79,7 +79,7 @@ export default function Sidebar({
           <span
             className="min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums leading-5"
             style={{ background: "var(--ax-signal)", color: "var(--ax-signal-ink)" }}
-            aria-label={tr(`${badge}건 대기`, `${badge} waiting`, `${badge} 件待ち`, `${badge} 项待处理`)}
+            aria-label={tr(`${badge} waiting`)}
           >
             {badge}
           </span>
@@ -125,20 +125,20 @@ export default function Sidebar({
             type="button"
             onClick={() => setCollapsed(true)}
             className="theme-toggle-btn !h-7 !w-7"
-            aria-label={tr("사이드바 접기", "Collapse sidebar")}
+            aria-label={tr("Collapse sidebar")}
           >
             <CollapseIcon size={15} strokeWidth={1.75} />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-2 pt-1" aria-label={tr("주 메뉴", "Main")}>
+      <nav className="flex-1 overflow-y-auto px-2 pb-2 pt-1" aria-label={tr("Main")}>
         {collapsed && (
           <button
             type="button"
             onClick={() => setCollapsed(false)}
             className="sidebar-nav-item justify-center !px-0"
-            aria-label={tr("사이드바 펼치기", "Expand sidebar")}
+            aria-label={tr("Expand sidebar")}
           >
             <CollapseIcon size={16} strokeWidth={1.75} />
           </button>
@@ -149,14 +149,14 @@ export default function Sidebar({
             onClick={onOpenCommandBar}
             className={`sidebar-nav-item mb-2 ${collapsed ? "justify-center !px-0" : ""}`}
             style={{ boxShadow: "inset 0 0 0 1px var(--th-border)" }}
-            title={collapsed ? tr("검색 및 이동", "Search and jump") : undefined}
+            title={collapsed ? tr("Search and jump") : undefined}
             aria-keyshortcuts="Control+K Meta+K"
           >
             <Search size={15} strokeWidth={1.75} />
             {!collapsed && (
               <>
                 <span className="flex-1 truncate text-left" style={{ color: "var(--th-text-muted)" }}>
-                  {tr("검색 및 이동", "Search and jump", "検索・移動", "搜索与跳转")}
+                  {tr("Search and jump")}
                 </span>
                 <kbd
                   className="rounded px-1.5 font-mono text-[10.5px]"
@@ -184,7 +184,7 @@ export default function Sidebar({
           style={{ borderTop: "1px solid var(--th-border)" }}
         >
           <div className="mb-1 px-2 text-[11px] font-medium" style={{ color: "var(--th-text-muted)" }}>
-            {tr("부서", "Departments", "部門", "部门")}
+            {tr("Departments")}
           </div>
           {departments.map((d) => {
             const deptAgents = agents.filter((a) => a.department_id === d.id);
@@ -215,7 +215,7 @@ export default function Sidebar({
       <div
         className={`flex h-10 items-center gap-2 text-[11px] ${collapsed ? "justify-center" : "px-4"}`}
         style={{ borderTop: "1px solid var(--th-border)", color: "var(--th-text-muted)" }}
-        title={connected ? undefined : tr("서버 연결 끊김", "Server disconnected")}
+        title={connected ? undefined : tr("Server disconnected")}
       >
         <span
           className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -223,14 +223,7 @@ export default function Sidebar({
         />
         {!collapsed && (
           <span className="truncate">
-            {connected
-              ? tr(
-                  `${workingCount}/${totalAgents} 근무중`,
-                  `${workingCount} of ${totalAgents} agents working`,
-                  `${workingCount}/${totalAgents} 稼働中`,
-                  `${workingCount}/${totalAgents} 工作中`,
-                )
-              : tr("연결 끊김", "Disconnected", "接続なし", "已断开")}
+            {connected ? tr(`${workingCount} of ${totalAgents} agents working`) : tr("Disconnected")}
           </span>
         )}
       </div>

@@ -302,10 +302,7 @@ function renderAgentHeader(
     text: pickLocale(
       activeLocale,
       LOCALE_TEXT.role[agent.role as keyof typeof LOCALE_TEXT.role] || {
-        ko: agent.role,
         en: agent.role,
-        ja: agent.role,
-        zh: agent.role,
       },
     ),
     style: new TextStyle({

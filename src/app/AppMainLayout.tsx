@@ -272,8 +272,7 @@ export default function AppMainLayout({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [executiveDesktopOpen, setView, view]);
-  const uiLanguage =
-    labels.uiLanguage === "ko" || labels.uiLanguage === "ja" || labels.uiLanguage === "zh" ? labels.uiLanguage : "en";
+  const uiLanguage = "en";
   const officePresentation = useMemo(
     () => ({ departments, agents, roomThemes: customRoomThemes }),
     [departments, agents, customRoomThemes],
@@ -340,10 +339,7 @@ export default function AppMainLayout({
     if (view === "dashboard") void refreshReadyDrafts();
   }, [view, refreshReadyDrafts]);
   const needsYouCount = pendingApprovals.items.length + decisionInboxCount + reviewCount + readyDrafts.items.length;
-  const tr = useCallback(
-    (text: { ko: string; en: string; ja: string; zh: string }) => pickLang(uiLanguage, text),
-    [uiLanguage],
-  );
+  const tr = useCallback((text: { en: string }) => pickLang(uiLanguage, text), [uiLanguage]);
 
   const commands = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = NAV_ITEMS.filter((item) => !(hiddenViews?.includes(item.view) ?? false)).map(
@@ -356,23 +352,19 @@ export default function AppMainLayout({
         run: () => handleViewChange(target),
       }),
     );
-    const settingsTabs: Array<[SettingsTab, { ko: string; en: string; ja: string; zh: string }, string]> = [
-      ["general", { ko: "일반", en: "General", ja: "一般", zh: "常规" }, "company name language preferences"],
-      [
-        "security",
-        { ko: "보안", en: "Security", ja: "セキュリティ", zh: "安全" },
-        "password login trusted networks sign out",
-      ],
-      ["cli", { ko: "CLI 도구", en: "CLI tools", ja: "CLI ツール", zh: "CLI 工具" }, "claude codex gemini opencode"],
-      ["oauth", { ko: "OAuth", en: "OAuth", ja: "OAuth", zh: "OAuth" }, "accounts sign in providers"],
-      ["api", { ko: "API", en: "API", ja: "API", zh: "API" }, "providers ollama models keys"],
-      ["gateway", { ko: "채널", en: "Channels", ja: "チャネル", zh: "频道" }, "telegram discord messenger"],
+    const settingsTabs: Array<[SettingsTab, { en: string }, string]> = [
+      ["general", { en: "General" }, "company name language preferences"],
+      ["security", { en: "Security" }, "password login trusted networks sign out"],
+      ["cli", { en: "CLI tools" }, "claude codex gemini opencode"],
+      ["oauth", { en: "OAuth" }, "accounts sign in providers"],
+      ["api", { en: "API" }, "providers ollama models keys"],
+      ["gateway", { en: "Channels" }, "telegram discord messenger"],
     ];
     for (const [tab, label, keywords] of settingsTabs) {
       items.push({
         id: `settings:${tab}`,
         group: "navigate",
-        label: `${tr({ ko: "설정", en: "Settings", ja: "設定", zh: "设置" })} › ${tr(label)}`,
+        label: `${tr({ en: "Settings" })} › ${tr(label)}`,
         icon: <Settings size={15} strokeWidth={1.75} />,
         keywords: `settings ${keywords}`,
         run: () => {
@@ -424,16 +416,14 @@ export default function AppMainLayout({
       );
     action(
       "new-task",
-      tr({ ko: "새 업무 만들기", en: "New task", ja: "新しいタスク", zh: "新建任务" }),
+      tr({ en: "New task" }),
       <ListChecks size={15} strokeWidth={1.75} />,
       () => handleViewChange("tasks"),
       "create add task work",
     );
     action(
       "theme",
-      theme === "dark"
-        ? tr({ ko: "라이트 모드로 전환", en: "Switch to light mode", ja: "ライトモードに切替", zh: "切换到浅色模式" })
-        : tr({ ko: "다크 모드로 전환", en: "Switch to dark mode", ja: "ダークモードに切替", zh: "切换到深色模式" }),
+      theme === "dark" ? tr({ en: "Switch to light mode" }) : tr({ en: "Switch to dark mode" }),
       <Moon size={15} strokeWidth={1.75} />,
       toggleTheme,
       "theme dark light appearance",
@@ -455,7 +445,7 @@ export default function AppMainLayout({
         items.push({
           id: `chat:${agent.id}`,
           group: "agents",
-          label: tr({ ko: `${name}와 대화`, en: `Chat with ${name}`, ja: `${name} とチャット`, zh: `与 ${name} 聊天` }),
+          label: tr({ en: `Chat with ${name}` }),
           hint: dept,
           icon: <MessageSquare size={15} strokeWidth={1.75} />,
           keywords: `${agent.name} message talk`,
@@ -567,8 +557,8 @@ export default function AppMainLayout({
             onToggleMobileHeaderMenu={() => setMobileHeaderMenuOpen(!mobileHeaderMenuOpen)}
             onCloseMobileHeaderMenu={() => setMobileHeaderMenuOpen(false)}
             onOpenCommandBar={() => setCommandBarOpen(true)}
-            commandBarLabel={tr({ ko: "검색 및 이동", en: "Search and jump", ja: "検索・移動", zh: "搜索与跳转" })}
-            moreLabel={tr({ ko: "더보기", en: "More", ja: "その他", zh: "更多" })}
+            commandBarLabel={tr({ en: "Search and jump" })}
+            moreLabel={tr({ en: "More" })}
             phone={phone}
           />
 

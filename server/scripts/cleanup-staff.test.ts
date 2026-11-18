@@ -44,7 +44,7 @@ afterEach(() => {
 });
 
 describe("cleanup-staff script", () => {
-  it("dry-run reset은 break 상태를 실제로 바꾸지 않는다", () => {
+  it("a dry-run reset does not change break status", () => {
     const { dbPath, db } = createDb();
     try {
       db.prepare("INSERT INTO agents (id, name, role, cli_provider, status) VALUES (?, ?, ?, ?, ?)").run(
@@ -72,7 +72,7 @@ describe("cleanup-staff script", () => {
     }
   });
 
-  it("reset과 중복/역할 리포트를 실행할 수 있다", () => {
+  it("runs the reset and the duplicate and role reports", () => {
     const { dbPath, db } = createDb();
     try {
       const insert = db.prepare(

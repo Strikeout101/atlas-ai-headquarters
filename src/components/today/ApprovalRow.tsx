@@ -30,10 +30,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
       const where = item.target_name ?? item.target_host ?? item.target_id;
       const ok = window.confirm(
         t({
-          ko: `${where}에서 이 명령을 승인할까요?\n\n${item.command}`,
           en: `Approve this exact SSH command on ${where}?\n\n${item.command}`,
-          ja: `${where} でこのコマンドを承認しますか？\n\n${item.command}`,
-          zh: `批准在 ${where} 上运行此命令吗？\n\n${item.command}`,
         }),
       );
       if (!ok) return;
@@ -53,22 +50,22 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
   const isProposal = item.kind === "task_proposal";
   const Icon = isEmail ? Mail : isSsh ? TerminalSquare : isProposal ? Lightbulb : Cpu;
   const kindLabel = isSsh
-    ? t({ ko: "SSH 명령", en: "SSH command", ja: "SSH コマンド", zh: "SSH 命令" })
+    ? t({ en: "SSH command" })
     : isEmail
       ? "Email to send"
       : isProposal
-        ? t({ ko: "제안된 업무", en: "Suggested task", ja: "提案されたタスク", zh: "建议的任务" })
+        ? t({ en: "Suggested task" })
         : item.kind === "record_change"
-          ? t({ ko: "기록 변경", en: "Record change", ja: "記録の変更", zh: "记录更改" })
+          ? t({ en: "Record change" })
           : item.kind === "code_push"
-            ? t({ ko: "코드 푸시", en: "Code push", ja: "コードのプッシュ", zh: "代码推送" })
+            ? t({ en: "Code push" })
             : item.kind === "listing_publish"
-              ? t({ ko: "게시할 상품", en: "Listing to publish", ja: "公開する出品", zh: "待发布的商品" })
+              ? t({ en: "Listing to publish" })
               : item.kind === "spend_request"
-                ? t({ ko: "지출 요청", en: "Spending request", ja: "支出リクエスト", zh: "支出请求" })
+                ? t({ en: "Spending request" })
                 : item.kind === "org_request"
-                  ? t({ ko: "조직 요청", en: "Organization request", ja: "組織リクエスト", zh: "组织请求" })
-                  : t({ ko: "모델 업그레이드", en: "Model upgrade", ja: "モデルアップグレード", zh: "模型升级" });
+                  ? t({ en: "Organization request" })
+                  : t({ en: "Model upgrade" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
@@ -140,10 +137,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
           ) : (
             <p className="mt-1 text-[12px]" style={{ color: "var(--ax-danger)" }}>
               {t({
-                ko: "명령을 표시할 수 없습니다. 홈랩에서 확인하세요.",
                 en: "The command can't be shown here. Review it in Homelab.",
-                ja: "コマンドを表示できません。ホームラボで確認してください。",
-                zh: "无法在此显示命令。请在家庭实验室中查看。",
               })}
             </p>
           )
@@ -152,16 +146,13 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             {item.description && <p className="break-words">{item.description}</p>}
             {item.reason && (
               <p className="break-words" style={{ color: "var(--th-text-muted)" }}>
-                {t({ ko: "이유: ", en: "Why: ", ja: "理由: ", zh: "原因：" })}
+                {t({ en: "Why: " })}
                 {item.reason}
               </p>
             )}
             <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: "승인하면 이 에이전트에게 배정된 작업이 생성됩니다. 실행은 직접 시작합니다.",
                 en: "Approving adds a planned task assigned to this agent. You start it when you want.",
-                ja: "承認するとこのエージェントに割り当てられたタスクが作成されます。実行はいつでも開始できます。",
-                zh: "批准后会创建一个分配给该代理的计划任务，由你决定何时开始。",
               })}
             </p>
           </div>
@@ -200,19 +191,13 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             {item.action === "delete" && (
               <p className="mt-1 text-xs" style={{ color: "var(--ax-danger)" }}>
                 {t({
-                  ko: "승인하면 이 기록이 삭제됩니다.",
                   en: "Approving deletes this record.",
-                  ja: "承認するとこの記録は削除されます。",
-                  zh: "批准后将删除此记录。",
                 })}
               </p>
             )}
             <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: "이 사업은 에이전트의 기록 변경에 승인이 필요합니다. 승인하면 그대로 적용됩니다.",
                 en: "This business requires approval before agents change its records. Approving applies exactly this.",
-                ja: "この事業ではエージェントによる記録変更に承認が必要です。承認するとこの内容が適用されます。",
-                zh: "该业务要求代理更改记录前须经批准。批准后将按此内容执行。",
               })}
             </p>
           </div>
@@ -224,10 +209,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             </p>
             <p className="mt-1 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: `${item.account_label ?? "GitHub 계정"}으로 푸시하고 main으로의 PR을 엽니다. 병합은 하지 않습니다.`,
                 en: `Pushes with ${item.account_label ?? "the project's GitHub account"}${item.account_login ? ` (${item.account_login})` : ""} and opens a pull request to main. Nothing is merged.`,
-                ja: `${item.account_label ?? "GitHub アカウント"}でプッシュし、main へのプルリクエストを開きます。マージはしません。`,
-                zh: `使用 ${item.account_label ?? "GitHub 账户"} 推送并打开到 main 的拉取请求，不会合并。`,
               })}
             </p>
           </div>
@@ -249,16 +231,10 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {item.fee_minor > 0
                 ? t({
-                    ko: `게시하면 플랫폼 수수료 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)}가 발생합니다${item.fee_over_budget ? " (이번 달 수수료 예산 초과)" : ""}. 승인해도 자동으로 게시되지 않습니다.`,
                     en: `Publishing costs a ${formatMoney(item.fee_minor, item.fee_currency, localeTag)} platform fee${item.fee_over_budget ? ", which is outside this month's listing fee budget" : ""}. Approving does not publish it; you publish it from Ventures.`,
-                    ja: `公開にはプラットフォーム手数料 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)} がかかります${item.fee_over_budget ? "（今月の手数料予算を超過）" : ""}。承認しても自動では公開されません。`,
-                    zh: `发布需支付平台费用 ${formatMoney(item.fee_minor, item.fee_currency, localeTag)}${item.fee_over_budget ? "（超出本月费用预算）" : ""}。批准后不会自动发布。`,
                   })
                 : t({
-                    ko: "수수료가 없습니다. 승인해도 자동으로 게시되지 않습니다.",
                     en: "No platform fee. Approving does not publish it; you publish it from Ventures.",
-                    ja: "手数料はありません。承認しても自動では公開されません。",
-                    zh: "无平台费用。批准后不会自动发布。",
                   })}
             </p>
           </div>
@@ -276,10 +252,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             <p className="mt-1 whitespace-pre-wrap break-words">{item.purpose}</p>
             <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: "승인은 권한만 기록하며 돈을 이동하지 않습니다.",
                 en: "Approval records permission only. It does not move money.",
-                ja: "承認は許可の記録のみです。送金は行いません。",
-                zh: "批准仅记录许可，不会转移资金。",
               })}
             </p>
           </div>
@@ -318,7 +291,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             style={{ borderColor: "var(--ax-signal)", color: "var(--th-text-secondary)" }}
           >
             <p className="font-medium">
-              {t({ ko: "VP 검토", en: "VP review", ja: "VPレビュー", zh: "VP审核" })}: {item.vp_review.status}
+              {t({ en: "VP review" })}: {item.vp_review.status}
             </p>
             <p className="mt-1 whitespace-pre-wrap break-words">{item.vp_review.reason}</p>
           </div>
@@ -331,7 +304,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
         <div className="mt-2.5 flex flex-wrap justify-end gap-2">
           {isSsh && item.command === null ? (
             <button type="button" onClick={onOpenHomelab} className={buttonClass} style={quietStyle}>
-              {t({ ko: "홈랩 열기", en: "Open Homelab", ja: "ホームラボを開く", zh: "打开家庭实验室" })}
+              {t({ en: "Open Homelab" })}
             </button>
           ) : (
             <>
@@ -342,9 +315,7 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
                 className={buttonClass}
                 style={quietStyle}
               >
-                {isProposal
-                  ? t({ ko: "넘기기", en: "Dismiss", ja: "見送る", zh: "忽略" })
-                  : t({ ko: "거부", en: "Deny", ja: "拒否", zh: "拒绝" })}
+                {isProposal ? t({ en: "Dismiss" }) : t({ en: "Deny" })}
               </button>
               <button
                 type="button"
@@ -355,10 +326,10 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
                 {isEmail
                   ? "Approve and send"
                   : isSsh
-                    ? t({ ko: "한 번 승인", en: "Approve once", ja: "一度だけ承認", zh: "批准一次" })
+                    ? t({ en: "Approve once" })
                     : isProposal
-                      ? t({ ko: "업무에 추가", en: "Add to tasks", ja: "タスクに追加", zh: "添加到任务" })
-                      : t({ ko: "승인", en: "Approve", ja: "承認", zh: "批准" })}
+                      ? t({ en: "Add to tasks" })
+                      : t({ en: "Approve" })}
               </button>
             </>
           )}

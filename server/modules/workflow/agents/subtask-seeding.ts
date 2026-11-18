@@ -16,7 +16,7 @@ type SubtaskSeedingDeps = {
   getDeptName: (departmentId: string) => string;
   getPreferredLanguage: () => Lang;
   resolveLang: (text: string) => Lang;
-  l: (ko: string[], en: string[], ja: string[], zh: string[]) => any;
+  l: (en: string[]) => any;
   pickL: (choices: any, lang: string) => string;
   appendTaskLog: (taskId: string | null, kind: string, message: string) => void;
   notifyCeo: (message: string, taskId: string | null, messageType?: string) => void;
@@ -61,15 +61,7 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
     if (targetDeptId) {
       const targetDeptName = getDeptName(targetDeptId);
       const lang = getPreferredLanguage();
-      const blockedReason = pickL(
-        l(
-          [`${targetDeptName} 협업 대기`],
-          [`Waiting for ${targetDeptName} collaboration`],
-          [`${targetDeptName}の協業待ち`],
-          [`等待${targetDeptName}协作`],
-        ),
-        lang,
-      );
+      const blockedReason = pickL(l([`Waiting for ${targetDeptName} collaboration`]), lang);
       db.prepare(
         "UPDATE subtasks SET target_department_id = ?, status = 'blocked', blocked_reason = ? WHERE id = ?",
       ).run(targetDeptId, blockedReason, subId);
@@ -140,22 +132,9 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
       targetDepartmentId: string | null;
     }> = [
       {
-        title: pickL(
-          l(
-            ["Planned 상세 실행 계획 확정"],
-            ["Finalize detailed execution plan from planned meeting"],
-            ["Planned会議の詳細実行計画を確定"],
-            ["确定 Planned 会议的详细执行计划"],
-          ),
-          lang,
-        ),
+        title: pickL(l(["Finalize detailed execution plan from planned meeting"]), lang),
         description: pickL(
-          l(
-            [`Planned 회의 기준으로 상세 작업 순서/산출물 기준을 확정합니다. (${task.title})`],
-            [`Finalize detailed task sequence and deliverable criteria from the planned meeting. (${task.title})`],
-            [`Planned会議を基準に、詳細な作業順序と成果物基準を確定します。(${task.title})`],
-            [`基于 Planned 会议，确定详细任务顺序与交付物标准。（${task.title}）`],
-          ),
+          l([`Finalize detailed task sequence and deliverable criteria from the planned meeting. (${task.title})`]),
           lang,
         ),
         status: "pending",
@@ -180,37 +159,14 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
       }
 
       items.push({
-        title: pickL(
-          l(
-            [`[보완계획] ${clippedTitle || "추가 보완 항목"}`],
-            [`[Plan Item] ${clippedTitle || "Additional improvement item"}`],
-            [`[補完計画] ${clippedTitle || "追加補完項目"}`],
-            [`[计划项] ${clippedTitle || "补充改进事项"}`],
-          ),
-          lang,
-        ),
+        title: pickL(l([`[Plan Item] ${clippedTitle || "Additional improvement item"}`]), lang),
         description: pickL(
-          l(
-            [`Planned 회의 보완점을 실행 계획으로 반영합니다: ${detail}`],
-            [`Convert this planned-meeting improvement note into an executable task: ${detail}`],
-            [`Planned会議の補完項目を実行計画へ反映します: ${detail}`],
-            [`将 Planned 会议补充项转为可执行任务：${detail}`],
-          ),
+          l([`Convert this planned-meeting improvement note into an executable task: ${detail}`]),
           lang,
         ),
         status: targetDeptId ? "blocked" : "pending",
         assignedAgentId: targetDeptId ? (targetLeader?.id ?? null) : baseAssignee,
-        blockedReason: targetDeptId
-          ? pickL(
-              l(
-                [`${targetDeptName} 협업 대기`],
-                [`Waiting for ${targetDeptName} collaboration`],
-                [`${targetDeptName}の協業待ち`],
-                [`等待${targetDeptName}协作`],
-              ),
-              lang,
-            )
-          : null,
+        blockedReason: targetDeptId ? pickL(l([`Waiting for ${targetDeptName} collaboration`]), lang) : null,
         targetDepartmentId: targetDeptId,
       });
     }
@@ -220,56 +176,22 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
       const deptName = getDeptName(deptId);
       const crossLeader = findTeamLeader(deptId, constrainedAgentIds);
       items.push({
-        title: pickL(
-          l(
-            [`[협업] ${deptName} 결과물 작성`],
-            [`[Collaboration] Produce ${deptName} deliverable`],
-            [`[協業] ${deptName}成果物を作成`],
-            [`[协作] 编写${deptName}交付物`],
-          ),
-          lang,
-        ),
+        title: pickL(l([`[Collaboration] Produce ${deptName} deliverable`]), lang),
         description: pickL(
-          l(
-            [`Planned 회의 기준 ${deptName} 담당 결과물을 작성/공유합니다.`],
-            [`Create and share the ${deptName}-owned deliverable based on the planned meeting.`],
-            [`Planned会議を基準に、${deptName}担当の成果物を作成・共有します。`],
-            [`基于 Planned 会议，完成并共享${deptName}负责的交付物。`],
-          ),
+          l([`Create and share the ${deptName}-owned deliverable based on the planned meeting.`]),
           lang,
         ),
         status: "blocked",
         assignedAgentId: crossLeader?.id ?? null,
-        blockedReason: pickL(
-          l(
-            [`${deptName} 협업 대기`],
-            [`Waiting for ${deptName} collaboration`],
-            [`${deptName}の協業待ち`],
-            [`等待${deptName}协作`],
-          ),
-          lang,
-        ),
+        blockedReason: pickL(l([`Waiting for ${deptName} collaboration`]), lang),
         targetDepartmentId: deptId,
       });
     }
 
     items.push({
-      title: pickL(
-        l(
-          ["부서 산출물 통합 및 최종 정리"],
-          ["Consolidate department deliverables and finalize package"],
-          ["部門成果物の統合と最終整理"],
-          ["整合部门交付物并完成最终整理"],
-        ),
-        lang,
-      ),
+      title: pickL(l(["Consolidate department deliverables and finalize package"]), lang),
       description: pickL(
-        l(
-          ["유관부서 산출물을 취합해 단일 결과물로 통합하고 Review 제출본을 준비합니다."],
-          ["Collect related-department outputs, merge into one package, and prepare the review submission."],
-          ["関連部門の成果物を集約して単一成果物へ統合し、レビュー提出版を準備します。"],
-          ["汇总相关部门产出，整合为单一成果，并准备 Review 提交版本。"],
-        ),
+        l(["Collect related-department outputs, merge into one package, and prepare the review submission."]),
         lang,
       ),
       status: "pending",
@@ -306,18 +228,9 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
     );
     notifyCeo(
       pickL(
-        l(
-          [
-            `'${task.title}' Planned 회의 결과 기준 SubTask ${items.length}건을 생성하고 담당자/유관부서 협업을 배정했습니다.`,
-          ],
-          [
-            `Created ${items.length} subtasks from the planned-meeting output for '${task.title}' and assigned owners/cross-department collaboration.`,
-          ],
-          [
-            `'${task.title}' のPlanned会議結果を基準に SubTask を${items.length}件作成し、担当者と関連部門協業を割り当てました。`,
-          ],
-          [`已基于'${task.title}'的 Planned 会议结果创建${items.length}个 SubTask，并分配负责人及跨部门协作。`],
-        ),
+        l([
+          `Created ${items.length} subtasks from the planned-meeting output for '${task.title}' and assigned owners/cross-department collaboration.`,
+        ]),
         lang,
       ),
       taskId,
@@ -384,60 +297,18 @@ export function createSubtaskSeedingTools(deps: SubtaskSeedingDeps) {
       const targetLeader = targetDeptId ? findTeamLeader(targetDeptId, constrainedAgentIds) : null;
 
       items.push({
-        title: pickL(
-          l(
-            [`[검토보완] ${clippedTitle || "추가 보완 항목"}`],
-            [`[Review Revision] ${clippedTitle || "Additional revision item"}`],
-            [`[レビュー補完] ${clippedTitle || "追加補完項目"}`],
-            [`[评审整改] ${clippedTitle || "补充整改事项"}`],
-          ),
-          lang,
-        ),
-        description: pickL(
-          l(
-            [`Review 회의 보완 요청을 반영합니다: ${detail}`],
-            [`Apply the review-meeting revision request: ${detail}`],
-            [`Review会議で要請された補完項目を反映します: ${detail}`],
-            [`落实 Review 会议提出的整改项：${detail}`],
-          ),
-          lang,
-        ),
+        title: pickL(l([`[Review Revision] ${clippedTitle || "Additional revision item"}`]), lang),
+        description: pickL(l([`Apply the review-meeting revision request: ${detail}`]), lang),
         status: targetDeptId ? "blocked" : "pending",
         assignedAgentId: targetDeptId ? (targetLeader?.id ?? null) : baseAssignee,
-        blockedReason: targetDeptId
-          ? pickL(
-              l(
-                [`${targetDeptName} 협업 대기`],
-                [`Waiting for ${targetDeptName} collaboration`],
-                [`${targetDeptName}の協業待ち`],
-                [`等待${targetDeptName}协作`],
-              ),
-              lang,
-            )
-          : null,
+        blockedReason: targetDeptId ? pickL(l([`Waiting for ${targetDeptName} collaboration`]), lang) : null,
         targetDepartmentId: targetDeptId,
       });
     }
 
     items.push({
-      title: pickL(
-        l(
-          ["[검토보완] 반영 결과 통합 및 재검토 제출"],
-          ["[Review Revision] Consolidate updates and resubmit for review"],
-          ["[レビュー補完] 反映結果を統合し再レビュー提出"],
-          ["[评审整改] 整合更新并重新提交评审"],
-        ),
-        lang,
-      ),
-      description: pickL(
-        l(
-          ["보완 반영 결과를 취합해 재검토 제출본을 정리합니다."],
-          ["Collect revision outputs and prepare the re-review submission package."],
-          ["補完反映の成果を集約し、再レビュー提出版を整えます。"],
-          ["汇总整改结果并整理重新评审提交包。"],
-        ),
-        lang,
-      ),
+      title: pickL(l(["[Review Revision] Consolidate updates and resubmit for review"]), lang),
+      description: pickL(l(["Collect revision outputs and prepare the re-review submission package."]), lang),
       status: "pending",
       assignedAgentId: baseAssignee,
       blockedReason: null,

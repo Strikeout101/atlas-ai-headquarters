@@ -120,7 +120,7 @@ export default function TodayView({
   const agentNameFor = (task: Task): string => {
     const agent = agentFor(task);
     if (agent) return localeName(language, agent);
-    return task.agent_name ?? t({ ko: "미배정", en: "Unassigned", ja: "未割り当て", zh: "未分配" });
+    return task.agent_name ?? t({ en: "Unassigned" });
   };
 
   const chip = (text: string, accent?: boolean) => (
@@ -152,7 +152,7 @@ export default function TodayView({
             className="text-[26px] font-semibold leading-tight tracking-[-0.02em]"
             style={{ color: "var(--th-text-heading)" }}
           >
-            {t({ ko: "오늘", en: "Today", ja: "今日", zh: "今日" })}
+            {t({ en: "Today" })}
           </h2>
           <p className="mt-1 text-[13px]" style={{ color: "var(--th-text-muted)" }}>
             {date}
@@ -161,19 +161,13 @@ export default function TodayView({
         <div className="flex flex-wrap gap-2">
           {chip(
             t({
-              ko: `${needsYouCount}건 대기`,
               en: `${needsYouCount} need you`,
-              ja: `${needsYouCount} 件対応待ち`,
-              zh: `${needsYouCount} 项待你处理`,
             }),
             needsYouCount > 0,
           )}
           {chip(
             t({
-              ko: `${running.length}건 진행 중`,
               en: `${running.length} running`,
-              ja: `${running.length} 件実行中`,
-              zh: `${running.length} 项运行中`,
             }),
           )}
         </div>
@@ -181,7 +175,7 @@ export default function TodayView({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Panel
-          title={t({ ko: "확인이 필요한 항목", en: "Needs you", ja: "対応が必要", zh: "待你处理" })}
+          title={t({ en: "Needs you" })}
           meta={
             decisionInboxLoading ? <Loader2 size={14} className="animate-spin" aria-label="Loading" /> : needsYouCount
           }
@@ -189,10 +183,7 @@ export default function TodayView({
           {needsYouCount === 0 ? (
             <p className="px-5 py-8 text-center text-[13px]" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: "지금은 결정할 것이 없습니다.",
                 en: "Nothing is waiting on you right now.",
-                ja: "今は対応待ちの項目はありません。",
-                zh: "目前没有需要你处理的事项。",
               })}
             </p>
           ) : (
@@ -225,9 +216,9 @@ export default function TodayView({
                       style={{ color: "var(--th-text-muted)" }}
                     >
                       <span className="font-medium" style={{ color: "var(--th-text-secondary)" }}>
-                        {t({ ko: "결정 요청", en: "Decision", ja: "意思決定", zh: "决策" })}
+                        {t({ en: "Decision" })}
                       </span>
-                      <span>{language === "ko" ? item.agentNameKo : item.agentName}</span>
+                      <span>{item.agentName}</span>
                       {item.projectName && <span>· {item.projectName}</span>}
                       <span>· {timeAgo(item.createdAt, localeTag)}</span>
                     </div>
@@ -236,7 +227,7 @@ export default function TodayView({
                     </p>
                   </div>
                   <button type="button" onClick={onOpenDecisionInbox} className={`${actionButtonClass} ax-btn-primary`}>
-                    {t({ ko: "결정하기", en: "Decide", ja: "決定する", zh: "去决定" })}
+                    {t({ en: "Decide" })}
                   </button>
                 </li>
               ))}
@@ -259,7 +250,7 @@ export default function TodayView({
                       style={{ color: "var(--th-text-muted)" }}
                     >
                       <span className="font-medium" style={{ color: "var(--th-text-secondary)" }}>
-                        {t({ ko: "초안 검토", en: "Draft ready", ja: "下書き確認", zh: "草稿待审" })}
+                        {t({ en: "Draft ready" })}
                       </span>
                       <span>
                         {BUSINESS_NAMES[draft.business]} · {draft.channel}
@@ -278,10 +269,7 @@ export default function TodayView({
                       style={quietButtonStyle}
                     >
                       {t({
-                        ko: "아웃리치에서 열기",
                         en: "Open in Outreach",
-                        ja: "アウトリーチで開く",
-                        zh: "在外联中打开",
                       })}
                     </button>
                   )}
@@ -304,7 +292,7 @@ export default function TodayView({
                       style={{ color: "var(--th-text-muted)" }}
                     >
                       <span className="font-medium" style={{ color: "var(--th-text-secondary)" }}>
-                        {t({ ko: "검토 대기", en: "Ready for review", ja: "レビュー待ち", zh: "待审核" })}
+                        {t({ en: "Ready for review" })}
                       </span>
                       <span>{agentNameFor(task)}</span>
                       <span>· {timeAgo(task.updated_at, localeTag)}</span>
@@ -319,9 +307,7 @@ export default function TodayView({
                     className={actionButtonClass}
                     style={quietButtonStyle}
                   >
-                    {onOpenTask
-                      ? t({ ko: "검토하기", en: "Review", ja: "レビューする", zh: "去审核" })
-                      : t({ ko: "업무에서 열기", en: "Open in Work", ja: "業務で開く", zh: "在工作中打开" })}
+                    {onOpenTask ? t({ en: "Review" }) : t({ en: "Open in Work" })}
                   </button>
                 </li>
               ))}
@@ -334,7 +320,7 @@ export default function TodayView({
                       className="inline-flex items-center gap-1 text-[12px] font-medium"
                       style={{ color: "var(--ax-signal)" }}
                     >
-                      {t({ ko: "모든 결정 보기", en: "All decisions", ja: "すべての意思決定", zh: "全部决策" })}
+                      {t({ en: "All decisions" })}
                       <ArrowRight size={13} />
                     </button>
                   )}
@@ -345,7 +331,7 @@ export default function TodayView({
                       className="inline-flex items-center gap-1 text-[12px] font-medium"
                       style={{ color: "var(--ax-signal)" }}
                     >
-                      {t({ ko: "모든 검토 보기", en: "All reviews", ja: "すべてのレビュー", zh: "全部审核" })}
+                      {t({ en: "All reviews" })}
                       <ArrowRight size={13} />
                     </button>
                   )}
@@ -355,14 +341,11 @@ export default function TodayView({
           )}
         </Panel>
 
-        <Panel title={t({ ko: "진행 중", en: "Running now", ja: "実行中", zh: "正在运行" })} meta={running.length}>
+        <Panel title={t({ en: "Running now" })} meta={running.length}>
           {running.length === 0 ? (
             <p className="px-5 py-8 text-center text-[13px]" style={{ color: "var(--th-text-muted)" }}>
               {t({
-                ko: "실행 중인 업무가 없습니다.",
                 en: "No tasks are running.",
-                ja: "実行中のタスクはありません。",
-                zh: "没有正在运行的任务。",
               })}
             </p>
           ) : (
@@ -411,14 +394,11 @@ export default function TodayView({
                       className={actionButtonClass}
                       style={quietButtonStyle}
                       aria-label={t({
-                        ko: `${task.title} 로그 열기`,
                         en: `Open log for ${task.title}`,
-                        ja: `${task.title} のログを開く`,
-                        zh: `打开 ${task.title} 的日志`,
                       })}
                     >
                       <SquareTerminal size={14} strokeWidth={1.75} />
-                      {t({ ko: "로그", en: "Log", ja: "ログ", zh: "日志" })}
+                      {t({ en: "Log" })}
                     </button>
                   </li>
                 );
@@ -432,7 +412,7 @@ export default function TodayView({
       {children && (
         <div className="space-y-3">
           <h3 className="text-[13px] font-semibold" style={{ color: "var(--th-text-muted)" }}>
-            {t({ ko: "회사 현황", en: "Company overview", ja: "会社の概況", zh: "公司概况" })}
+            {t({ en: "Company overview" })}
           </h3>
           {children}
         </div>

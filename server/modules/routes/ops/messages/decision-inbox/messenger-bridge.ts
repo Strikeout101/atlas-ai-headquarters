@@ -41,11 +41,10 @@ const TASK_MESSENGER_ROUTE_PREFIX = "[messenger-route]";
 const DECISION_NOTICE_CACHE_MAX = 1024;
 const DECISION_NOTICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DECISION_NOTICE_SENT_KEY_PREFIX = "decision_notice_sent:";
-const DECISION_REPLY_MARKER_RE = /\[(의사결정\s*회신|decision\s*reply|意思決定返信|决策回复)\]/i;
+const DECISION_REPLY_MARKER_RE = /\[(decision\s*reply)\]/i;
 const DECISION_TOKEN_RE = /\[DECISION:([A-Za-z0-9_-]{6,128})\]/i;
-const DECISION_APPROVE_WORD_RE =
-  /^(승인|진행|go|ok|okay|yes|yep|approve|approved|확인|동의|承認|進行|はい|同意|通过|批准|好的|可以|行)$/i;
-const DECISION_NOTE_RE = /(?:추가\s*(?:코멘트|의견|메모)|note|비고|备注)\s*[:：]\s*(.+)$/i;
+const DECISION_APPROVE_WORD_RE = /^(go|ok|okay|yes|yep|approve|approved)$/i;
+const DECISION_NOTE_RE = /(?:note|comment)\s*:\s*(.+)$/i;
 
 export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
   const { db, nowMs, getPreferredLanguage, normalizeTextField, getDecisionInboxItems, applyDecisionReply } = deps;
@@ -60,12 +59,9 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
     { channel: MessengerChannel; targetId: string; updatedAt: number }
   >();
 
-  function pickDecisionL10n(ko: string, en: string, ja: string, zh: string): string {
+  function pickDecisionL10n(en: string): string {
     const lang = getPreferredLanguage();
-    if (lang === "en") return en;
-    if (lang === "ja") return ja;
-    if (lang === "zh") return zh;
-    return ko;
+    return en;
   }
 
   function pruneDecisionCaches(now: number, activeDecisionIds?: Set<string>): void {
@@ -254,7 +250,7 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
   function parseOptionNumbersFromText(text: string): number[] {
     const sanitized = text.replace(DECISION_TOKEN_RE, " ").replace(DECISION_REPLY_MARKER_RE, " ");
     const numbers: number[] = [];
-    for (const match of sanitized.matchAll(/(?:^|[^\d])([1-9]\d?)(?:\s*(?:번|番|号|option))?(?=$|[^\d])/gi)) {
+    for (const match of sanitized.matchAll(/(?:^|[^\d])([1-9]\d?)(?:\s*(?:option))?(?=$|[^\d])/gi)) {
       const raw = match[1];
       if (!raw) continue;
       const num = Number.parseInt(raw, 10);
@@ -273,7 +269,7 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
       .map((token) => token.trim())
       .filter(Boolean);
     if (tokens.length <= 0) return false;
-    return tokens.every((token) => /^[1-9]\d?(?:번|option|号|番)?$/i.test(token));
+    return tokens.every((token) => /^[1-9]\d?(?:option)?$/i.test(token));
   }
 
   function extractDecisionNote(text: string, body: Record<string, unknown>): string | null {
@@ -312,42 +308,22 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
   ): string {
     if (status >= 400) {
       const reason = normalizeTextField(payload.error) || `status_${status}`;
-      return pickDecisionL10n(
-        `⚠️ 의사결정 회신 처리 실패 (${reason})`,
-        `⚠️ Decision reply failed (${reason})`,
-        `⚠️ 意思決定返信に失敗しました (${reason})`,
-        `⚠️ 决策回复失败（${reason}）`,
-      );
+      return pickDecisionL10n(`⚠️ Decision reply failed (${reason})`);
     }
     if (String(payload.action ?? "") === "start_project_review_blocked") {
       const blockedTasks = Array.isArray(payload.blocked_tasks) ? payload.blocked_tasks : [];
       const firstBlocked = blockedTasks[0] as { title?: unknown; reason?: unknown } | undefined;
       const blockedLabel = String(firstBlocked?.title ?? "").trim() || "task";
       const reasonLabel = String(firstBlocked?.reason ?? "").trim() || "review_gate_hold";
-      return pickDecisionL10n(
-        `⚠️ 팀장 회의 시작이 보류되었습니다. (${blockedLabel}, ${reasonLabel})`,
-        `⚠️ Team-lead meeting start is on hold. (${blockedLabel}, ${reasonLabel})`,
-        `⚠️ チームリーダー会議の開始は保留です。(${blockedLabel}, ${reasonLabel})`,
-        `⚠️ 组长评审会议暂缓启动。(${blockedLabel}, ${reasonLabel})`,
-      );
+      return pickDecisionL10n(`⚠️ Team-lead meeting start is on hold. (${blockedLabel}, ${reasonLabel})`);
     }
     const optionLabel =
       item.options.find((option) => option.number === optionNumber)?.label || `option ${optionNumber}`;
     const resolved = payload.resolved === true;
     if (resolved) {
-      return pickDecisionL10n(
-        `✅ 의사결정 반영 완료: ${optionLabel}`,
-        `✅ Decision applied: ${optionLabel}`,
-        `✅ 意思決定を反映しました: ${optionLabel}`,
-        `✅ 已应用决策：${optionLabel}`,
-      );
+      return pickDecisionL10n(`✅ Decision applied: ${optionLabel}`);
     }
-    return pickDecisionL10n(
-      `☑️ 의사결정 기록 완료: ${optionLabel}`,
-      `☑️ Decision recorded: ${optionLabel}`,
-      `☑️ 意思決定を記録しました: ${optionLabel}`,
-      `☑️ 已记录决策：${optionLabel}`,
-    );
+    return pickDecisionL10n(`☑️ Decision recorded: ${optionLabel}`);
   }
 
   async function flushDecisionInboxMessengerNotices(options: { force?: boolean } = {}): Promise<void> {
@@ -429,12 +405,7 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
     const pendingDecision = findLatestDecisionForRoute(route, explicitDecisionId);
     if (!pendingDecision) {
       if (!hasExplicitMarker) return { handled: false, status: 200, payload: {} };
-      const noDecisionMsg = pickDecisionL10n(
-        "⚠️ 이 채널에는 대기 중인 의사결정 요청이 없습니다.",
-        "⚠️ There is no pending decision request on this channel.",
-        "⚠️ このチャンネルには保留中の意思決定リクエストがありません。",
-        "⚠️ 此频道没有待处理的决策请求。",
-      );
+      const noDecisionMsg = pickDecisionL10n("⚠️ There is no pending decision request on this channel.");
       await sendMessengerMessage({ channel: route.channel, targetId: route.targetId, text: noDecisionMsg }).catch(
         () => {
           // no-op
@@ -450,12 +421,7 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
     }
     if (!selectedOptionNumber) {
       const optionsHint = pendingDecision.options.map((option) => option.number).join(", ");
-      const retryMsg = pickDecisionL10n(
-        `⚠️ 선택 번호가 필요합니다. 가능한 번호: ${optionsHint}`,
-        `⚠️ Option number required. Available options: ${optionsHint}`,
-        `⚠️ 選択番号が必要です。選べる番号: ${optionsHint}`,
-        `⚠️ 需要选项编号。可用编号：${optionsHint}`,
-      );
+      const retryMsg = pickDecisionL10n(`⚠️ Option number required. Available options: ${optionsHint}`);
       await sendMessengerMessage({ channel: route.channel, targetId: route.targetId, text: retryMsg }).catch(() => {
         // no-op
       });

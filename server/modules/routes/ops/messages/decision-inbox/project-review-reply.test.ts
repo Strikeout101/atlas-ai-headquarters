@@ -63,8 +63,8 @@ function createBaseInput(db: DatabaseSync, overrides?: Partial<ProjectReviewRepl
       return text || null;
     },
     getPreferredLanguage: () => "ko",
-    pickL: (pool: any) => (Array.isArray(pool?.ko) ? pool.ko[0] : ""),
-    l: (ko: string[], en: string[], ja: string[], zh: string[]) => ({ ko, en, ja, zh }),
+    pickL: (pool: any) => (Array.isArray(pool?.en) ? pool.en[0] : ""),
+    l: (en: string[]) => ({ en }),
     broadcast: vi.fn(),
     finishReview: vi.fn(),
     getProjectReviewDecisionState: () => ({ snapshot_hash: "snap-1" }) as any,
@@ -90,7 +90,7 @@ function createBaseInput(db: DatabaseSync, overrides?: Partial<ProjectReviewRepl
       {
         number: 1,
         action: "start_project_review",
-        label: "팀장 회의 진행",
+        label: "Hold team lead meeting",
       },
     ],
   };
@@ -119,13 +119,13 @@ function createBaseInput(db: DatabaseSync, overrides?: Partial<ProjectReviewRepl
 }
 
 describe("project review reply", () => {
-  it("start_project_review에서 hold 로그가 감지되면 blocked 응답을 반환한다", () => {
+  it("start_project_review returns blocked when a hold log is found", () => {
     const db = createDb();
     try {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
+          VALUES ('task-1', 'Final feature review', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
 
@@ -166,13 +166,13 @@ describe("project review reply", () => {
     }
   });
 
-  it("start_project_review에서 hold 없이 진행되면 resolved=true로 완료된다", () => {
+  it("start_project_review completes with resolved=true when nothing is on hold", () => {
     const db = createDb();
     try {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
+          VALUES ('task-1', 'Final feature review', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
 
@@ -207,19 +207,19 @@ describe("project review reply", () => {
     }
   });
 
-  it("위임 prefix가 붙은 VIDEO_FINAL_RENDER 서브태스크가 있으면 신규 생성하지 않는다", () => {
+  it("does not create a VIDEO_FINAL_RENDER subtask when a delegated one already exists", () => {
     const db = createDb();
     try {
       db.prepare(
         `
           INSERT INTO tasks (id, title, project_id, status, workflow_pack_key, source_task_id, created_at, updated_at)
-          VALUES ('task-1', '기능 최종 검토', 'proj-1', 'review', 'development', NULL, 1, 1)
+          VALUES ('task-1', 'Final feature review', 'proj-1', 'review', 'development', NULL, 1, 1)
         `,
       ).run();
       db.prepare(
         `
           INSERT INTO subtasks (id, task_id, title, description, status, target_department_id, created_at)
-          VALUES ('st-render-prefixed', 'task-1', '[서브태스크 일괄협업 x1] [VIDEO_FINAL_RENDER] 최종 영상 렌더링', 'delegated render', 'blocked', 'dev', 2000)
+          VALUES ('st-render-prefixed', 'task-1', '[Subtask batch x1] [VIDEO_FINAL_RENDER] Final video render', 'delegated render', 'blocked', 'dev', 2000)
         `,
       ).run();
 

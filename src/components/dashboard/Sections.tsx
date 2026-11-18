@@ -44,7 +44,7 @@ export function TaskPipeline({
   const max = Math.max(1, ...stages.map((stage) => stage.count));
   return (
     <div className="ax-panel">
-      <PanelHeader title={t({ ko: "작업 흐름", en: "Task flow", ja: "タスクの流れ", zh: "任务流程" })} meta={aside} />
+      <PanelHeader title={t({ en: "Task flow" })} meta={aside} />
       <ol className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {stages.map((stage, index) => (
           <li
@@ -106,20 +106,17 @@ export function RecentActivity({
 }) {
   return (
     <div className="ax-panel self-start">
-      <PanelHeader title={t({ ko: "최근 활동", en: "Recent activity", ja: "最近の動き", zh: "最近活动" })} />
+      <PanelHeader title={t({ en: "Recent activity" })} />
       {tasks.length === 0 ? (
         <div className="flex flex-col items-start gap-3 px-5 py-8">
           <p className="max-w-[46ch] text-[13.5px] leading-relaxed" style={{ color: "var(--th-text-secondary)" }}>
             {t({
-              ko: "아직 작업이 없습니다. 첫 작업을 만들면 에이전트가 바로 처리하기 시작합니다.",
               en: "No tasks yet. Create one and an agent will pick it up.",
-              ja: "タスクはまだありません。作成するとエージェントがすぐに着手します。",
-              zh: "还没有任务。创建一个任务，代理会立即开始处理。",
             })}
           </p>
           <button type="button" onClick={onCreateTask} className="header-action-btn header-action-btn-primary">
             <Plus size={15} strokeWidth={2} />
-            {t({ ko: "새 작업", en: "New task", ja: "新しいタスク", zh: "新建任务" })}
+            {t({ en: "New task" })}
           </button>
         </div>
       ) : (
@@ -145,7 +142,7 @@ export function RecentActivity({
                     </>
                   ) : (
                     <span className="text-[12.5px]" style={{ color: "var(--th-text-muted)" }}>
-                      {t({ ko: "미배정", en: "Unassigned", ja: "未割当", zh: "未分配" })}
+                      {t({ en: "Unassigned" })}
                     </span>
                   )}
                 </div>
@@ -190,17 +187,11 @@ export function DepartmentTable({
 }) {
   return (
     <div className="ax-panel">
-      <PanelHeader
-        title={t({ ko: "부서", en: "Departments", ja: "部門", zh: "部门" })}
-        meta={t({ ko: "완료 / 전체", en: "done / total", ja: "完了 / 全体", zh: "完成 / 总数" })}
-      />
+      <PanelHeader title={t({ en: "Departments" })} meta={t({ en: "done / total" })} />
       {departments.length === 0 ? (
         <p className="px-5 py-6 text-[13px]" style={{ color: "var(--th-text-muted)" }}>
           {t({
-            ko: "부서가 아직 없습니다.",
             en: "No departments set up yet.",
-            ja: "部門はまだありません。",
-            zh: "尚未设置部门。",
           })}
         </p>
       ) : (
@@ -217,10 +208,7 @@ export function DepartmentTable({
                     {dept.working > 0 && (
                       <span className="shrink-0 text-[11.5px]" style={{ color: "var(--ax-working)" }}>
                         {t({
-                          ko: `${dept.working}명 근무`,
                           en: `${dept.working} working`,
-                          ja: `${dept.working}名稼働`,
-                          zh: `${dept.working} 人工作中`,
                         })}
                       </span>
                     )}
@@ -271,17 +259,11 @@ export function TopContributors({
   const hasWork = contributors.some((c) => c.tasksDone > 0 || c.xp > 0);
   return (
     <div className="ax-panel">
-      <PanelHeader
-        title={t({ ko: "주요 기여자", en: "Top contributors", ja: "主な貢献者", zh: "主要贡献者" })}
-        meta={t({ ko: "완료 작업", en: "tasks done", ja: "完了タスク", zh: "已完成任务" })}
-      />
+      <PanelHeader title={t({ en: "Top contributors" })} meta={t({ en: "tasks done" })} />
       {!hasWork ? (
         <p className="px-5 py-6 text-[13px]" style={{ color: "var(--th-text-muted)" }}>
           {t({
-            ko: "완료된 작업이 생기면 여기에 순위가 표시됩니다.",
             en: "Rankings appear once agents finish their first tasks.",
-            ja: "最初のタスクが完了するとランキングが表示されます。",
-            zh: "代理完成第一个任务后，这里会显示排名。",
           })}
         </p>
       ) : (
@@ -297,7 +279,7 @@ export function TopContributors({
                   {c.name}
                 </div>
                 <div className="truncate text-[11.5px]" style={{ color: "var(--th-text-muted)" }}>
-                  {c.department || t({ ko: "미배정", en: "Unassigned", ja: "未割当", zh: "未分配" })}
+                  {c.department || t({ en: "Unassigned" })}
                 </div>
               </div>
               <div className="text-right leading-tight">

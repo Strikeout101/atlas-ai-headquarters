@@ -110,9 +110,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         const oneShotTimeoutMs = Math.max(5_000, Number(reviewMeetingOneShotTimeoutMs ?? 65_000));
         const oneShotOptions = { projectPath, timeoutMs: oneShotTimeoutMs, noTools: true };
         const wantsRevision = (content: string): boolean =>
-          /보완|수정|보류|리스크|추가.?필요|hold|revise|revision|required|pending|risk|block|保留|修正|补充|暂缓/i.test(
-            content,
-          );
+          /hold|revise|revision|required|pending|risk|block/i.test(content);
         const isTimeoutRun = (run: { text?: string; error?: string } | null | undefined): boolean => {
           const source = `${run?.error ?? ""}\n${run?.text ?? ""}`;
           return /timeout after|timed out|request timed out|aborted/i.test(source);
@@ -190,18 +188,9 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         callLeadersToCeoOffice(taskId, leaders, "kickoff");
         notifyCeo(
           pickL(
-            l(
-              [
-                `[CEO OFFICE] '${taskTitle}' Planned 계획 라운드 ${round} 시작. 부서별 보완점 수집 후 실행계획(SubTask)으로 정리합니다.`,
-              ],
-              [
-                `[CEO OFFICE] '${taskTitle}' planned round ${round} started. Collecting supplement points and turning them into executable subtasks.`,
-              ],
-              [
-                `[CEO OFFICE] '${taskTitle}' のPlanned計画ラウンド${round}を開始。補完項目を収集し、実行SubTaskへ落とし込みます。`,
-              ],
-              [`[CEO OFFICE] 已开始'${taskTitle}'第${round}轮 Planned 规划，正在收集补充点并转为可执行 SubTask。`],
-            ),
+            l([
+              `[CEO OFFICE] '${taskTitle}' planned round ${round} started. Collecting supplement points and turning them into executable subtasks.`,
+            ]),
             lang,
           ),
           taskId,
@@ -301,20 +290,9 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         );
         notifyCeo(
           pickL(
-            l(
-              [
-                `[CEO OFFICE] '${taskTitle}' Planned 회의 종료. 보완점 ${planItems.length}건을 계획 항목으로 기록하고 In Progress로 진행합니다.`,
-              ],
-              [
-                `[CEO OFFICE] Planned meeting for '${taskTitle}' is complete. Recorded ${planItems.length} improvement items and moving to In Progress.`,
-              ],
-              [
-                `[CEO OFFICE] '${taskTitle}' のPlanned会議が完了。補完項目${planItems.length}件を計画化し、In Progressへ進みます。`,
-              ],
-              [
-                `[CEO OFFICE] '${taskTitle}' 的 Planned 会议已结束，已记录 ${planItems.length} 个改进项并转入 In Progress。`,
-              ],
-            ),
+            l([
+              `[CEO OFFICE] Planned meeting for '${taskTitle}' is complete. Recorded ${planItems.length} improvement items and moving to In Progress.`,
+            ]),
             lang,
           ),
           taskId,
@@ -335,15 +313,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         appendTaskLog(taskId, "error", `Planned meeting error: ${msg}`);
         const errLang = resolveLang(taskTitle);
         notifyCeo(
-          pickL(
-            l(
-              [`[CEO OFFICE] '${taskTitle}' Planned 회의 처리 중 오류가 발생했습니다: ${msg}`],
-              [`[CEO OFFICE] Error while processing planned meeting for '${taskTitle}': ${msg}`],
-              [`[CEO OFFICE] '${taskTitle}' のPlanned会議処理中にエラーが発生しました: ${msg}`],
-              [`[CEO OFFICE] 处理'${taskTitle}'的 Planned 会议时发生错误：${msg}`],
-            ),
-            errLang,
-          ),
+          pickL(l([`[CEO OFFICE] Error while processing planned meeting for '${taskTitle}': ${msg}`]), errLang),
           taskId,
         );
         if (meetingId) finishMeetingMinutes(meetingId, "failed");

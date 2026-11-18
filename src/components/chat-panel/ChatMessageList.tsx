@@ -5,7 +5,7 @@ import type { DecisionOption } from "../chat/decision-request";
 import AgentAvatar from "../AgentAvatar";
 import MessageContent from "../MessageContent";
 
-type Tr = (ko: string, en: string, ja?: string, zh?: string) => string;
+type Tr = (en: string) => string;
 
 interface StreamingMessageLike {
   message_id: string;
@@ -106,28 +106,11 @@ export default function ChatMessageList({
         <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
           <MessageSquare size={40} strokeWidth={1.25} className="opacity-40" />
           <div>
-            <p className="font-medium text-gray-400">
-              {tr(
-                "대화를 시작해보세요.",
-                "Send a message to start the conversation.",
-                "メッセージを送って会話を始めましょう。",
-                "发送消息开始对话。",
-              )}
-            </p>
+            <p className="font-medium text-gray-400">{tr("Send a message to start the conversation.")}</p>
             <p className="mt-1 text-sm text-gray-600">
               {selectedAgent
-                ? tr(
-                    `${getAgentName(selectedAgent)}에게 메시지를 보내보세요`,
-                    `Send a message to ${getAgentName(selectedAgent)}`,
-                    `${getAgentName(selectedAgent)}にメッセージを送ってみましょう`,
-                    `给 ${getAgentName(selectedAgent)} 发送一条消息吧`,
-                  )
-                : tr(
-                    "전체 에이전트에게 공지를 보내보세요",
-                    "Send an announcement to all agents",
-                    "すべてのエージェントに告知を送ってみましょう",
-                    "给所有代理发送一条公告吧",
-                  )}
+                ? tr(`Send a message to ${getAgentName(selectedAgent)}`)
+                : tr("Send an announcement to all agents")}
             </p>
           </div>
         </div>
@@ -142,10 +125,10 @@ export default function ChatMessageList({
               msg.sender_agent ?? agents.find((agent) => agent.id === msg.sender_id) ?? buildFallbackSenderAgent(msg);
             const senderNameFromPayload = normalizeMessageSenderName(msg);
             const senderName = isCeo
-              ? tr("CEO", "CEO")
+              ? tr("CEO")
               : isSystem
-                ? tr("시스템", "System", "システム", "系统")
-                : getAgentName(senderAgent) || senderNameFromPayload || tr("알 수 없음", "Unknown", "不明", "未知");
+                ? tr("System")
+                : getAgentName(senderAgent) || senderNameFromPayload || tr("Unknown");
             const decisionRequest = decisionRequestByMessage.get(msg.id);
 
             if (msg.sender_type === "agent" && msg.receiver_type === "all") {
@@ -159,9 +142,7 @@ export default function ChatMessageList({
                     </div>
                     {decisionRequest && (
                       <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2">
-                        <p className="text-[11px] font-medium text-indigo-200">
-                          {tr("의사결정 요청", "Decision request", "意思決定リクエスト", "决策请求")}
-                        </p>
+                        <p className="text-[11px] font-medium text-indigo-200">{tr("Decision request")}</p>
                         <div className="mt-1.5 space-y-1">
                           {decisionRequest.options.map((option) => {
                             const key = `${msg.id}:${option.number}`;
@@ -174,9 +155,7 @@ export default function ChatMessageList({
                                 disabled={isBusy}
                                 className="decision-inline-option w-full rounded-md px-2 py-1.5 text-left text-[11px] transition disabled:opacity-60"
                               >
-                                {isBusy
-                                  ? tr("전송 중...", "Sending...", "送信中...", "发送中...")
-                                  : `${option.number}. ${option.label}`}
+                                {isBusy ? tr("Sending...") : `${option.number}. ${option.label}`}
                               </button>
                             );
                           })}
@@ -186,7 +165,7 @@ export default function ChatMessageList({
                           onClick={() => onDecisionManualDraft(decisionRequest.options[0])}
                           className="mt-2 text-[11px] text-indigo-200/90 underline underline-offset-2 hover:text-indigo-100"
                         >
-                          {tr("직접 답변 작성", "Write custom reply", "カスタム返信を作成", "编写自定义回复")}
+                          {tr("Write custom reply")}
                         </button>
                       </div>
                     )}
@@ -201,7 +180,7 @@ export default function ChatMessageList({
                 <div key={msg.id} className="flex flex-col items-center gap-1">
                   {isDirective && (
                     <span className="rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-bold text-red-400">
-                      {tr("업무지시", "Directive", "業務指示", "业务指示")}
+                      {tr("Directive")}
                     </span>
                   )}
                   <div
@@ -221,7 +200,7 @@ export default function ChatMessageList({
             if (isCeo) {
               return (
                 <div key={msg.id} className="flex flex-col items-end gap-1">
-                  <span className="px-1 text-xs text-gray-500">{tr("CEO", "CEO")}</span>
+                  <span className="px-1 text-xs text-gray-500">{tr("CEO")}</span>
                   <div className="ax-bubble-self max-w-[80%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm">
                     <MessageContent content={msg.content} />
                   </div>
@@ -240,9 +219,7 @@ export default function ChatMessageList({
                   </div>
                   {decisionRequest && (
                     <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2">
-                      <p className="text-[11px] font-medium text-indigo-200">
-                        {tr("의사결정 요청", "Decision request", "意思決定リクエスト", "决策请求")}
-                      </p>
+                      <p className="text-[11px] font-medium text-indigo-200">{tr("Decision request")}</p>
                       <div className="mt-1.5 space-y-1">
                         {decisionRequest.options.map((option) => {
                           const key = `${msg.id}:${option.number}`;
@@ -255,9 +232,7 @@ export default function ChatMessageList({
                               disabled={isBusy}
                               className="decision-inline-option w-full rounded-md px-2 py-1.5 text-left text-[11px] transition disabled:opacity-60"
                             >
-                              {isBusy
-                                ? tr("전송 중...", "Sending...", "送信中...", "发送中...")
-                                : `${option.number}. ${option.label}`}
+                              {isBusy ? tr("Sending...") : `${option.number}. ${option.label}`}
                             </button>
                           );
                         })}
@@ -267,7 +242,7 @@ export default function ChatMessageList({
                         onClick={() => onDecisionManualDraft(decisionRequest.options[0])}
                         className="mt-2 text-[11px] text-indigo-200/90 underline underline-offset-2 hover:text-indigo-100"
                       >
-                        {tr("직접 답변 작성", "Write custom reply", "カスタム返信を作成", "编写自定义回复")}
+                        {tr("Write custom reply")}
                       </button>
                     </div>
                   )}

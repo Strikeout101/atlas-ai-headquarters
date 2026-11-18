@@ -89,42 +89,27 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         const code = error.code ?? "";
         if (code === "discord_token_required") {
           return t({
-            ko: "Discord 토큰을 입력해주세요.",
             en: "Please enter a Discord token.",
-            ja: "Discordトークンを入力してください。",
-            zh: "请输入 Discord 令牌。",
           });
         }
         if (code === "discord_auth_failed") {
           return t({
-            ko: "Discord 인증에 실패했습니다. Bot 토큰과 권한을 확인하세요.",
             en: "Discord authentication failed. Check your bot token and permissions.",
-            ja: "Discord認証に失敗しました。Botトークンと権限を確認してください。",
-            zh: "Discord 认证失败，请检查 Bot 令牌和权限。",
           });
         }
         if (code === "discord_rate_limited") {
           return t({
-            ko: "Discord API 요청이 많습니다. 잠시 후 다시 시도해주세요.",
             en: "Discord API is rate-limited. Please try again shortly.",
-            ja: "Discord API のレート制限に達しました。しばらくしてから再試行してください。",
-            zh: "Discord API 已触发限流，请稍后重试。",
           });
         }
         if (code === "discord_channel_lookup_failed") {
           return t({
-            ko: "Discord 채널 조회에 실패했습니다. 네트워크/권한 상태를 확인해주세요.",
             en: "Failed to load Discord channels. Check network connectivity and permissions.",
-            ja: "Discordチャネルの取得に失敗しました。ネットワークと権限を確認してください。",
-            zh: "Discord 频道加载失败，请检查网络和权限状态。",
           });
         }
       }
       return t({
-        ko: "Discord 채널 조회 중 오류가 발생했습니다.",
         en: "An error occurred while loading Discord channels.",
-        ja: "Discordチャネルの取得中にエラーが発生しました。",
-        zh: "加载 Discord 频道时发生错误。",
       });
     },
     [t],
@@ -143,10 +128,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         msg:
           successMsg ??
           t({
-            ko: "채널 설정 저장 완료",
             en: "Channel settings saved",
-            ja: "チャネル設定を保存しました",
-            zh: "频道设置已保存",
           }),
       });
       setTimeout(() => setSaved(null), 2500);
@@ -168,10 +150,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     persistChannelsForm(
       next,
       t({
-        ko: "채팅 삭제 완료",
         en: "Chat deleted",
-        ja: "チャットを削除しました",
-        zh: "聊天已删除",
       }),
     );
     setSendStatus(null);
@@ -216,10 +195,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     if (!token) {
       setEditorError(
         t({
-          ko: "토큰을 입력해주세요.",
           en: "Please enter a token.",
-          ja: "トークンを入力してください。",
-          zh: "请输入令牌。",
         }),
       );
       return;
@@ -227,10 +203,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     if (!name) {
       setEditorError(
         t({
-          ko: "채팅 이름을 입력해주세요.",
           en: "Please enter a chat name.",
-          ja: "チャット名を入力してください。",
-          zh: "请输入聊天名称。",
         }),
       );
       return;
@@ -238,10 +211,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     if (!targetId) {
       setEditorError(
         t({
-          ko: "채널/대상 ID를 입력해주세요.",
           en: "Please enter a channel/target ID.",
-          ja: "チャンネル/対象 ID を入力してください。",
-          zh: "请输入频道/目标 ID。",
         }),
       );
       return;
@@ -292,19 +262,13 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
     const savedOk = persistChannelsForm(
       next,
       t({
-        ko: "채팅 설정 저장 완료",
         en: "Chat saved",
-        ja: "チャット設定を保存しました",
-        zh: "聊天设置已保存",
       }),
     );
     if (!savedOk) {
       setEditorError(
         t({
-          ko: "채팅 저장에 실패했습니다. 다시 시도해주세요.",
           en: "Failed to save chat. Please try again.",
-          ja: "チャット保存に失敗しました。再試行してください。",
-          zh: "聊天保存失败，请重试。",
         }),
       );
       return;
@@ -332,10 +296,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
       setSendStatus({
         ok: true,
         msg: t({
-          ko: "메시지 전송 완료",
           en: "Message sent",
-          ja: "メッセージを送信しました",
-          zh: "消息已发送",
         }),
       });
       setSendText("");
@@ -436,43 +397,32 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
   const selectedChatTransportReady = selectedChat ? CHANNEL_META[selectedChat.channel].transportReady : false;
 
   return (
-    <SettingsSection
-      title={t({ ko: "채널 메시지 설정", en: "Messaging channels", ja: "メッセージチャネル", zh: "消息渠道" })}
-      defaultOpen
-    >
+    <SettingsSection title={t({ en: "Messaging channels" })} defaultOpen>
       <div className="flex items-center justify-between">
         {saved && <span className={`text-xs ${saved.ok ? "text-emerald-400" : "text-red-400"}`}>{saved.msg}</span>}
       </div>
 
       <p className="text-xs text-slate-400">
         {t({
-          ko: "이 탭에서 메신저 채널을 직접 설정할 수 있습니다. '새 채팅 추가'로 메신저/토큰/대상 ID/대화 Agent를 등록하세요.",
           en: "You can configure messenger channels directly in this tab. Use 'Add Chat' to register messenger/token/target ID/conversation agent.",
-          ja: "このタブでメッセンジャーチャネルを直接設定できます。'チャット追加'からメッセンジャー/トークン/対象ID/担当Agentを登録してください。",
-          zh: "可在此标签页直接配置消息渠道。通过“新增聊天”注册消息渠道/令牌/目标ID/对话 Agent。",
         })}
       </p>
 
       <div className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-200">
-            {t({ ko: "채팅 세션", en: "Chat Sessions", ja: "チャットセッション", zh: "聊天会话" })}
-          </div>
+          <div className="text-sm font-semibold text-slate-200">{t({ en: "Chat Sessions" })}</div>
           <button
             onClick={openCreateModal}
             className="text-xs px-3 py-1 rounded-md bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/40"
           >
-            + {t({ ko: "새 채팅 추가", en: "Add Chat", ja: "チャット追加", zh: "新增聊天" })}
+            + {t({ en: "Add Chat" })}
           </button>
         </div>
 
         {chatRows.length === 0 ? (
           <div className="text-xs text-slate-500 py-2">
             {t({
-              ko: "등록된 채팅이 없습니다. '새 채팅 추가'로 메신저/토큰/채널을 등록하세요.",
               en: "No chats yet. Use 'Add Chat' to register messenger/token/channel.",
-              ja: "チャットがありません。'チャット追加'でメッセンジャー/トークン/チャネルを登録してください。",
-              zh: "暂无聊天。请通过“新增聊天”注册消息渠道/令牌/频道。",
             })}
           </div>
         ) : (
@@ -480,9 +430,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
             {chatRows.map((row) => {
               const meta = CHANNEL_META[row.channel];
               const assignedAgent = row.session.agentId ? agentById.get(row.session.agentId) : undefined;
-              const assignedAgentName = assignedAgent
-                ? assignedAgent.name_ko || assignedAgent.name
-                : row.session.agentId || "";
+              const assignedAgentName = assignedAgent ? assignedAgent.name : row.session.agentId || "";
               const tokenReady = row.token.trim().length > 0;
               return (
                 <div key={row.key} className="rounded-md border border-slate-700/70 bg-slate-800/50 px-3 py-2">
@@ -496,13 +444,11 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
                         <span
                           className={`text-[10px] px-1.5 py-0.5 rounded ${meta.transportReady ? "bg-emerald-600/20 text-emerald-300" : "bg-amber-600/20 text-amber-300"}`}
                         >
-                          {meta.transportReady
-                            ? t({ ko: "직접연동", en: "Native", ja: "直接連携", zh: "直连" })
-                            : t({ ko: "호환설정", en: "Compat", ja: "互換設定", zh: "兼容配置" })}
+                          {meta.transportReady ? t({ en: "Native" }) : t({ en: "Compat" })}
                         </span>
                         {!tokenReady && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-600/20 text-red-300">
-                            {t({ ko: "토큰 없음", en: "No token", ja: "トークンなし", zh: "无令牌" })}
+                            {t({ en: "No token" })}
                           </span>
                         )}
                       </div>
@@ -510,7 +456,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
                       <div className="mt-1 text-[11px] text-slate-500 flex items-center gap-1.5">
                         {assignedAgentName ? (
                           <>
-                            <span>{t({ ko: "대화 Agent", en: "Agent", ja: "担当Agent", zh: "对话 Agent" })}:</span>
+                            <span>{t({ en: "Agent" })}:</span>
                             {assignedAgent && (
                               <AgentAvatar agent={assignedAgent} spriteMap={spriteMap} size={14} rounded="xl" />
                             )}
@@ -519,10 +465,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
                         ) : (
                           <span>
                             {t({
-                              ko: "대화 Agent 미지정",
                               en: "No agent assigned",
-                              ja: "Agent未指定",
-                              zh: "未指定 Agent",
                             })}
                           </span>
                         )}
@@ -533,13 +476,13 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
                         onClick={() => openEditModal(row)}
                         className="px-2 py-1 rounded text-[11px] bg-slate-700/70 border border-slate-600 text-slate-200 hover:bg-slate-700"
                       >
-                        {t({ ko: "편집", en: "Edit", ja: "編集", zh: "编辑" })}
+                        {t({ en: "Edit" })}
                       </button>
                       <button
                         onClick={() => removeChat(row)}
                         className="px-2 py-1 rounded text-[11px] bg-red-600/20 border border-red-500/30 text-red-300 hover:bg-red-600/30"
                       >
-                        {t({ ko: "삭제", en: "Delete", ja: "削除", zh: "删除" })}
+                        {t({ en: "Delete" })}
                       </button>
                     </div>
                   </div>
@@ -551,33 +494,28 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
 
         <div className="text-[11px] text-slate-500">
           {t({
-            ko: "$로 시작하면 전사공지, 일반 메시지는 선택된 Agent에게 1:1 대화로 전달됩니다.",
             en: "Messages starting with $ become company directives; normal messages go 1:1 to the selected agent.",
-            ja: "$ で始まると全社通知、通常メッセージは選択 Agent との 1:1 会話になります。",
-            zh: "以 $ 开头为公司指令，普通消息会进入所选 Agent 的 1:1 对话。",
           })}
         </div>
       </div>
 
       <div className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-200">
-            {t({ ko: "세션 테스트 전송", en: "Test Send", ja: "送信テスト", zh: "发送测试" })}
-          </div>
+          <div className="text-sm font-semibold text-slate-200">{t({ en: "Test Send" })}</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => void loadMessengerReceiverStatus()}
               disabled={receiverLoading}
               className="text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-60"
             >
-              {t({ ko: "수신상태", en: "Receiver", ja: "受信状態", zh: "接收状态" })}
+              {t({ en: "Receiver" })}
             </button>
             <button
               onClick={() => void loadRuntimeSessions()}
               disabled={runtimeLoading}
               className="text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-60"
             >
-              {t({ ko: "실행중 세션", en: "Runtime", ja: "実行セッション", zh: "运行会话" })}
+              {t({ en: "Runtime" })}
             </button>
           </div>
         </div>
@@ -585,16 +523,13 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         {telegramReceiverStatus && (
           <div className="rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs text-slate-300 space-y-1">
             <div>
-              {t({ ko: "텔레그램 수신기", en: "Telegram Receiver", ja: "Telegram 受信機", zh: "Telegram 接收器" })}:{" "}
+              {t({ en: "Telegram Receiver" })}:{" "}
               <span className={telegramReceiverStatus.enabled ? "text-emerald-400" : "text-amber-300"}>
-                {telegramReceiverStatus.enabled
-                  ? t({ ko: "활성", en: "active", ja: "有効", zh: "已启用" })
-                  : t({ ko: "비활성", en: "inactive", ja: "無効", zh: "未启用" })}
+                {telegramReceiverStatus.enabled ? t({ en: "active" }) : t({ en: "inactive" })}
               </span>
             </div>
             <div>
-              {t({ ko: "허용 chat 수", en: "Allowed chats", ja: "許可チャット数", zh: "允许聊天数" })}:{" "}
-              {telegramReceiverStatus.allowedChatCount}
+              {t({ en: "Allowed chats" })}: {telegramReceiverStatus.allowedChatCount}
             </div>
             {telegramReceiverStatus.lastError && <div className="text-red-400">{telegramReceiverStatus.lastError}</div>}
           </div>
@@ -603,32 +538,24 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         {discordReceiverStatus && (
           <div className="rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs text-slate-300 space-y-1">
             <div>
-              {t({ ko: "디스코드 수신기", en: "Discord Receiver", ja: "Discord 受信機", zh: "Discord 接收器" })}:{" "}
+              {t({ en: "Discord Receiver" })}:{" "}
               <span className={discordReceiverStatus.enabled ? "text-emerald-400" : "text-amber-300"}>
-                {discordReceiverStatus.enabled
-                  ? t({ ko: "활성", en: "active", ja: "有効", zh: "已启用" })
-                  : t({ ko: "비활성", en: "inactive", ja: "無効", zh: "未启用" })}
+                {discordReceiverStatus.enabled ? t({ en: "active" }) : t({ en: "inactive" })}
               </span>
             </div>
             <div>
-              {t({ ko: "폴링 채널 수", en: "Polled channels", ja: "ポーリングチャネル数", zh: "轮询频道数" })}:{" "}
-              {discordReceiverStatus.routeCount}
+              {t({ en: "Polled channels" })}: {discordReceiverStatus.routeCount}
             </div>
             {discordReceiverStatus.lastError && <div className="text-red-400">{discordReceiverStatus.lastError}</div>}
           </div>
         )}
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">
-            {t({ ko: "전송 대상 세션", en: "Target Session", ja: "送信先セッション", zh: "目标会话" })}
-          </label>
+          <label className="block text-xs text-slate-400 mb-1">{t({ en: "Target Session" })}</label>
           {chatRows.length === 0 ? (
             <div className="text-xs text-slate-500 py-1">
               {t({
-                ko: "저장된 세션이 없습니다. 먼저 채팅을 등록하세요.",
                 en: "No saved session. Add a chat first.",
-                ja: "保存済みセッションがありません。先にチャットを追加してください。",
-                zh: "没有已保存会话，请先添加聊天。",
               })}
             </div>
           ) : (
@@ -651,10 +578,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
           onChange={(e) => setSendText(e.target.value)}
           rows={3}
           placeholder={t({
-            ko: "테스트 메시지를 입력하세요...",
             en: "Type a test message...",
-            ja: "テストメッセージを入力...",
-            zh: "输入测试消息...",
           })}
           className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 resize-y"
         />
@@ -662,10 +586,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
         {!selectedChatTransportReady && selectedChat && (
           <div className="text-xs px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
             {t({
-              ko: "이 채널은 현재 설정 저장/매핑은 가능하지만, 직접 전송 런타임은 아직 준비되지 않았습니다.",
               en: "This channel can be configured and mapped, but direct transport runtime is not ready yet.",
-              ja: "このチャネルは設定/マッピングは可能ですが、直接送信ランタイムは未対応です。",
-              zh: "该渠道可配置和映射，但直连发送运行时暂未就绪。",
             })}
           </div>
         )}
@@ -675,9 +596,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
           disabled={sending || !selectedChat || !sendText.trim() || !selectedChatTransportReady}
           className="px-4 py-2 rounded-lg ax-btn-primary text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {sending
-            ? t({ ko: "전송 중...", en: "Sending...", ja: "送信中...", zh: "发送中..." })
-            : t({ ko: "메시지 전송", en: "Send", ja: "送信", zh: "发送" })}
+          {sending ? t({ en: "Sending..." }) : t({ en: "Send" })}
         </button>
 
         {sendStatus && (
@@ -694,9 +613,7 @@ export default function GatewaySettingsTab({ t, form, setForm, persistSettings }
 
         {runtimeSessions.length > 0 && (
           <div className="pt-1">
-            <div className="text-xs text-slate-400 mb-1">
-              {t({ ko: "런타임 세션", en: "Runtime Sessions", ja: "実行中セッション", zh: "运行时会话" })}
-            </div>
+            <div className="text-xs text-slate-400 mb-1">{t({ en: "Runtime Sessions" })}</div>
             <div className="max-h-44 overflow-auto rounded-md border border-slate-700/60">
               {runtimeSessions.map((session) => (
                 <div

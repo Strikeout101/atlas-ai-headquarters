@@ -40,7 +40,7 @@ interface TaskDelegationDeps {
   recordTaskCreationAudit: (payload: any) => void;
   appendTaskLog: (taskId: string, source: string, message: string) => void;
   broadcast: (event: string, payload: unknown) => void;
-  l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
+  l: (en: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   notifyCeo: (content: string, taskId?: string | null, messageType?: string) => void;
   isTaskWorkflowInterrupted: (taskId: string) => boolean;
@@ -118,7 +118,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
     options: DelegationOptions = {},
   ): void {
     const lang = resolveLang(ceoMessage);
-    const leaderName = lang === "ko" ? teamLeader.name_ko || teamLeader.name : teamLeader.name;
+    const leaderName = teamLeader.name;
     const leaderDeptId = teamLeader.department_id!;
     const leaderDeptName = getDeptName(leaderDeptId);
     const skipPlannedMeeting = !!options.skipPlannedMeeting;
@@ -225,20 +225,10 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
 
       if (isPlanningLead) {
         const relatedLabel =
-          mentionedDepts.length > 0
-            ? mentionedDepts.map(getDeptName).join(", ")
-            : pickL(l(["없음"], ["None"], ["なし"], ["无"]), lang);
+          mentionedDepts.length > 0 ? mentionedDepts.map(getDeptName).join(", ") : pickL(l(["None"]), lang);
         appendTaskLog(taskId, "system", `Planning pre-check related departments: ${relatedLabel}`);
         notifyCeo(
-          pickL(
-            l(
-              [`[기획팀] '${taskTitle}' 유관부서 사전 파악 완료: ${relatedLabel}`],
-              [`[Planning] Related departments identified for '${taskTitle}': ${relatedLabel}`],
-              [`[企画] '${taskTitle}' の関連部門の事前把握が完了: ${relatedLabel}`],
-              [`[企划] 已完成'${taskTitle}'相关部门预识别：${relatedLabel}`],
-            ),
-            lang,
-          ),
+          pickL(l([`[Planning] Related departments identified for '${taskTitle}': ${relatedLabel}`]), lang),
           taskId,
         );
       }
@@ -254,12 +244,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
         if (hasOpenForeignSubtasks(taskId, mentionedDepts)) {
           notifyCeo(
             pickL(
-              l(
-                [`[CEO OFFICE] 기획팀 선행 협업을 서브태스크 통합 디스패처로 실행합니다: ${crossDeptNames}`],
-                [`[CEO OFFICE] Running planning pre-collaboration via unified subtask dispatcher: ${crossDeptNames}`],
-                [`[CEO OFFICE] 企画先行協業を統合サブタスクディスパッチャで実行します: ${crossDeptNames}`],
-                [`[CEO OFFICE] 企划前置协作改为统一 SubTask 调度执行：${crossDeptNames}`],
-              ),
+              l([`[CEO OFFICE] Running planning pre-collaboration via unified subtask dispatcher: ${crossDeptNames}`]),
               lang,
             ),
             taskId,
@@ -274,18 +259,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
           return;
         }
 
-        notifyCeo(
-          pickL(
-            l(
-              [`[CEO OFFICE] 기획팀 선행 협업 처리 시작: ${crossDeptNames}`],
-              [`[CEO OFFICE] Planning pre-collaboration started with: ${crossDeptNames}`],
-              [`[CEO OFFICE] 企画チームの先行協業を開始: ${crossDeptNames}`],
-              [`[CEO OFFICE] 企划团队前置协作已启动：${crossDeptNames}`],
-            ),
-            lang,
-          ),
-          taskId,
-        );
+        notifyCeo(pickL(l([`[CEO OFFICE] Planning pre-collaboration started with: ${crossDeptNames}`]), lang), taskId);
         // Mark original task as 'collaborating' while cross-dept work proceeds
         db.prepare("UPDATE tasks SET status = 'collaborating', updated_at = ? WHERE id = ?").run(nowMs(), taskId);
         broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
@@ -309,12 +283,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
             if (isTaskWorkflowInterrupted(taskId)) return;
             notifyCeo(
               pickL(
-                l(
-                  ["[CEO OFFICE] 유관부서 선행 처리 완료. 이제 내부 업무 하달을 시작합니다."],
-                  ["[CEO OFFICE] Related-department pre-processing complete. Starting internal delegation now."],
-                  ["[CEO OFFICE] 関連部門の先行処理が完了。これより内部委任を開始します。"],
-                  ["[CEO OFFICE] 相关部门前置处理完成，现开始内部下达。"],
-                ),
+                l(["[CEO OFFICE] Related-department pre-processing complete. Starting internal delegation now."]),
                 lang,
               ),
               taskId,
@@ -381,7 +350,7 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
       };
 
       if (subordinate) {
-        const subName = lang === "ko" ? subordinate.name_ko || subordinate.name : subordinate.name;
+        const subName = subordinate.name;
         const subRole = getRoleLabel(subordinate.role, lang);
 
         const ackMsg = buildLeaderAckMessage({

@@ -32,7 +32,7 @@ function setup({ github = false, delegated = false, worktree = true } = {}) {
     db,
     nowMs: () => 1000,
     resolveLang: () => "en",
-    l: (_ko: string[], en: string[]) => en,
+    l: (en: string[]) => en,
     pickL: (pool: string[]) => pool[0],
     appendTaskLog: vi.fn(),
     notifyCeo: vi.fn(),

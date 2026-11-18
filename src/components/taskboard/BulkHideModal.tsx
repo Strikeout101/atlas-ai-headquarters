@@ -61,16 +61,13 @@ export default function BulkHideModal({ tasks, hiddenTaskIds, onClose, onApply }
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-bold text-white">
             {t({
-              ko: "숨길 상태 선택",
               en: "Select statuses to hide",
-              ja: "非表示にする状態を選択",
-              zh: "选择要隐藏的状态",
             })}
           </h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            title={t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+            title={t({ en: "Close" })}
           >
             ✕
           </button>
@@ -78,10 +75,7 @@ export default function BulkHideModal({ tasks, hiddenTaskIds, onClose, onApply }
 
         <p className="mb-3 text-xs leading-relaxed text-slate-400">
           {t({
-            ko: "완료/보류/취소 중 선택한 상태의 업무를 한 번에 숨깁니다.",
             en: "Hide all tasks in the selected done/pending/cancelled statuses at once.",
-            ja: "選択した完了/保留/キャンセル状態のタスクを一括で非表示にします。",
-            zh: "一次性隐藏所选完成/待处理/已取消状态的任务。",
           })}
         </p>
 
@@ -117,14 +111,14 @@ export default function BulkHideModal({ tasks, hiddenTaskIds, onClose, onApply }
             onClick={onClose}
             className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800 hover:text-white"
           >
-            {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
+            {t({ en: "Cancel" })}
           </button>
           <button
             onClick={() => onApply(selectedStatuses)}
             disabled={hideTargetCount <= 0}
             className="rounded-lg ax-btn-primary px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
           >
-            {t({ ko: "숨김 적용", en: "Apply hide", ja: "非表示適用", zh: "应用隐藏" })} ({hideTargetCount})
+            {t({ en: "Apply hide" })} ({hideTargetCount})
           </button>
         </div>
       </div>

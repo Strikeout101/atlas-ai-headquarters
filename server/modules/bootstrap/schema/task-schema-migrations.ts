@@ -95,7 +95,7 @@ export function applyTaskSchemaMigrations(db: DbLike): void {
     /* already exists */
   }
 
-  // 프로젝트별 직원 직접선택 기능: assignment_mode + project_agents 테이블
+  // Per-project manual staff selection: assignment_mode + project_agents table
   try {
     db.exec("ALTER TABLE projects ADD COLUMN assignment_mode TEXT NOT NULL DEFAULT 'auto'");
   } catch {

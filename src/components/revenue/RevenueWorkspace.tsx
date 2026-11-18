@@ -85,17 +85,11 @@ export default function RevenueWorkspace() {
       if (isApiRequestError(cause)) {
         if (cause.code === "owner_session_required")
           return t({
-            ko: "설정 > 보안에서 비밀번호로 로그인하세요.",
             en: "Sign in with your password in Settings > Security to change financial records.",
-            ja: "財務記録を変更するには設定 > セキュリティでパスワードでサインインしてください。",
-            zh: "请在设置 > 安全中使用密码登录以更改财务记录。",
           });
         if (cause.code?.includes("paid") || cause.code?.includes("receipt"))
           return t({
-            ko: "동일 통화의 검증된 결제 영수증을 먼저 연결하세요.",
             en: "Link sufficient verified receipts in the same currency before marking a deal paid.",
-            ja: "支払済みにするには同じ通貨の十分な検証済み入金を関連付けてください。",
-            zh: "请先关联同一币种的足够已验证收款，再标记交易已付款。",
           });
         if (cause.code) return cause.code.replaceAll("_", " ");
       }
@@ -133,7 +127,7 @@ export default function RevenueWorkspace() {
       await action();
       setFormKind(null);
       setEditing(null);
-      setNotice(t({ ko: "저장했습니다.", en: "Saved.", ja: "保存しました。", zh: "已保存。" }));
+      setNotice(t({ en: "Saved." }));
       await refresh();
     } catch (cause) {
       setError(failure(cause));
@@ -204,10 +198,10 @@ export default function RevenueWorkspace() {
   const money = (amount: number, currency: string) => formatMoney(amount, currency, locale);
   const label = (kind: FormKind) =>
     ({
-      deal: t({ ko: "거래", en: "Deal", ja: "商談", zh: "交易" }),
-      entry: t({ ko: "수동 기록", en: "Manual record", ja: "手動記録", zh: "手动记录" }),
-      spend: t({ ko: "지출 요청", en: "Spending request", ja: "支出申請", zh: "支出请求" }),
-      link: t({ ko: "기록 연결", en: "Link record", ja: "記録を関連付け", zh: "关联记录" }),
+      deal: t({ en: "Deal" }),
+      entry: t({ en: "Manual record" }),
+      spend: t({ en: "Spending request" }),
+      link: t({ en: "Link record" }),
     })[kind];
   const opportunities = data?.opportunities.filter((item) => item.business === formBusiness) ?? [];
   const compatibleDeals =
@@ -217,18 +211,15 @@ export default function RevenueWorkspace() {
     <section className="revenue-workspace mx-auto w-full max-w-7xl space-y-6 pb-8" aria-label="Revenue">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold">{t({ ko: "매출", en: "Revenue", ja: "売上", zh: "收入" })}</h1>
+          <h1 className="text-lg font-semibold">{t({ en: "Revenue" })}</h1>
           <p className="mt-1 max-w-3xl text-sm" style={{ color: "var(--th-text-secondary)" }}>
             {t({
-              ko: "검증된 순입금, 보고된 비용 및 영업 진행을 통화별로 확인합니다. 기록된 잔액은 완전한 회계상 이익이 아닙니다.",
               en: "Verified net receipts, reported costs and sales progress, kept separate by currency. Recorded surplus does not establish complete accounting profit.",
-              ja: "検証済み純入金、報告費用、営業進捗を通貨別に確認します。記録上の余剰は完全な会計利益ではありません。",
-              zh: "按币种分别查看已验证净收款、已报告成本和销售进展。记录盈余并不代表完整会计利润。",
             })}
           </p>
         </div>
         <button type="button" className="revenue-button" disabled={busy || loading} onClick={() => void refresh()}>
-          {t({ ko: "새로고침", en: "Refresh", ja: "更新", zh: "刷新" })}
+          {t({ en: "Refresh" })}
         </button>
       </header>
       <form
@@ -245,7 +236,7 @@ export default function RevenueWorkspace() {
           });
         }}
       >
-        <Field label={t({ ko: "사업", en: "Business filter", ja: "事業フィルター", zh: "业务筛选" })}>
+        <Field label={t({ en: "Business filter" })}>
           <select
             value={business}
             onChange={(event) => {
@@ -253,7 +244,7 @@ export default function RevenueWorkspace() {
               setFormKind(null);
             }}
           >
-            <option value="">{t({ ko: "모든 사업", en: "All businesses", ja: "全事業", zh: "所有业务" })}</option>
+            <option value="">{t({ en: "All businesses" })}</option>
             {BUSINESS_KINDS.map((item) => (
               <option key={item} value={item}>
                 {BUSINESS_NAMES[item]}
@@ -261,22 +252,19 @@ export default function RevenueWorkspace() {
             ))}
           </select>
         </Field>
-        <Field label={t({ ko: "시작일", en: "From", ja: "開始日", zh: "开始日期" })}>
+        <Field label={t({ en: "From" })}>
           <input name="from" type="date" />
         </Field>
-        <Field label={t({ ko: "종료일", en: "To", ja: "終了日", zh: "结束日期" })}>
+        <Field label={t({ en: "To" })}>
           <input name="to" type="date" />
         </Field>
         <button type="submit" className="revenue-button">
-          {t({ ko: "기간 적용", en: "Apply dates", ja: "期間を適用", zh: "应用日期" })}
+          {t({ en: "Apply dates" })}
         </button>
       </form>
       <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
         {t({
-          ko: "날짜 필터는 입출금 기록과 기회별 합계에 적용됩니다. 목표는 각자의 기간을 사용합니다.",
           en: "Date filters apply to financial records and opportunity totals. Goals use their own periods.",
-          ja: "日付フィルターは財務記録と機会別合計に適用されます。目標はそれぞれの期間を使います。",
-          zh: "日期筛选适用于财务记录和机会汇总。目标使用各自的时间段。",
         })}
       </p>
       {error && (
@@ -292,10 +280,7 @@ export default function RevenueWorkspace() {
       {loading && (
         <p role="status" className="text-sm">
           {t({
-            ko: "재무 기록 불러오는 중…",
             en: "Loading financial records…",
-            ja: "財務記録を読み込み中…",
-            zh: "正在加载财务记录…",
           })}
         </p>
       )}
@@ -336,10 +321,7 @@ export default function RevenueWorkspace() {
                 {!data.totals.length ? (
                   <p className="py-6 text-sm">
                     {t({
-                      ko: "아직 수입이나 비용 기록이 없습니다. Square 읽기 전용 동기화는 설정에서 연결할 수 있습니다.",
                       en: "No receipts or costs recorded yet. Connect read-only Square sync in Settings > Businesses.",
-                      ja: "入金や費用の記録はまだありません。設定 > 事業でSquare読み取り専用同期を接続できます。",
-                      zh: "尚无收款或成本记录。请在设置 > 业务中连接只读Square同步。",
                     })}
                   </p>
                 ) : (

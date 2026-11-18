@@ -52,7 +52,7 @@ export type DirectChatDeps = {
   };
   buildRoundGoal: (projectCoreGoal: string, message: string) => string;
   getDeptName: (deptId: string) => string;
-  l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
+  l: (en: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   sendAgentMessage: (
     agent: AgentRow,

@@ -95,7 +95,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
   } catch {
     /* already exists */
   }
-  // 부서 다국어 + 프롬프트 컬럼 추가
+  // Add department name and prompt columns
   try {
     db.exec("ALTER TABLE departments ADD COLUMN name_ja TEXT NOT NULL DEFAULT ''");
   } catch {
@@ -111,26 +111,20 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
   } catch {
     /* already exists */
   }
-  // 기존 부서 다국어 이름 백필 (빈 값인 경우만)
+  // (Translated department names were removed; ATLAS is English-only.)
   try {
     db.exec(`
-    UPDATE departments SET name_ja = '企画チーム',              name_zh = '企划组'    WHERE id = 'planning' AND (name_ja = '' OR name_ja IS NULL);
-    UPDATE departments SET name_ja = '開発チーム',              name_zh = '开发组'    WHERE id = 'dev' AND (name_ja = '' OR name_ja IS NULL);
-    UPDATE departments SET name_ja = 'デザインチーム',          name_zh = '设计组'    WHERE id = 'design' AND (name_ja = '' OR name_ja IS NULL);
-    UPDATE departments SET name_ja = '品質管理チーム',          name_zh = '质量管理组' WHERE id = 'qa' AND (name_ja = '' OR name_ja IS NULL);
-    UPDATE departments SET name_ja = 'インフラセキュリティチーム', name_zh = '基础安全组' WHERE id = 'devsecops' AND (name_ja = '' OR name_ja IS NULL);
-    UPDATE departments SET name_ja = '運営チーム',              name_zh = '运营组'    WHERE id = 'operations' AND (name_ja = '' OR name_ja IS NULL);
   `);
   } catch {
     /* already backfilled */
   }
-  // sort_order 중복 방지 UNIQUE 인덱스
+  // UNIQUE index so sort_order values cannot repeat
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_sort_order ON departments(sort_order)");
   } catch {
     /* already exists or duplicate data */
   }
-  // 기존 DB의 provider CHECK 제약 확장 (SQLite는 ALTER CHECK 미지원이므로 테이블 재구성이 필요)
+  // Widen the provider CHECK on older databases (SQLite cannot ALTER a CHECK, so the table is rebuilt)
   try {
     const agentSql =
       (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='agents'").get() as any)?.sql ?? "";
@@ -264,7 +258,7 @@ export function initializeOAuthRuntime(deps: OAuthRuntimeDeps): OAuthRuntimeHelp
   } catch {
     /* best effort */
   }
-  // api_providers CHECK 제약 확장: cerebras 추가
+  // Widen the api_providers CHECK to allow cerebras
   try {
     const apiProvSql =
       (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='api_providers'").get() as any)?.sql ?? "";

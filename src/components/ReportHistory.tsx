@@ -37,7 +37,7 @@ function projectNameFromSummary(report: TaskReportSummary): string {
 
 export default function ReportHistory({ agents, departments, uiLanguage, onClose }: ReportHistoryProps) {
   useEscapeToClose(onClose);
-  const t = (text: { ko: string; en: string; ja?: string; zh?: string }) => pickLang(uiLanguage, text);
+  const t = (text: { en: string }) => pickLang(uiLanguage, text);
   const [reports, setReports] = useState<TaskReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<TaskReportDetail | null>(null);
@@ -66,7 +66,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
     setGroupPages({});
   }, [reports]);
 
-  // 페이지 변경 시 그룹 서브 페이지 리셋
+  // Reset group sub-pages when the page changes
   useEffect(() => {
     setGroupPages({});
   }, [page]);
@@ -92,7 +92,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
     }
   };
 
-  // 상세 보기가 열려 있으면 TaskReportPopup 표시
+  // Show TaskReportPopup while a detail view is open
   if (detail) {
     return (
       <TaskReportPopup
@@ -115,9 +115,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
         <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="text-2xl">&#x1F4CA;</span>
-            <h2 className="text-lg font-bold text-white">
-              {t({ ko: "작업 보고서 이력", en: "Report History", ja: "レポート履歴", zh: "报告历史" })}
-            </h2>
+            <h2 className="text-lg font-bold text-white">{t({ en: "Report History" })}</h2>
           </div>
           <button
             onClick={onClose}
@@ -131,19 +129,14 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
         <div className="max-h-[70vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-sm text-slate-500">
-                {t({ ko: "불러오는 중...", en: "Loading...", ja: "読み込み中...", zh: "加载中..." })}
-              </div>
+              <div className="text-sm text-slate-500">{t({ en: "Loading..." })}</div>
             </div>
           ) : reports.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <span className="mb-2 text-3xl opacity-40">&#x1F4ED;</span>
               <p className="text-sm text-slate-500">
                 {t({
-                  ko: "완료된 보고서가 없습니다",
                   en: "No completed reports",
-                  ja: "完了レポートなし",
-                  zh: "没有已完成的报告",
                 })}
               </p>
             </div>
@@ -165,8 +158,8 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                     <div className="divide-y divide-slate-700/30">
                       {visibleRows.map((r) => {
                         const agent = resolveReportAgent(agents, r);
-                        const agentName = uiLanguage === "ko" ? r.agent_name_ko || r.agent_name : r.agent_name;
-                        const deptName = uiLanguage === "ko" ? r.dept_name_ko || r.dept_name : r.dept_name;
+                        const agentName = r.agent_name;
+                        const deptName = r.dept_name;
                         return (
                           <button
                             key={r.id}
@@ -200,7 +193,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                             disabled={groupCurrent <= 0}
                             className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            {t({ ko: "이전", en: "Prev", ja: "前へ", zh: "上一页" })}
+                            {t({ en: "Prev" })}
                           </button>
                           <span className="text-[11px] text-slate-400">
                             {groupCurrent + 1} / {groupTotal}
@@ -211,7 +204,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                             disabled={groupCurrent >= groupTotal - 1}
                             className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            {t({ ko: "다음", en: "Next", ja: "次へ", zh: "下一页" })}
+                            {t({ en: "Next" })}
                           </button>
                         </div>
                       </div>
@@ -228,10 +221,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-500">
               {t({
-                ko: `총 ${reports.length}건`,
                 en: `${reports.length} reports`,
-                ja: `全${reports.length}件`,
-                zh: `共${reports.length}条`,
               })}
             </span>
             <div className="flex items-center gap-3">
@@ -243,7 +233,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                     disabled={currentPage <= 0}
                     className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {t({ ko: "이전", en: "Prev", ja: "前へ", zh: "上一页" })}
+                    {t({ en: "Prev" })}
                   </button>
                   <span className="text-[11px] text-slate-400">
                     {currentPage + 1} / {totalPages}
@@ -254,7 +244,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                     disabled={currentPage >= totalPages - 1}
                     className="rounded border border-slate-700 px-2 py-0.5 text-[11px] text-slate-300 transition hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {t({ ko: "다음", en: "Next", ja: "次へ", zh: "下一页" })}
+                    {t({ en: "Next" })}
                   </button>
                 </div>
               )}
@@ -262,7 +252,7 @@ export default function ReportHistory({ agents, departments, uiLanguage, onClose
                 onClick={onClose}
                 className="rounded-lg bg-slate-700 px-4 py-1.5 text-sm font-medium text-slate-300 transition hover:bg-slate-600"
               >
-                {t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+                {t({ en: "Close" })}
               </button>
             </div>
           </div>

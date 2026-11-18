@@ -54,11 +54,11 @@ async function expectOkJson<T>(response: APIResponse, label: string): Promise<T>
     try {
       parsed = JSON.parse(text);
     } catch {
-      throw new Error(`${label}: JSON 파싱 실패 (status=${response.status()}): ${text.slice(0, 500)}`);
+      throw new Error(`${label}: JSON parse failed (status=${response.status()}): ${text.slice(0, 500)}`);
     }
   }
   if (!response.ok()) {
-    throw new Error(`${label}: 요청 실패 (status=${response.status()}): ${text.slice(0, 1000)}`);
+    throw new Error(`${label}: request failed (status=${response.status()}): ${text.slice(0, 1000)}`);
   }
   return parsed as T;
 }
@@ -81,17 +81,17 @@ async function establishApiSession(request: APIRequestContext): Promise<string> 
       await sleep(500);
       continue;
     }
-    throw new Error(`GET /api/auth/session 실패 (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
+    throw new Error(`GET /api/auth/session failed (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
   }
 
   if (lastStatus !== 0 && Date.now() - startedAt >= timeoutMs) {
-    throw new Error(`GET /api/auth/session 타임아웃 (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
+    throw new Error(`GET /api/auth/session timed out (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
   }
 
   const storage = await request.storageState();
   const sessionCookie = storage.cookies.find((cookie) => cookie.name === "claw_session");
   if (!sessionCookie) {
-    throw new Error("WebSocket 테스트용 claw_session 쿠키를 찾을 수 없습니다.");
+    throw new Error("Could not find the claw_session cookie for the WebSocket test.");
   }
   return `${sessionCookie.name}=${sessionCookie.value}`;
 }
@@ -113,7 +113,7 @@ async function waitForTask(
     await sleep(350);
   }
   throw new Error(
-    `조건에 맞는 task를 찾지 못했습니다. 최근 task=${lastTasks
+    `No task matched. Recent tasks=${lastTasks
       .slice(0, 10)
       .map((task) => `${task.id}:${task.title}:${task.status}`)
       .join(" | ")}`,
@@ -143,7 +143,7 @@ async function waitForProjectTask(
     await sleep(350);
   }
   throw new Error(
-    `project 조건에 맞는 task를 찾지 못했습니다. project=${projectId}, recent=${lastTasks
+    `No task matched the project. project=${projectId}, recent=${lastTasks
       .slice(0, 10)
       .map((task) => `${task.id}:${task.title}:${task.status}`)
       .join(" | ")}`,
@@ -191,9 +191,9 @@ async function reorderDepartmentsWithRetry(
       await sleep(250);
       continue;
     }
-    throw new Error(`PATCH /api/departments/reorder 실패 (status=${response.status()}): ${text.slice(0, 500)}`);
+    throw new Error(`PATCH /api/departments/reorder failed (status=${response.status()}): ${text.slice(0, 500)}`);
   }
-  throw new Error("PATCH /api/departments/reorder 재시도 초과");
+  throw new Error("PATCH /api/departments/reorder ran out of retries");
 }
 
 async function connectWsWithSessionCookie(cookieHeader: string): Promise<WebSocket> {
@@ -208,7 +208,7 @@ async function connectWsWithSessionCookie(cookieHeader: string): Promise<WebSock
 
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error("WebSocket 연결 타임아웃"));
+      reject(new Error("WebSocket connection timed out"));
     }, 10_000);
 
     ws.once("open", () => {
@@ -249,7 +249,7 @@ test.describe("CI coverage gap expansion", () => {
         data: {
           id: deptA,
           name: `Coverage Dept A ${seed}`,
-          name_ko: `커버리지A-${seed}`,
+          name_ko: `CoverageA-${seed}`,
           icon: "🧪",
           color: "#0ea5e9",
         },
@@ -261,7 +261,7 @@ test.describe("CI coverage gap expansion", () => {
         data: {
           id: deptB,
           name: `Coverage Dept B ${seed}`,
-          name_ko: `커버리지B-${seed}`,
+          name_ko: `CoverageB-${seed}`,
           icon: "🧪",
           color: "#22c55e",
         },
@@ -282,7 +282,7 @@ test.describe("CI coverage gap expansion", () => {
       const createLeaderRes = await request.post("/api/agents", {
         data: {
           name: leaderName,
-          name_ko: `리더-${seed}`,
+          name_ko: `Leader-${seed}`,
           department_id: deptA,
           role: "team_leader",
           cli_provider: "api",
@@ -297,7 +297,7 @@ test.describe("CI coverage gap expansion", () => {
       const createMemberRes = await request.post("/api/agents", {
         data: {
           name: memberName,
-          name_ko: `멤버-${seed}`,
+          name_ko: `Member-${seed}`,
           department_id: deptA,
           role: "senior",
           cli_provider: "api",
@@ -482,7 +482,7 @@ test.describe("CI coverage gap expansion", () => {
 
       const settingsPutRes = await request.put("/api/settings", {
         data: {
-          language: "ja",
+          language: "en",
           uiDensity: "compact",
         },
       });
@@ -493,7 +493,7 @@ test.describe("CI coverage gap expansion", () => {
         settingsGetRes,
         "GET /api/settings",
       );
-      expect(settingsGet.settings.language).toBe("ja");
+      expect(settingsGet.settings.language).toBe("en");
       expect(settingsGet.settings.uiDensity).toBe("compact");
 
       const settingsGetRes2 = await request.get("/api/settings");
@@ -501,7 +501,7 @@ test.describe("CI coverage gap expansion", () => {
         settingsGetRes2,
         "GET /api/settings(second-read)",
       );
-      expect(settingsGet2.settings.language).toBe("ja");
+      expect(settingsGet2.settings.language).toBe("en");
 
       const badDeptRes = await request.post("/api/departments", {
         data: {},
@@ -542,7 +542,7 @@ test.describe("CI coverage gap expansion", () => {
       await waitForCondition(
         () => receivedTypes.has("task_update") && receivedTypes.has("new_message"),
         15_000,
-        `WebSocket 이벤트 대기 실패: ${[...receivedTypes].join(", ")}`,
+        `Gave up waiting for WebSocket events: ${[...receivedTypes].join(", ")}`,
       );
 
       const statsRes = await request.get("/api/stats");

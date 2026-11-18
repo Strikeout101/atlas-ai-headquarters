@@ -127,7 +127,7 @@ test.describe("CI public API surface", () => {
         data: {
           id: deptId,
           name: `CI Public Dept ${seed}`,
-          name_ko: `공개API-${seed}`,
+          name_ko: `PublicAPI-${seed}`,
           icon: "🧪",
           color: "#2563eb",
         },
@@ -145,7 +145,7 @@ test.describe("CI public API surface", () => {
       const createAgentRes = await request.post("/api/agents", {
         data: {
           name: agentName,
-          name_ko: `에이전트-${seed}`,
+          name_ko: `Agent-${seed}`,
           department_id: deptId,
           role: "senior",
           cli_provider: "api",

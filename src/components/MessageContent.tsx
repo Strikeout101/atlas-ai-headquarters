@@ -38,7 +38,7 @@ function parseTable(block: string): { headers: string[]; rows: string[][] } | nu
 function renderInline(text: string): (string | JSX.Element)[] {
   const parts: (string | JSX.Element)[] = [];
   // Pattern: **bold**, *italic*, `code`, [text](url), @mention
-  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[([^\]]+)\]\(([^)]+)\))|(@[\w가-힣]+)/g;
+  const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[([^\]]+)\]\(([^)]+)\))/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;

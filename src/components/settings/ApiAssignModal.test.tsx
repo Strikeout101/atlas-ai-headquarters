@@ -33,7 +33,7 @@ function makeApiState(): ApiStateBundle {
       {
         id: "agent-dev",
         name: "Dev Lead",
-        name_ko: "개발 리드",
+        name_ko: "",
         department_id: "planning",
         role: "team_leader",
         cli_provider: "claude",
@@ -48,7 +48,7 @@ function makeApiState(): ApiStateBundle {
       {
         id: "agent-video",
         name: "Design Lead",
-        name_ko: "디자인 리드",
+        name_ko: "",
         department_id: null,
         role: "team_leader",
         cli_provider: "claude",
@@ -65,7 +65,7 @@ function makeApiState(): ApiStateBundle {
       {
         id: "planning",
         name: "Planning",
-        name_ko: "기획",
+        name_ko: "",
         icon: "P",
         color: "#000000",
         description: null,

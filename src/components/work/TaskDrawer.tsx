@@ -189,7 +189,7 @@ export default function TaskDrawer({
       <button
         type="button"
         className="fixed inset-0 z-[46] cursor-default bg-black/40"
-        aria-label={t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+        aria-label={t({ en: "Close" })}
         onClick={onClose}
       />
       <aside
@@ -222,7 +222,7 @@ export default function TaskDrawer({
                 </span>
               )}
               <span style={{ color: "var(--th-text-muted)" }}>
-                {t({ ko: "우선순위", en: "Priority", ja: "優先度", zh: "优先级" })}: {priorityLabel(task.priority, t)}
+                {t({ en: "Priority" })}: {priorityLabel(task.priority, t)}
               </span>
             </div>
             <h2 className="text-[17px] font-semibold leading-snug" style={{ color: "var(--th-text-heading)" }}>
@@ -233,7 +233,7 @@ export default function TaskDrawer({
             type="button"
             onClick={onClose}
             className="theme-toggle-btn !h-8 !w-8 shrink-0"
-            aria-label={t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+            aria-label={t({ en: "Close" })}
           >
             <X size={16} strokeWidth={1.75} />
           </button>
@@ -243,7 +243,7 @@ export default function TaskDrawer({
           {canRun &&
             act(
               <Play size={12} strokeWidth={2.25} />,
-              t({ ko: "실행", en: "Run", ja: "実行", zh: "运行" }),
+              t({ en: "Run" }),
               () => {
                 if (!task.assigned_agent_id) {
                   setAgentWarning(true);
@@ -255,23 +255,15 @@ export default function TaskDrawer({
               "go",
             )}
           {canPause &&
-            act(
-              <Pause size={12} strokeWidth={2.25} />,
-              t({ ko: "일시중지", en: "Pause", ja: "一時停止", zh: "暂停" }),
-              () => void onPauseTask!(task.id),
-              "warn",
-            )}
+            act(<Pause size={12} strokeWidth={2.25} />, t({ en: "Pause" }), () => void onPauseTask!(task.id), "warn")}
           {canStop &&
             act(
               <Square size={11} strokeWidth={2.25} />,
-              t({ ko: "중지", en: "Cancel", ja: "キャンセル", zh: "取消" }),
+              t({ en: "Cancel" }),
               () => {
                 const ok = window.confirm(
                   t({
-                    ko: `"${task.title}" 작업을 중지할까요?\n\n경고: Stop 처리 시 해당 프로젝트 변경분은 롤백됩니다.`,
                     en: `Stop "${task.title}"?\n\nWarning: stopping will roll back project changes.`,
-                    ja: `「${task.title}」を停止しますか？\n\n警告: 停止するとプロジェクトの変更はロールバックされます。`,
-                    zh: `要停止“${task.title}”吗？\n\n警告：停止后将回滚该项目的更改。`,
                   }),
                 );
                 if (ok) void onStopTask(task.id);
@@ -279,49 +271,29 @@ export default function TaskDrawer({
               "danger",
             )}
           {canResume &&
-            act(
-              <RotateCcw size={12} strokeWidth={2} />,
-              t({ ko: "재개", en: "Resume", ja: "再開", zh: "恢复" }),
-              () => void onResumeTask!(task.id),
-              "go",
-            )}
+            act(<RotateCcw size={12} strokeWidth={2} />, t({ en: "Resume" }), () => void onResumeTask!(task.id), "go")}
           {hasLog &&
-            act(
-              <SquareTerminal size={13} strokeWidth={1.75} />,
-              t({ ko: "전체 로그", en: "Full log", ja: "全ログ", zh: "完整日志" }),
-              () => onOpenTerminal(task.id),
-            )}
+            act(<SquareTerminal size={13} strokeWidth={1.75} />, t({ en: "Full log" }), () => onOpenTerminal(task.id))}
           {hasMinutes &&
-            act(
-              <FileText size={13} strokeWidth={1.75} />,
-              t({ ko: "회의록", en: "Minutes", ja: "会議録", zh: "会议纪要" }),
-              () => onOpenMeetingMinutes(task.id),
-            )}
+            act(<FileText size={13} strokeWidth={1.75} />, t({ en: "Minutes" }), () => onOpenMeetingMinutes(task.id))}
           {task.status === "review" &&
             act(
               <GitCompare size={12} strokeWidth={1.75} />,
-              t({ ko: "변경사항 · 병합", en: "Diff · merge", ja: "差分・マージ", zh: "差异 · 合并" }),
+              t({ en: "Diff · merge" }),
               () => setShowDiff(true),
               "info",
             )}
           {hasReport &&
             onOpenReport &&
-            act(
-              <FileBarChart size={13} strokeWidth={1.75} />,
-              t({ ko: "보고서", en: "Report", ja: "レポート", zh: "报告" }),
-              () => onOpenReport(task.id),
-            )}
+            act(<FileBarChart size={13} strokeWidth={1.75} />, t({ en: "Report" }), () => onOpenReport(task.id))}
           {canDelete &&
             act(
               <Trash2 size={13} strokeWidth={1.75} />,
-              t({ ko: "삭제", en: "Delete", ja: "削除", zh: "删除" }),
+              t({ en: "Delete" }),
               () => {
                 const ok = window.confirm(
                   t({
-                    ko: `"${task.title}" 업무를 삭제할까요?`,
                     en: `Delete "${task.title}"?`,
-                    ja: `「${task.title}」を削除しますか？`,
-                    zh: `要删除“${task.title}”吗？`,
                   }),
                 );
                 if (ok) {
@@ -335,7 +307,7 @@ export default function TaskDrawer({
 
         <div className="flex-1 overflow-y-auto">
           {approvals.length > 0 && (
-            <Section title={t({ ko: "승인 대기", en: "Waiting on you", ja: "承認待ち", zh: "等待你批准" })}>
+            <Section title={t({ en: "Waiting on you" })}>
               <ul className="-mx-5">
                 {approvals.map((item) => (
                   <ApprovalRow
@@ -349,11 +321,11 @@ export default function TaskDrawer({
             </Section>
           )}
 
-          <Section title={t({ ko: "세부 정보", en: "Details", ja: "詳細", zh: "详情" })}>
+          <Section title={t({ en: "Details" })}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block min-w-0">
                 <span className="text-[11.5px]" style={{ color: "var(--th-text-muted)" }}>
-                  {t({ ko: "상태", en: "Status", ja: "ステータス", zh: "状态" })}
+                  {t({ en: "Status" })}
                 </span>
                 <select
                   value={task.status}
@@ -374,7 +346,7 @@ export default function TaskDrawer({
               </label>
               <div className={`min-w-0 rounded-lg ${agentWarning ? "ring-2 ring-red-500" : ""}`}>
                 <span className="text-[11.5px]" style={{ color: "var(--th-text-muted)" }}>
-                  {t({ ko: "담당", en: "Assigned to", ja: "担当", zh: "负责人" })}
+                  {t({ en: "Assigned to" })}
                 </span>
                 <div className="mt-1">
                   <AgentSelect
@@ -391,28 +363,16 @@ export default function TaskDrawer({
                 {agentWarning && (
                   <p className="mt-1 text-[12px] font-medium text-red-400">
                     {t({
-                      ko: "담당자를 배정해주세요!",
                       en: "Please assign an agent!",
-                      ja: "担当者を割り当ててください！",
-                      zh: "请分配负责人！",
                     })}
                   </p>
                 )}
               </div>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {field(
-                t({ ko: "생성", en: "Created", ja: "作成", zh: "创建" }),
-                formatDateTime(task.created_at, localeTag),
-              )}
-              {field(
-                t({ ko: "시작", en: "Started", ja: "開始", zh: "开始" }),
-                formatDateTime(task.started_at, localeTag),
-              )}
-              {field(
-                t({ ko: "완료", en: "Completed", ja: "完了", zh: "完成" }),
-                formatDateTime(task.completed_at, localeTag),
-              )}
+              {field(t({ en: "Created" }), formatDateTime(task.created_at, localeTag))}
+              {field(t({ en: "Started" }), formatDateTime(task.started_at, localeTag))}
+              {field(t({ en: "Completed" }), formatDateTime(task.completed_at, localeTag))}
             </dl>
             {task.project_path && (
               <p
@@ -435,7 +395,7 @@ export default function TaskDrawer({
 
           {subtasks.length > 0 && (
             <Section
-              title={t({ ko: "하위 작업", en: "Subtasks", ja: "サブタスク", zh: "子任务" })}
+              title={t({ en: "Subtasks" })}
               aside={
                 <span className="text-[12px] tabular-nums" style={{ color: "var(--th-text-muted)" }}>
                   {subtasks.filter((s) => s.status === "done").length}/{subtasks.length}
@@ -476,7 +436,7 @@ export default function TaskDrawer({
             </Section>
           )}
 
-          <Section title={t({ ko: "모델", en: "Model", ja: "モデル", zh: "模型" })}>
+          <Section title={t({ en: "Model" })}>
             <div className="flex items-center gap-2.5">
               {assignedAgent && <AgentAvatar agent={assignedAgent} agents={agents} size={24} />}
               <p className="min-w-0 text-[13px]" style={{ color: "var(--th-text-primary)" }}>
@@ -490,9 +450,7 @@ export default function TaskDrawer({
                     </span>
                   </>
                 ) : (
-                  <span style={{ color: "var(--th-text-muted)" }}>
-                    {t({ ko: "기본 모델", en: "Default model", ja: "既定のモデル", zh: "默认模型" })}
-                  </span>
+                  <span style={{ color: "var(--th-text-muted)" }}>{t({ en: "Default model" })}</span>
                 )}
               </p>
             </div>
@@ -513,12 +471,12 @@ export default function TaskDrawer({
           </Section>
 
           <Section
-            title={t({ ko: "최근 활동", en: "Recent activity", ja: "最近のアクティビティ", zh: "最近活动" })}
+            title={t({ en: "Recent activity" })}
             aside={
               task.status === "in_progress" ? (
                 <span className="flex items-center gap-1.5 text-[11.5px]" style={{ color: "var(--th-text-muted)" }}>
                   <span className="ax-live" aria-hidden />
-                  {t({ ko: "실시간", en: "Live", ja: "ライブ", zh: "实时" })}
+                  {t({ en: "Live" })}
                 </span>
               ) : undefined
             }
@@ -526,10 +484,7 @@ export default function TaskDrawer({
             {activity.length === 0 && !outputTail ? (
               <p className="text-[13px]" style={{ color: "var(--th-text-muted)" }}>
                 {t({
-                  ko: "아직 기록이 없습니다.",
                   en: "Nothing logged yet.",
-                  ja: "まだ記録はありません。",
-                  zh: "暂无记录。",
                 })}
               </p>
             ) : (
@@ -558,12 +513,9 @@ export default function TaskDrawer({
                       style={{ color: "var(--ax-signal)" }}
                     >
                       {showOutput
-                        ? t({ ko: "출력 숨기기", en: "Hide output", ja: "出力を隠す", zh: "隐藏输出" })
+                        ? t({ en: "Hide output" })
                         : t({
-                            ko: "최근 출력 보기",
                             en: "Show latest output",
-                            ja: "最新の出力を表示",
-                            zh: "显示最新输出",
                           })}
                     </button>
                     {showOutput && (
@@ -585,7 +537,7 @@ export default function TaskDrawer({
           </Section>
 
           {task.result && (
-            <Section title={t({ ko: "결과", en: "Result", ja: "結果", zh: "结果" })}>
+            <Section title={t({ en: "Result" })}>
               <p
                 className="max-h-64 overflow-auto whitespace-pre-wrap text-[13px] leading-relaxed"
                 style={{ color: "var(--th-text-primary)" }}

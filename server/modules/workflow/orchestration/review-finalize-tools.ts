@@ -101,10 +101,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     }
 
     const lang = getPreferredLanguage();
-    const blockedReason = pickL(
-      l(["위임 작업 실패"], ["Delegated task failed"], ["委任タスク失敗"], ["委派任务失败"]),
-      lang,
-    );
+    const blockedReason = pickL(l(["Delegated task failed"]), lang);
     for (const sub of linked) {
       db.prepare("UPDATE subtasks SET status = 'blocked', blocked_reason = ?, completed_at = NULL WHERE id = ?").run(
         blockedReason,
@@ -155,20 +152,9 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
           const projectName = (project?.name || currentTask.project_id).trim();
           notifyCeo(
             pickL(
-              l(
-                [
-                  `[CEO OFFICE] 프로젝트 '${projectName}'의 활성 항목 ${gateSnapshot.activeTotal}건이 모두 Review 상태입니다. 의사결정 인박스에서 승인하면 팀장 회의를 시작합니다.`,
-                ],
-                [
-                  `[CEO OFFICE] Project '${projectName}' now has all ${gateSnapshot.activeTotal} active tasks in Review. Approve from Decision Inbox to start team-lead review meetings.`,
-                ],
-                [
-                  `[CEO OFFICE] プロジェクト'${projectName}'のアクティブタスク${gateSnapshot.activeTotal}件がすべてReviewに到達しました。Decision Inboxで承認するとチームリーダー会議を開始します。`,
-                ],
-                [
-                  `[CEO OFFICE] 项目'${projectName}'的 ${gateSnapshot.activeTotal} 个活跃任务已全部进入 Review。请在 Decision Inbox 批准后启动组长评审会议。`,
-                ],
-              ),
+              l([
+                `[CEO OFFICE] Project '${projectName}' now has all ${gateSnapshot.activeTotal} active tasks in Review. Approve from Decision Inbox to start team-lead review meetings.`,
+              ]),
               lang,
             ),
             taskId,
@@ -220,12 +206,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     if (remainingSubtaskCount > 0) {
       notifyCeo(
         pickL(
-          l(
-            [`'${taskTitle}' 는 아직 ${remainingSubtaskCount}개 서브태스크가 남아 있어 Review 단계에서 대기합니다.`],
-            [`'${taskTitle}' is waiting in Review because ${remainingSubtaskCount} subtasks are still unfinished.`],
-            [`'${taskTitle}' は未完了サブタスクが${remainingSubtaskCount}件あるため、Reviewで待機しています。`],
-            [`'${taskTitle}' 仍有 ${remainingSubtaskCount} 个 SubTask 未完成，当前在 Review 阶段等待。`],
-          ),
+          l([`'${taskTitle}' is waiting in Review because ${remainingSubtaskCount} subtasks are still unfinished.`]),
           lang,
         ),
         taskId,
@@ -256,16 +237,9 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
         const waiting = childTotal - childReady;
         notifyCeo(
           pickL(
-            l(
-              [`'${taskTitle}' 는 협업 하위 태스크 ${waiting}건이 아직 Review 진입 전이라 전체 팀장회의를 대기합니다.`],
-              [
-                `'${taskTitle}' is waiting for ${waiting} collaboration child task(s) to reach review before the single team-lead meeting starts.`,
-              ],
-              [
-                `'${taskTitle}' は協業子タスク${waiting}件がまだReview未到達のため、全体チームリーダー会議を待機しています。`,
-              ],
-              [`'${taskTitle}' 仍有 ${waiting} 个协作子任务尚未进入 Review，当前等待后再开启一次团队负责人会议。`],
-            ),
+            l([
+              `'${taskTitle}' is waiting for ${waiting} collaboration child task(s) to reach review before the single team-lead meeting starts.`,
+            ]),
             lang,
           ),
           taskId,
@@ -304,51 +278,22 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
 
         if (mergeResult.success) {
           appendTaskLog(taskId, "system", `Git merge completed: ${mergeResult.message}`);
-          mergeNote = githubRepo
-            ? pickL(
-                l(
-                  [" (dev 병합 + PR 생성)"],
-                  [" (merged to dev + PR)"],
-                  [" (dev マージ + PR)"],
-                  ["（合并到 dev + PR）"],
-                ),
-                lang,
-              )
-            : pickL(l([" (병합 완료)"], [" (merged)"], [" (マージ完了)"], ["（已合并）"]), lang);
+          mergeNote = githubRepo ? pickL(l([" (merged to dev + PR)"]), lang) : pickL(l([" (merged)"]), lang);
         } else {
           appendTaskLog(taskId, "system", `Git merge failed: ${mergeResult.message}`);
 
           const conflictLeader = findTeamLeader(latestTask.department_id);
           const conflictLeaderName = conflictLeader
             ? getAgentDisplayName(conflictLeader, lang)
-            : pickL(l(["팀장"], ["Team Lead"], ["チームリーダー"], ["组长"]), lang);
+            : pickL(l(["Team Lead"]), lang);
           const conflictFiles = mergeResult.conflicts?.length
-            ? pickL(
-                l(
-                  [`\n충돌 파일: ${mergeResult.conflicts.join(", ")}`],
-                  [`\nConflicting files: ${mergeResult.conflicts.join(", ")}`],
-                  [`\n競合ファイル: ${mergeResult.conflicts.join(", ")}`],
-                  [`\n冲突文件: ${mergeResult.conflicts.join(", ")}`],
-                ),
-                lang,
-              )
+            ? pickL(l([`\nConflicting files: ${mergeResult.conflicts.join(", ")}`]), lang)
             : "";
           notifyCeo(
             pickL(
-              l(
-                [
-                  `${conflictLeaderName}: '${taskTitle}' 병합에 실패하여 Review에서 대기합니다. 문제를 해결한 뒤 다시 승인하세요.\n${mergeResult.message}${conflictFiles}\n브랜치: ${wtInfo.branchName}`,
-                ],
-                [
-                  `${conflictLeaderName}: Merge failed for '${taskTitle}'. Task remains in Review; resolve the failure and approve again.\n${mergeResult.message}${conflictFiles}\nBranch: ${wtInfo.branchName}`,
-                ],
-                [
-                  `${conflictLeaderName}: '${taskTitle}' のマージに失敗したためReviewで待機します。問題を解決して再承認してください。\n${mergeResult.message}${conflictFiles}\nブランチ: ${wtInfo.branchName}`,
-                ],
-                [
-                  `${conflictLeaderName}：合并 '${taskTitle}' 失败，任务保留在 Review。请解决问题后重新批准。\n${mergeResult.message}${conflictFiles}\n分支: ${wtInfo.branchName}`,
-                ],
-              ),
+              l([
+                `${conflictLeaderName}: Merge failed for '${taskTitle}'. Task remains in Review; resolve the failure and approve again.\n${mergeResult.message}${conflictFiles}\nBranch: ${wtInfo.branchName}`,
+              ]),
               lang,
             ),
             taskId,
@@ -409,23 +354,13 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       }
 
       const leader = findTeamLeader(latestTask.department_id);
-      const leaderName = leader
-        ? getAgentDisplayName(leader, lang)
-        : pickL(l(["팀장"], ["Team Lead"], ["チームリーダー"], ["组长"]), lang);
+      const leaderName = leader ? getAgentDisplayName(leader, lang) : pickL(l(["Team Lead"]), lang);
       const subtaskProgressSummary = formatTaskSubtaskProgressSummary(taskId, lang);
       const progressSuffix = subtaskProgressSummary
-        ? `\n${pickL(l(["보완/협업 완료 현황"], ["Remediation/Collaboration completion"], ["補完/協業 完了状況"], ["整改/协作完成情况"]), lang)}\n${subtaskProgressSummary}`
+        ? `\n${pickL(l(["Remediation/Collaboration completion"]), lang)}\n${subtaskProgressSummary}`
         : "";
       notifyCeo(
-        pickL(
-          l(
-            [`${leaderName}: '${taskTitle}' 최종 승인 완료 보고드립니다.${mergeNote}${progressSuffix}`],
-            [`${leaderName}: Final approval completed for '${taskTitle}'.${mergeNote}${progressSuffix}`],
-            [`${leaderName}: '${taskTitle}' の最終承認が完了しました。${mergeNote}${progressSuffix}`],
-            [`${leaderName}：'${taskTitle}' 最终审批已完成。${mergeNote}${progressSuffix}`],
-          ),
-          lang,
-        ),
+        pickL(l([`${leaderName}: Final approval completed for '${taskTitle}'.${mergeNote}${progressSuffix}`]), lang),
         taskId,
       );
 

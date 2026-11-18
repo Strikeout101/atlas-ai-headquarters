@@ -138,17 +138,14 @@ export function TaskBoard({
     <div className="taskboard-shell flex h-full flex-col gap-4 p-3 sm:p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[20px] font-semibold tracking-[-0.015em]" style={{ color: "var(--th-text-heading)" }}>
-          {t({ ko: "업무 보드", en: "Task Board", ja: "タスクボード", zh: "任务看板" })}
+          {t({ en: "Task Board" })}
         </h1>
         <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs text-slate-400">
-          {t({ ko: "총", en: "Total", ja: "合計", zh: "总计" })} {filteredTasks.length}
-          {t({ ko: "개", en: "", ja: "件", zh: "项" })}
+          {t({ en: "Total" })} {filteredTasks.length}
+          {t({ en: "" })}
           {activeFilterCount > 0 &&
-            ` (${t({ ko: "필터", en: "filters", ja: "フィルター", zh: "筛选器" })} ${activeFilterCount}${t({
-              ko: "개 적용",
+            ` (${t({ en: "filters" })} ${activeFilterCount}${t({
               en: " applied",
-              ja: "件適用",
-              zh: "个已应用",
             })})`}
         </span>
         <div className="ml-auto flex items-center gap-2">
@@ -162,7 +159,7 @@ export function TaskBoard({
               }}
               className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-white"
             >
-              {t({ ko: "필터 초기화", en: "Reset Filters", ja: "フィルターをリセット", zh: "重置筛选" })}
+              {t({ en: "Reset Filters" })}
             </button>
           )}
           <button
@@ -175,26 +172,16 @@ export function TaskBoard({
             title={
               showAllTasks
                 ? t({
-                    ko: "진행중 보기로 전환 (숨김 제외)",
                     en: "Switch to active view (exclude hidden)",
-                    ja: "進行中表示へ切替（非表示を除外）",
-                    zh: "切换到进行中视图（排除隐藏）",
                   })
                 : t({
-                    ko: "모두보기로 전환 (숨김 포함)",
                     en: "Switch to all view (include hidden)",
-                    ja: "全体表示へ切替（非表示を含む）",
-                    zh: "切换到全部视图（包含隐藏）",
                   })
             }
           >
-            <span className={showAllTasks ? "text-slate-400" : "text-emerald-200"}>
-              {t({ ko: "진행중", en: "Active", ja: "進行中", zh: "进行中" })}
-            </span>
+            <span className={showAllTasks ? "text-slate-400" : "text-emerald-200"}>{t({ en: "Active" })}</span>
             <span className="mx-1 text-slate-500">/</span>
-            <span className={showAllTasks ? "text-cyan-100" : "text-slate-500"}>
-              {t({ ko: "모두보기", en: "All", ja: "すべて", zh: "全部" })}
-            </span>
+            <span className={showAllTasks ? "text-cyan-100" : "text-slate-500"}>{t({ en: "All" })}</span>
             <span className="ml-1 rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
               {hiddenTaskCount}
             </span>
@@ -203,25 +190,22 @@ export function TaskBoard({
             onClick={() => setShowBulkHideModal(true)}
             className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800 hover:text-white"
             title={t({
-              ko: "완료/보류/취소 상태 업무 숨기기",
               en: "Hide done/pending/cancelled tasks",
-              ja: "完了/保留/キャンセル状態を非表示",
-              zh: "隐藏完成/待处理/已取消任务",
             })}
           >
             <EyeOff size={13} strokeWidth={1.75} className="mr-1 inline -mt-px" />
-            {t({ ko: "숨김", en: "Hide", ja: "非表示", zh: "隐藏" })}
+            {t({ en: "Hide" })}
           </button>
           <button
             onClick={() => setShowProjectManager(true)}
             className="taskboard-project-manage-btn rounded-lg border px-3 py-1.5 text-xs font-semibold transition"
           >
             <FolderKanban size={13} strokeWidth={1.75} className="mr-1 inline -mt-px" />
-            {t({ ko: "프로젝트 관리", en: "Project Manager", ja: "プロジェクト管理", zh: "项目管理" })}
+            {t({ en: "Project Manager" })}
           </button>
           <button onClick={() => setShowCreate(true)} className="ax-btn-primary h-8 rounded-[7px] px-3.5 text-[13px]">
             <Plus size={15} strokeWidth={2} />
-            {t({ ko: "새 업무", en: "New task", ja: "新規タスク", zh: "新建任务" })}
+            {t({ en: "New task" })}
           </button>
         </div>
       </div>
@@ -273,7 +257,7 @@ export function TaskBoard({
                     className="flex min-h-24 items-center justify-center rounded-lg border border-dashed py-8 text-xs sm:flex-1"
                     style={{ borderColor: "var(--th-border)", color: "var(--th-text-muted)" }}
                   >
-                    {t({ ko: "업무 없음", en: "No tasks", ja: "タスクなし", zh: "暂无任务" })}
+                    {t({ en: "No tasks" })}
                   </div>
                 ) : (
                   columnTasks.map((task) => (

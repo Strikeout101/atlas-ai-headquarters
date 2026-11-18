@@ -83,15 +83,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
         const relayOptions = mergePendingOptions(pendingBinding.options, options);
         if (isCancelReply(ceoMessage)) {
           pendingProjectBindingByAgent.delete(agent.id);
-          const cancelMsg = pickL(
-            l(
-              ["알겠습니다. 프로젝트 지정 대기는 취소했습니다."],
-              ["Understood. I canceled the pending project binding request."],
-              ["承知しました。プロジェクト指定待ちはキャンセルしました。"],
-              ["已了解。已取消项目绑定等待。"],
-            ),
-            lang,
-          );
+          const cancelMsg = pickL(l(["Understood. I canceled the pending project binding request."]), lang);
           sendAgentMessage(agent, cancelMsg);
           void replyRuntime.relayReplyToMessenger(relayOptions, agent, cancelMsg).catch((err) => {
             console.warn(`[messenger-reply] failed to relay pending-cancel message from ${agent.name}: ${String(err)}`);
@@ -116,28 +108,11 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
               existingCandidates: recentCandidates,
             });
             const askExisting = pickL(
-              l(
-                [
-                  recentLines.length > 0
-                    ? `기존 프로젝트를 선택해주세요. 최근 프로젝트 ${RECENT_EXISTING_PROJECT_LIMIT}개입니다.\n${recentLines.join("\n")}\n번호(1-${recentLines.length}) 또는 프로젝트 이름/절대경로를 보내주세요.`
-                    : "기존 프로젝트 목록이 비어 있습니다. 프로젝트 절대경로(예: /Users/classys/Projects/climpire) 또는 기존 프로젝트 이름을 보내주세요.",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `Choose an existing project. Recent ${RECENT_EXISTING_PROJECT_LIMIT} projects:\n${recentLines.join("\n")}\nSend a number (1-${recentLines.length}) or project name/absolute path.`
-                    : "No recent existing projects found. Send an absolute project path (e.g. /Users/classys/Projects/climpire) or an existing project name.",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `既存プロジェクトを選んでください。最近の${RECENT_EXISTING_PROJECT_LIMIT}件です:\n${recentLines.join("\n")}\n番号(1-${recentLines.length}) またはプロジェクト名/絶対パスを送ってください。`
-                    : "既存プロジェクト一覧がありません。絶対パスまたは既存プロジェクト名を送ってください。",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `请选择已有项目。最近${RECENT_EXISTING_PROJECT_LIMIT}个项目如下：\n${recentLines.join("\n")}\n请发送编号(1-${recentLines.length})，或项目名称/绝对路径。`
-                    : "当前没有最近项目列表。请发送项目绝对路径或已有项目名称。",
-                ],
-              ),
+              l([
+                recentLines.length > 0
+                  ? `Choose an existing project. Recent ${RECENT_EXISTING_PROJECT_LIMIT} projects:\n${recentLines.join("\n")}\nSend a number (1-${recentLines.length}) or project name/absolute path.`
+                  : "No recent existing projects found. Send an absolute project path (e.g. /Users/classys/Projects/climpire) or an existing project name.",
+              ]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -157,15 +132,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
               state: "ask_new_name",
               requestedAt: nowMs(),
             });
-            const askNewName = pickL(
-              l(
-                ["신규 프로젝트 이름을 먼저 알려주세요."],
-                ["Please provide the new project name first."],
-                ["新規プロジェクト名を先に教えてください。"],
-                ["请先提供新项目名称。"],
-              ),
-              lang,
-            );
+            const askNewName = pickL(l(["Please provide the new project name first."]), lang);
             replyRuntime.sendInCharacterAutoMessage({
               agent,
               lang,
@@ -178,12 +145,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
 
           const askKindAgain = (): void => {
             const askKind = pickL(
-              l(
-                ["기존 프로젝트인가요, 신규 프로젝트인가요?\n1️⃣ 기존 프로젝트\n2️⃣ 신규 프로젝트"],
-                ["Is this an existing project or a new project?\n1️⃣ Existing project\n2️⃣ New project"],
-                ["既存プロジェクトですか？新規プロジェクトですか？\n1️⃣ 既存\n2️⃣ 新規"],
-                ["这是已有项目还是新项目？\n1️⃣ 已有项目\n2️⃣ 新项目"],
-              ),
+              l(["Is this an existing project or a new project?\n1️⃣ Existing project\n2️⃣ New project"]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -265,28 +227,11 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
             });
             const recentLines = formatExistingProjectCandidateLines(normalizeTextField, refreshedCandidates, lang);
             const askExistingAgain = pickL(
-              l(
-                [
-                  recentLines.length > 0
-                    ? `기존 프로젝트를 찾지 못했습니다. 아래 목록에서 번호(1-${recentLines.length}) 또는 정확한 프로젝트 이름/절대경로를 다시 보내주세요.\n${recentLines.join("\n")}`
-                    : "기존 프로젝트를 찾지 못했습니다. 프로젝트 절대경로나 정확한 프로젝트 이름을 다시 보내주세요.",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `I couldn't resolve that project. Reply with a number (1-${recentLines.length}) from the list or send the exact project name/absolute path.\n${recentLines.join("\n")}`
-                    : "I couldn't find that existing project. Send an absolute project path or the exact project name again.",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `既存プロジェクトを特定できませんでした。番号(1-${recentLines.length}) または正確なプロジェクト名/絶対パスを再送してください。\n${recentLines.join("\n")}`
-                    : "既存プロジェクトが見つかりませんでした。絶対パスまたは正確なプロジェクト名を再送してください。",
-                ],
-                [
-                  recentLines.length > 0
-                    ? `未能定位已有项目。请回复列表编号(1-${recentLines.length})，或重新发送准确项目名称/绝对路径。\n${recentLines.join("\n")}`
-                    : "未找到该已有项目。请重新发送项目绝对路径或准确的项目名称。",
-                ],
-              ),
+              l([
+                recentLines.length > 0
+                  ? `I couldn't resolve that project. Reply with a number (1-${recentLines.length}) from the list or send the exact project name/absolute path.\n${recentLines.join("\n")}`
+                  : "I couldn't find that existing project. Send an absolute project path or the exact project name again.",
+              ]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -314,12 +259,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
           const newProjectName = normalizeNewProjectNameInput(ceoMessage);
           if (!newProjectName) {
             const askNameAgain = pickL(
-              l(
-                ["신규 프로젝트 이름을 다시 알려주세요. 예: climpire-redesign"],
-                ["Please provide the new project name again. Example: climpire-redesign"],
-                ["新規プロジェクト名をもう一度送ってください。例: climpire-redesign"],
-                ["请重新提供新项目名称。例如：climpire-redesign"],
-              ),
+              l(["Please provide the new project name again. Example: climpire-redesign"]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -340,12 +280,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
             newProjectName,
           });
           const askNewPath = pickL(
-            l(
-              ["신규 프로젝트 절대경로를 보내주세요. 예: /Users/classys/Projects/climpire-redesign"],
-              ["Send the new project's absolute path. Example: /Users/classys/Projects/climpire-redesign"],
-              ["新規プロジェクトの絶対パスを送ってください。例: /Users/classys/Projects/climpire-redesign"],
-              ["请发送新项目绝对路径。例如：/Users/classys/Projects/climpire-redesign"],
-            ),
+            l(["Send the new project's absolute path. Example: /Users/classys/Projects/climpire-redesign"]),
             lang,
           );
           replyRuntime.sendInCharacterAutoMessage({
@@ -363,12 +298,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
           const providedPath = extractAbsolutePathFromText(ceoMessage);
           if (!providedPath) {
             const askPathAgain = pickL(
-              l(
-                ["절대경로 형식으로 다시 보내주세요. 예: /Users/classys/Projects/climpire-redesign"],
-                ["Please send it again as an absolute path. Example: /Users/classys/Projects/climpire-redesign"],
-                ["絶対パス形式で再送してください。例: /Users/classys/Projects/climpire-redesign"],
-                ["请用绝对路径格式重新发送。例如：/Users/classys/Projects/climpire-redesign"],
-              ),
+              l(["Please send it again as an absolute path. Example: /Users/classys/Projects/climpire-redesign"]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -394,12 +324,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
           );
           if (!binding) {
             const askPathFail = pickL(
-              l(
-                ["프로젝트 생성에 실패했습니다. 신규 프로젝트 절대경로를 다시 보내주세요."],
-                ["Failed to create the project. Please send the new project's absolute path again."],
-                ["プロジェクト作成に失敗しました。新規プロジェクトの絶対パスを再送してください。"],
-                ["创建项目失败。请重新发送新项目绝对路径。"],
-              ),
+              l(["Failed to create the project. Please send the new project's absolute path again."]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({
@@ -509,16 +434,9 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
           requestedAt: now,
         });
         const askProject = pickL(
-          l(
-            [
-              "프로젝트를 먼저 정해야 합니다. 기존 프로젝트인가요, 신규 프로젝트인가요?\n1️⃣ 기존 프로젝트\n2️⃣ 신규 프로젝트",
-            ],
-            [
-              "I need to fix the project first. Is this an existing project or a new project?\n1️⃣ Existing project\n2️⃣ New project",
-            ],
-            ["先に対象プロジェクトを決める必要があります。既存ですか？新規ですか？\n1️⃣ 既存\n2️⃣ 新規"],
-            ["需要先确定项目。是已有项目还是新项目？\n1️⃣ 已有项目\n2️⃣ 新项目"],
-          ),
+          l([
+            "I need to fix the project first. Is this an existing project or a new project?\n1️⃣ Existing project\n2️⃣ New project",
+          ]),
           resolveLang(ceoMessage),
         );
         replyRuntime.sendInCharacterAutoMessage({

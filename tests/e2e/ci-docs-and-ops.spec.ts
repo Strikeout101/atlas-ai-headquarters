@@ -19,11 +19,11 @@ async function expectOkJson<T>(response: APIResponse, label: string): Promise<T>
     try {
       parsed = JSON.parse(text);
     } catch {
-      throw new Error(`${label}: JSON 파싱 실패 (status=${response.status()}): ${text.slice(0, 500)}`);
+      throw new Error(`${label}: JSON parse failed (status=${response.status()}): ${text.slice(0, 500)}`);
     }
   }
   if (!response.ok()) {
-    throw new Error(`${label}: 요청 실패 (status=${response.status()}): ${text.slice(0, 1000)}`);
+    throw new Error(`${label}: request failed (status=${response.status()}): ${text.slice(0, 1000)}`);
   }
   return parsed as T;
 }
@@ -46,10 +46,10 @@ async function establishApiSession(request: APIRequestContext): Promise<void> {
       await sleep(500);
       continue;
     }
-    throw new Error(`GET /api/auth/session 실패 (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
+    throw new Error(`GET /api/auth/session failed (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
   }
 
-  throw new Error(`GET /api/auth/session 타임아웃 (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
+  throw new Error(`GET /api/auth/session timed out (status=${lastStatus}): ${lastText.slice(0, 1000)}`);
 }
 
 test.describe("CI docs and operational API coverage", () => {
@@ -185,7 +185,7 @@ test.describe("CI docs and operational API coverage", () => {
         expect(projectPath).toBe(repoPath);
       } else {
         const text = await createProjectRes.text();
-        throw new Error(`POST /api/projects 실패 (status=${createProjectRes.status()}): ${text.slice(0, 1000)}`);
+        throw new Error(`POST /api/projects failed (status=${createProjectRes.status()}): ${text.slice(0, 1000)}`);
       }
 
       const projectDetailRes = await request.get(`/api/projects/${projectId}`);

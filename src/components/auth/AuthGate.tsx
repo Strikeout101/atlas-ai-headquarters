@@ -64,10 +64,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       >
         <p className="max-w-sm text-sm" style={{ color: "var(--th-text-secondary)" }}>
           {t({
-            ko: "ATLAS 서버에 연결할 수 없습니다.",
             en: "Couldn't reach the ATLAS server.",
-            ja: "ATLAS サーバーに接続できません。",
-            zh: "无法连接 ATLAS 服务器。",
           })}
         </p>
         <button
@@ -75,7 +72,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           onClick={() => void check()}
           className="ax-btn-primary min-h-[44px] rounded-lg px-5 text-sm"
         >
-          {t({ ko: "다시 시도", en: "Try again", ja: "再試行", zh: "重试" })}
+          {t({ en: "Try again" })}
         </button>
       </div>
     );

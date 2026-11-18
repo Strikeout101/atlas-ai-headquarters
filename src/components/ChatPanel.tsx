@@ -66,13 +66,12 @@ export function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const spriteMap = useMemo(() => buildSpriteMap(agents), [agents]);
   const { t, locale } = useI18n();
-  const isKorean = locale.startsWith("ko");
 
-  const tr = (ko: string, en: string, ja = en, zh = en) => t({ ko, en, ja, zh });
+  const tr = (en: string) => t({ en });
 
   const getAgentName = (agent: Agent | null | undefined) => {
     if (!agent) return "";
-    return isKorean ? agent.name_ko || agent.name : agent.name || agent.name_ko;
+    return agent.name || agent.name_ko;
   };
 
   const getRoleLabel = (role: string) => {
@@ -86,9 +85,7 @@ export function ChatPanel({
   };
 
   const selectedDeptName = selectedAgent?.department
-    ? isKorean
-      ? selectedAgent.department.name_ko || selectedAgent.department.name
-      : selectedAgent.department.name || selectedAgent.department.name_ko
+    ? selectedAgent.department.name || selectedAgent.department.name_ko
     : selectedAgent?.department_id;
   const selectedTaskId = selectedAgent?.current_task_id;
 
@@ -101,7 +98,7 @@ export function ChatPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // 스트리밍 중인 메시지가 현재 에이전트 것인지 판별
+  // Is the streaming message from the current agent?
   const isStreamingForAgent = streamingMessage && selectedAgent && streamingMessage.agent_id === selectedAgent.id;
 
   // Auto-scroll to bottom on new messages or streaming delta
@@ -207,14 +204,7 @@ export function ChatPanel({
   const applyExistingProjectSelection = useCallback(() => {
     const picked = resolveExistingProjectSelection(existingProjectInput);
     if (!picked) {
-      setExistingProjectError(
-        tr(
-          "번호(1-10) 또는 프로젝트명을 다시 입력해주세요.",
-          "Please enter a number (1-10) or a project name.",
-          "番号(1-10)またはプロジェクト名を入力してください。",
-          "请输入编号(1-10)或项目名称。",
-        ),
-      );
+      setExistingProjectError(tr("Please enter a number (1-10) or a project name."));
       return;
     }
     setExistingProjectError("");
@@ -330,7 +320,7 @@ export function ChatPanel({
     } else if (mode === "report" && selectedAgent) {
       action = {
         kind: "report",
-        content: `[${tr("보고 요청", "Report Request", "レポート依頼", "报告请求")}] ${trimmed}`,
+        content: `[${tr("Report Request")}] ${trimmed}`,
         receiverId: selectedAgent.id,
       };
     } else if (selectedAgent) {

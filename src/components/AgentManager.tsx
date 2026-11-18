@@ -14,8 +14,7 @@ import { pickRandomSpritePair } from "./agent-manager/utils";
 
 export default function AgentManager({ agents, departments, onAgentsChange }: AgentManagerProps) {
   const { t, locale } = useI18n();
-  const isKo = locale.startsWith("ko");
-  const tr = (ko: string, en: string) => t({ ko, en, ja: en, zh: en });
+  const tr = (en: string) => t({ en });
 
   const [subTab, setSubTab] = useState<"agents" | "departments">("agents");
   const [search, setSearch] = useState("");
@@ -286,10 +285,10 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div role="tablist" className="ax-tabs flex-1">
           {[
-            { key: "agents" as const, label: tr("직원관리", "Agents"), Icon: Bot, count: agents.length },
+            { key: "agents" as const, label: tr("Agents"), Icon: Bot, count: agents.length },
             {
               key: "departments" as const,
-              label: tr("부서관리", "Departments"),
+              label: tr("Departments"),
               Icon: Building2,
               count: departments.length,
             },
@@ -317,11 +316,11 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
             className="header-action-btn header-action-btn-secondary !border-[var(--th-border)]"
           >
             <Plus size={15} strokeWidth={2} />
-            {tr("부서 추가", "Add department")}
+            {tr("Add department")}
           </button>
           <button type="button" onClick={openCreate} className="ax-btn-primary h-8 rounded-[7px] px-3.5 text-[13px]">
             <UserPlus size={15} strokeWidth={2} />
-            {tr("신규 채용", "Hire agent")}
+            {tr("Hire agent")}
           </button>
         </div>
       </div>
@@ -330,7 +329,6 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
         <AgentsTab
           tr={tr}
           locale={locale}
-          isKo={isKo}
           agents={agents}
           departments={departments}
           deptTab={deptTab}
@@ -374,7 +372,6 @@ export default function AgentManager({ agents, departments, onAgentsChange }: Ag
 
       {showModal && (
         <AgentFormModal
-          isKo={isKo}
           locale={locale}
           tr={tr}
           form={form}

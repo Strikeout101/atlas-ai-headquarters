@@ -92,7 +92,7 @@ export function registerTaskSubtaskRoutes(deps: TaskSubtaskRouteDeps): void {
       const targetDeptName = getDeptName(targetDeptId);
       db.prepare(
         "UPDATE subtasks SET target_department_id = ?, status = 'blocked', blocked_reason = ? WHERE id = ?",
-      ).run(targetDeptId, `${targetDeptName} 협업 대기`, id);
+      ).run(targetDeptId, `Waiting on ${targetDeptName}`, id);
     }
 
     const subtask = db.prepare("SELECT * FROM subtasks WHERE id = ?").get(id);
@@ -211,15 +211,7 @@ export function registerTaskSubtaskRoutes(deps: TaskSubtaskRouteDeps): void {
       const leaderName = getAgentDisplayName(leader, lang);
       sendAgentMessage(
         leader,
-        pickL(
-          l(
-            [`${leaderName}이(가) ${agentName}에게 '${task.title}' 업무를 할당했습니다.`],
-            [`${leaderName} assigned '${task.title}' to ${agentName}.`],
-            [`${leaderName}が '${task.title}' を${agentName}に割り当てました。`],
-            [`${leaderName} 已将 '${task.title}' 分配给 ${agentName}。`],
-          ),
-          lang,
-        ),
+        pickL(l([`${leaderName} assigned '${task.title}' to ${agentName}.`]), lang),
         "status_update",
         "all",
         null,

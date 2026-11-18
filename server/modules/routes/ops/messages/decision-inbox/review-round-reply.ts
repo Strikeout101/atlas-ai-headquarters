@@ -129,15 +129,7 @@ export function handleReviewRoundDecisionReply(input: ReviewRoundReplyInput): bo
         project_id: resolvedProjectId,
         snapshot_hash: decisionSnapshotHash,
         event_type: "representative_pick",
-        summary: pickL(
-          l(
-            [`리뷰 라운드 ${reviewRound} 의사결정: 다음 라운드로 SKIP`],
-            [`Review round ${reviewRound} decision: skip to next round`],
-            [`レビューラウンド${reviewRound}判断: 次ラウンドへスキップ`],
-            [`评审第 ${reviewRound} 轮决策：跳到下一轮`],
-          ),
-          lang,
-        ),
+        summary: pickL(l([`Review round ${reviewRound} decision: skip to next round`]), lang),
         selected_options_json: JSON.stringify([
           {
             number: skipNumber,
@@ -225,15 +217,7 @@ export function handleReviewRoundDecisionReply(input: ReviewRoundReplyInput): bo
       project_id: resolvedProjectId,
       snapshot_hash: decisionSnapshotHash,
       event_type: "representative_pick",
-      summary: pickL(
-        l(
-          [`리뷰 라운드 ${reviewRound} 의사결정: 보완 항목 선택 ${pickedNumbers.length}건`],
-          [`Review round ${reviewRound} decision: ${pickedNumbers.length} remediation pick(s)`],
-          [`レビューラウンド${reviewRound}判断: 補完項目 ${pickedNumbers.length} 件を選択`],
-          [`评审第 ${reviewRound} 轮决策：已选择 ${pickedNumbers.length} 项补充整改`],
-        ),
-        lang,
-      ),
+      summary: pickL(l([`Review round ${reviewRound} decision: ${pickedNumbers.length} remediation pick(s)`]), lang),
       selected_options_json: pickedPayload.length > 0 ? JSON.stringify(pickedPayload) : null,
       note: extraNote ?? null,
       task_id: taskId,

@@ -11,7 +11,6 @@ interface CustomSkillModalProps {
   show: boolean;
   agents: Agent[];
   representatives: Array<{ provider: SkillLearnProvider; agent: Agent | null }>;
-  preferKoreanName: boolean;
   customSkillName: string;
   setCustomSkillName: (value: string) => void;
   customSkillContent: string;
@@ -31,7 +30,6 @@ export default function CustomSkillModal({
   show,
   agents,
   representatives,
-  preferKoreanName,
   customSkillName,
   setCustomSkillName,
   customSkillContent,
@@ -54,14 +52,11 @@ export default function CustomSkillModal({
           <div>
             <h3 className="text-base font-semibold text-white flex items-center gap-2">
               <Pencil size={14} strokeWidth={1.75} />
-              {t({ ko: "커스텀 스킬 추가", en: "Add Custom Skill", ja: "カスタムスキル追加", zh: "添加自定义技能" })}
+              {t({ en: "Add Custom Skill" })}
             </h3>
             <div className="mt-1 text-xs text-slate-400">
               {t({
-                ko: "skills.md 파일을 첨부하고 CLI 대표자를 선택하세요",
                 en: "Attach a skills.md file and select CLI representatives",
-                ja: "skills.md ファイルを添付し、CLI代表を選択してください",
-                zh: "附加 skills.md 文件并选择 CLI 代表",
               })}
             </div>
           </div>
@@ -70,48 +65,38 @@ export default function CustomSkillModal({
             disabled={customSkillSubmitting}
             className="rounded-lg border border-slate-600 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800 transition-all"
           >
-            {t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+            {t({ en: "Close" })}
           </button>
         </div>
 
         <div className="space-y-4 overflow-y-auto px-5 py-4 max-h-[calc(90vh-72px)]">
           <div>
-            <label className="block text-xs text-slate-400 mb-1.5">
-              {t({ ko: "스킬명", en: "Skill Name", ja: "スキル名", zh: "技能名称" })}
-            </label>
+            <label className="block text-xs text-slate-400 mb-1.5">{t({ en: "Skill Name" })}</label>
             <input
               type="text"
               value={customSkillName}
               onChange={(e) => setCustomSkillName(e.target.value)}
               placeholder={t({
-                ko: "예: my-custom-skill",
                 en: "e.g. my-custom-skill",
-                ja: "例: my-custom-skill",
-                zh: "例如: my-custom-skill",
               })}
               className="w-full bg-slate-900/60 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/25"
             />
             <div className="text-[10px] text-slate-500 mt-1">
               {t({
-                ko: "영문, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능",
                 en: "Only alphanumeric, dash (-), underscore (_) allowed",
-                ja: "英数字、ハイフン(-)、アンダースコア(_)のみ使用可能",
-                zh: "仅允许字母数字、短划线(-)或下划线(_)",
               })}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1.5">
-              {t({ ko: "skills.md 파일", en: "skills.md File", ja: "skills.md ファイル", zh: "skills.md 文件" })}
-            </label>
+            <label className="block text-xs text-slate-400 mb-1.5">{t({ en: "skills.md File" })}</label>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => customFileInputRef.current?.click()}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800/60 border border-slate-600/50 rounded-lg text-slate-300 hover:bg-slate-700/60 transition-all"
               >
                 <Paperclip size={14} strokeWidth={1.75} />
-                {t({ ko: "파일 선택", en: "Choose File", ja: "ファイル選択", zh: "选择文件" })}
+                {t({ en: "Choose File" })}
               </button>
               <input
                 ref={customFileInputRef}
@@ -137,21 +122,14 @@ export default function CustomSkillModal({
           <div>
             <label className="block text-xs text-slate-400 mb-1.5">
               {t({
-                ko: "학습시킬 CLI 대표자",
                 en: "CLI Representatives to Train",
-                ja: "学習させるCLI代表",
-                zh: "要培训的 CLI 代表",
               })}
             </label>
             <div className="grid grid-cols-2 gap-2">
               {representatives.map((row) => {
                 const isSelected = customSkillProviders.includes(row.provider);
                 const hasAgent = !!row.agent;
-                const displayName = row.agent
-                  ? preferKoreanName
-                    ? row.agent.name_ko || row.agent.name
-                    : row.agent.name || row.agent.name_ko
-                  : t({ ko: "없음", en: "None", ja: "なし", zh: "无" });
+                const displayName = row.agent ? row.agent.name : t({ en: "None" });
                 return (
                   <button
                     key={`custom-${row.provider}`}
@@ -197,7 +175,7 @@ export default function CustomSkillModal({
               disabled={customSkillSubmitting}
               className="px-3 py-1.5 rounded-lg text-xs border border-slate-600 text-slate-300 hover:bg-slate-800 transition-all"
             >
-              {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
+              {t({ en: "Cancel" })}
             </button>
             <button
               onClick={onSubmit}
@@ -216,12 +194,12 @@ export default function CustomSkillModal({
               {customSkillSubmitting ? (
                 <>
                   <span className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full" />
-                  {t({ ko: "등록중...", en: "Submitting...", ja: "登録中...", zh: "提交中..." })}
+                  {t({ en: "Submitting..." })}
                 </>
               ) : (
                 <>
                   <GraduationCap size={14} strokeWidth={1.75} />
-                  {t({ ko: "학습 시작", en: "Start Training", ja: "学習開始", zh: "开始培训" })}
+                  {t({ en: "Start Training" })}
                 </>
               )}
             </button>

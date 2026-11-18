@@ -228,29 +228,29 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export function categoryLabel(category: string, t: TFunction) {
   switch (category) {
     case "All":
-      return t({ ko: "전체", en: "All", ja: "すべて", zh: "全部" });
+      return t({ en: "All" });
     case "Frontend":
-      return t({ ko: "프론트엔드", en: "Frontend", ja: "フロントエンド", zh: "前端" });
+      return t({ en: "Frontend" });
     case "Backend":
-      return t({ ko: "백엔드", en: "Backend", ja: "バックエンド", zh: "后端" });
+      return t({ en: "Backend" });
     case "Design":
-      return t({ ko: "디자인", en: "Design", ja: "デザイン", zh: "设计" });
+      return t({ en: "Design" });
     case "AI & Agent":
-      return t({ ko: "AI & 에이전트", en: "AI & Agent", ja: "AI & エージェント", zh: "AI 与代理" });
+      return t({ en: "AI & Agent" });
     case "Marketing":
-      return t({ ko: "마케팅", en: "Marketing", ja: "マーケティング", zh: "营销" });
+      return t({ en: "Marketing" });
     case "Testing & QA":
-      return t({ ko: "테스트 & QA", en: "Testing & QA", ja: "テスト & QA", zh: "测试与 QA" });
+      return t({ en: "Testing & QA" });
     case "DevOps":
-      return t({ ko: "데브옵스", en: "DevOps", ja: "DevOps", zh: "DevOps" });
+      return t({ en: "DevOps" });
     case "Productivity":
-      return t({ ko: "생산성", en: "Productivity", ja: "生産性", zh: "效率" });
+      return t({ en: "Productivity" });
     case "Architecture":
-      return t({ ko: "아키텍처", en: "Architecture", ja: "アーキテクチャ", zh: "架构" });
+      return t({ en: "Architecture" });
     case "Security":
-      return t({ ko: "보안", en: "Security", ja: "セキュリティ", zh: "安全" });
+      return t({ en: "Security" });
     case "Other":
-      return t({ ko: "기타", en: "Other", ja: "その他", zh: "其他" });
+      return t({ en: "Other" });
     default:
       return category;
   }
@@ -278,10 +278,10 @@ export function formatFirstSeen(value: string, localeTag: string): string {
 
 export function localizeAuditStatus(status: string, t: TFunction): string {
   const normalized = status.toLowerCase();
-  if (normalized === "pass") return t({ ko: "통과", en: "Pass", ja: "合格", zh: "通过" });
-  if (normalized === "warn") return t({ ko: "경고", en: "Warn", ja: "警告", zh: "警告" });
-  if (normalized === "pending") return t({ ko: "대기", en: "Pending", ja: "保留", zh: "待处理" });
-  if (normalized === "fail") return t({ ko: "실패", en: "Fail", ja: "失敗", zh: "失败" });
+  if (normalized === "pass") return t({ en: "Pass" });
+  if (normalized === "warn") return t({ en: "Warn" });
+  if (normalized === "pending") return t({ en: "Pending" });
+  if (normalized === "fail") return t({ en: "Fail" });
   return status;
 }
 
@@ -307,11 +307,11 @@ const ROLE_ORDER: Record<AgentRole, number> = {
 };
 
 export function roleLabel(role: AgentRole, t: TFunction): string {
-  if (role === "vp") return t({ ko: "부사장", en: "Vice President", ja: "副社長", zh: "副总裁" });
-  if (role === "team_leader") return t({ ko: "팀장", en: "Team Lead", ja: "チームリード", zh: "团队负责人" });
-  if (role === "senior") return t({ ko: "시니어", en: "Senior", ja: "シニア", zh: "资深" });
-  if (role === "junior") return t({ ko: "주니어", en: "Junior", ja: "ジュニア", zh: "初级" });
-  return t({ ko: "인턴", en: "Intern", ja: "インターン", zh: "实习生" });
+  if (role === "vp") return t({ en: "Vice President" });
+  if (role === "team_leader") return t({ en: "Team Lead" });
+  if (role === "senior") return t({ en: "Senior" });
+  if (role === "junior") return t({ en: "Junior" });
+  return t({ en: "Intern" });
 }
 
 export function providerLabel(provider: SkillLearnProvider): string {
@@ -387,10 +387,10 @@ export function cliProviderIcon(provider: SkillHistoryProvider) {
 }
 
 export function learningStatusLabel(status: SkillLearnJob["status"] | null, t: TFunction): string {
-  if (status === "queued") return t({ ko: "대기중", en: "Queued", ja: "待機中", zh: "排队中" });
-  if (status === "running") return t({ ko: "학습중", en: "Running", ja: "学習中", zh: "学习中" });
-  if (status === "succeeded") return t({ ko: "완료", en: "Succeeded", ja: "完了", zh: "完成" });
-  if (status === "failed") return t({ ko: "실패", en: "Failed", ja: "失敗", zh: "失败" });
+  if (status === "queued") return t({ en: "Queued" });
+  if (status === "running") return t({ en: "Running" });
+  if (status === "succeeded") return t({ en: "Succeeded" });
+  if (status === "failed") return t({ en: "Failed" });
   return "-";
 }
 

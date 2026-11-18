@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Lang } from "../../../types/lang.ts";
 
 type L10n = Record<Lang, string[]>;
-type LocalizeFactory = (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
+type LocalizeFactory = (en: string[]) => L10n;
 type PickLocalized = (pool: L10n, lang: Lang) => string;
 
 export interface SubtaskRow {
@@ -26,18 +26,9 @@ interface TaskSubtaskProgressSummary {
   collaborationDone: number;
 }
 
-const REMEDIATION_SUBTASK_PREFIXES = [
-  "[보완계획]",
-  "[검토보완]",
-  "[Plan Item]",
-  "[Review Revision]",
-  "[補完計画]",
-  "[レビュー補完]",
-  "[计划项]",
-  "[评审整改]",
-];
+const REMEDIATION_SUBTASK_PREFIXES = ["[Plan Item]", "[Review Revision]"];
 
-const COLLABORATION_SUBTASK_PREFIXES = ["[협업]", "[Collaboration]", "[協業]", "[协作]"];
+const COLLABORATION_SUBTASK_PREFIXES = ["[Collaboration]"];
 
 interface InitializeSubtaskSummaryArgs {
   db: DatabaseSync;
@@ -95,28 +86,11 @@ export function initializeSubtaskSummary({ db, l, pickL }: InitializeSubtaskSumm
     if (summary.total === 0) return "";
 
     return pickL(
-      l(
-        [
-          `- 전체: ${summary.done}/${summary.total} 완료`,
-          `- 보완사항: ${summary.remediationDone}/${summary.remediationTotal} 완료`,
-          `- 협업사항: ${summary.collaborationDone}/${summary.collaborationTotal} 완료`,
-        ],
-        [
-          `- Overall: ${summary.done}/${summary.total} done`,
-          `- Remediation: ${summary.remediationDone}/${summary.remediationTotal} done`,
-          `- Collaboration: ${summary.collaborationDone}/${summary.collaborationTotal} done`,
-        ],
-        [
-          `- 全体: ${summary.done}/${summary.total} 完了`,
-          `- 補完事項: ${summary.remediationDone}/${summary.remediationTotal} 完了`,
-          `- 協業事項: ${summary.collaborationDone}/${summary.collaborationTotal} 完了`,
-        ],
-        [
-          `- 全部: ${summary.done}/${summary.total} 完成`,
-          `- 整改事项: ${summary.remediationDone}/${summary.remediationTotal} 完成`,
-          `- 协作事项: ${summary.collaborationDone}/${summary.collaborationTotal} 完成`,
-        ],
-      ),
+      l([
+        `- Overall: ${summary.done}/${summary.total} done`,
+        `- Remediation: ${summary.remediationDone}/${summary.remediationTotal} done`,
+        `- Collaboration: ${summary.collaborationDone}/${summary.collaborationTotal} done`,
+      ]),
       lang,
     );
   }

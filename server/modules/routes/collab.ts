@@ -252,28 +252,10 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
   }
 
   function buildMessengerReportIdentityIntro(agent: AgentRow, content: string, requestLine: string): string {
-    const hasKorean = /[가-힣]/.test(content);
-    const hasJapanese = /[ぁ-んァ-ン一-龯]/.test(content);
-    const hasChinese = /[\u4e00-\u9fff]/.test(content) && !hasJapanese;
-    const displayName = normalizeMessengerTextLine(agent.name_ko || agent.name || "Agent");
+    const displayName = normalizeMessengerTextLine(agent.name || "Agent");
     const avatar = normalizeMessengerTextLine(agent.avatar_emoji || "🤖");
     const taskTitle = extractTaskTitleFromReportText(content, requestLine);
 
-    if (hasKorean) {
-      return taskTitle
-        ? `${avatar} ${displayName} 보고: '${taskTitle}' 완료 결과를 전달드려요.`
-        : `${avatar} ${displayName} 보고: 완료 결과를 전달드려요.`;
-    }
-    if (hasJapanese) {
-      return taskTitle
-        ? `${avatar} ${displayName} から報告: '${taskTitle}' の完了結果を共有します。`
-        : `${avatar} ${displayName} から報告: 完了結果を共有します。`;
-    }
-    if (hasChinese) {
-      return taskTitle
-        ? `${avatar} ${displayName} 汇报：'${taskTitle}' 已完成，现发送结果。`
-        : `${avatar} ${displayName} 汇报：任务已完成，现发送结果。`;
-    }
     return taskTitle
       ? `${avatar} ${displayName} report: sharing completion result for '${taskTitle}'.`
       : `${avatar} ${displayName} report: sharing completion result.`;
@@ -283,24 +265,16 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     const shouldSummarize =
       /\|\s*#\s*\|/i.test(content) ||
       /\|\s*1\s*\|/.test(content) ||
-      /📋\s*(결과|Result|結果|结果)\s*:/i.test(content) ||
+      /📋\s*(Result)\s*:/i.test(content) ||
       content.length >= 900;
     if (!shouldSummarize) return content;
 
     const rawLines = content.split(/\r?\n/);
     const plainLines = rawLines.map((line) => normalizeMessengerTextLine(line));
 
-    const requestLine =
-      plainLines.find((line) =>
-        /(업무 완료 보고드립니다|reporting completion|完了をご報告します|汇报.+已完成)/i.test(line),
-      ) ?? "";
+    const requestLine = plainLines.find((line) => /(reporting completion)/i.test(line)) ?? "";
     const identityIntro = buildMessengerReportIdentityIntro(agent, content, requestLine);
-    const progressLine =
-      plainLines.find((line) =>
-        /(?:전체|total)\s*:\s*\d+\s*\/\s*\d+|(?:완료율|completion|progress|진행)\s*[:：]?\s*(?:\d+\s*%|\d+\s*\/\s*\d+)/i.test(
-          line,
-        ),
-      ) ?? "";
+    const progressLine = plainLines.find((line) => /(?:total)\s*:\s*\d+\s*\/\s*\d+/i.test(line)) ?? "";
 
     const tableItems: string[] = [];
     for (const line of rawLines) {
@@ -325,14 +299,14 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
       const rawLine = rawLines[i] ?? "";
       const plain = plainLines[i] ?? "";
       if (!inResultSection) {
-        if (/📋\s*(결과|Result|結果|结果)\s*:?/i.test(rawLine) || /^(결과|result|結果|结果)\s*:?$/i.test(plain)) {
+        if (/📋\s*(Result)\s*:?/i.test(rawLine) || /^(result)\s*:?$/i.test(plain)) {
           inResultSection = true;
         }
         continue;
       }
       if (!plain || plain === "...") continue;
       if (/^[📌📝]/u.test(rawLine.trim())) break;
-      if (/(보완\/협업 진행 요약|Remediation\/Collaboration Progress|変更点|변경사항|Changes)/i.test(plain)) break;
+      if (/(Remediation\/Collaboration Progress|Changes)/i.test(plain)) break;
       if (rawLine.trim().startsWith("|")) continue;
       const cleaned = plain.replace(/^[-•]\s*/, "").trim();
       if (!cleaned) continue;
@@ -343,11 +317,10 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     const keyItems = tableItems.length > 0 ? tableItems : resultItems.map((line, idx) => `${idx + 1}. ${line}`);
     if (keyItems.length <= 0) return content;
 
-    const hasKorean = /[가-힣]/.test(content);
-    const title = hasKorean ? "업무 완료 요약" : "Task Completion Summary";
-    const keyLabel = hasKorean ? "핵심 결과" : "Key Results";
-    const progressLabel = hasKorean ? "진행 요약" : "Progress";
-    const detailHint = hasKorean ? "상세 내용은 ATLAS 채팅창에서 확인하세요." : "See the ATLAS chat for full details.";
+    const title = "Task Completion Summary";
+    const keyLabel = "Key Results";
+    const progressLabel = "Progress";
+    const detailHint = "See the ATLAS chat for full details.";
 
     const out: string[] = [title, identityIntro];
     out.push(`${keyLabel}:`);
@@ -524,25 +497,19 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     const deptIds: string[] = [];
     const agentIds: string[] = [];
 
-    // Match @부서이름 patterns (both with and without 팀 suffix)
+    // Match @department mentions
     const depts = db.prepare("SELECT id, name, name_ko FROM departments").all() as {
       id: string;
       name: string;
       name_ko: string;
     }[];
     for (const dept of depts) {
-      const nameKo = dept.name_ko.replace("팀", "");
-      if (
-        message.includes(`@${dept.name_ko}`) ||
-        message.includes(`@${nameKo}`) ||
-        message.includes(`@${dept.name}`) ||
-        message.includes(`@${dept.id}`)
-      ) {
+      if (message.includes(`@${dept.name}`) || message.includes(`@${dept.id}`)) {
         deptIds.push(dept.id);
       }
     }
 
-    // Match @에이전트이름 patterns
+    // Match @agent mentions
     const agents = db.prepare("SELECT id, name, name_ko FROM agents").all() as {
       id: string;
       name: string;
@@ -562,24 +529,16 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     const crossLeader = findTeamLeader(targetDeptId);
     if (!crossLeader) return;
     const crossDeptName = getDeptName(targetDeptId);
-    const crossLeaderName = lang === "ko" ? crossLeader.name_ko || crossLeader.name : crossLeader.name;
-    const originLeaderName = lang === "ko" ? originLeader.name_ko || originLeader.name : originLeader.name;
+    const crossLeaderName = crossLeader.name;
+    const originLeaderName = originLeader.name;
     const taskTitle = ceoMessage.length > 60 ? ceoMessage.slice(0, 57) + "..." : ceoMessage;
 
     // Origin team leader sends mention request to target team leader
     const mentionReq = pickL(
-      l(
-        [
-          `${crossLeaderName}님! 대표님 지시입니다: "${taskTitle}" — ${crossDeptName}에서 처리 부탁드립니다! 🏷️`,
-          `${crossLeaderName}님, 대표님이 직접 요청하셨습니다. "${taskTitle}" 건, ${crossDeptName} 담당으로 진행해주세요!`,
-        ],
-        [
-          `${crossLeaderName}! CEO directive for ${crossDeptName}: "${taskTitle}" — please handle this! 🏷️`,
-          `${crossLeaderName}, CEO requested this for your team: "${taskTitle}"`,
-        ],
-        [`${crossLeaderName}さん！CEO指示です："${taskTitle}" — ${crossDeptName}で対応お願いします！🏷️`],
-        [`${crossLeaderName}，CEO指示："${taskTitle}" — 请${crossDeptName}处理！🏷️`],
-      ),
+      l([
+        `${crossLeaderName}! CEO directive for ${crossDeptName}: "${taskTitle}" — please handle this! 🏷️`,
+        `${crossLeaderName}, CEO requested this for your team: "${taskTitle}"`,
+      ]),
       lang,
     );
     sendAgentMessage(originLeader, mentionReq, "task_assign", "agent", crossLeader.id, null);
@@ -604,7 +563,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     excludeId: string,
     candidateAgentIds?: string[] | null,
   ): AgentRow | null {
-    // candidateAgentIds가 지정되면 해당 목록에서만 선택 (manual 모드, 부서 고정)
+    // With candidateAgentIds, pick only from that list (manual mode, fixed department)
     if (Array.isArray(candidateAgentIds)) {
       if (candidateAgentIds.length === 0) {
         return null;
@@ -619,7 +578,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
         .all(...candidateAgentIds, deptId, excludeId) as unknown as AgentRow[];
       return agents[0] ?? null;
     }
-    // 기존 로직: 부서 전체에서 선택
+    // Default: pick from the whole department
     const agents = db
       .prepare(
         `SELECT * FROM agents WHERE department_id = ? AND id != ? AND role NOT IN ('vp','team_leader') ORDER BY
@@ -734,9 +693,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     const lang = getPreferredLanguage();
     const scoped = getDepartment(db as any, deptId);
     if (!scoped) return deptId;
-    if (lang === "ko") return scoped.name_ko || scoped.name || deptId;
-    if (lang === "ja") return scoped.name_ja || scoped.name || scoped.name_ko || deptId;
-    if (lang === "zh") return scoped.name_zh || scoped.name || scoped.name_ko || deptId;
+
     return scoped.name || scoped.name_ko || deptId;
   }
 

@@ -116,7 +116,7 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
       department_id: taskMeta?.department_id ?? fallbackDeptId ?? null,
     });
 
-    // 프로젝트 manual 모드 확인 — 지정 직원의 부서 팀장만 참석
+    // Project manual mode: only the leads of the chosen staff's departments attend
     if (taskMeta?.project_id) {
       const proj = db.prepare("SELECT assignment_mode FROM projects WHERE id = ?").get(taskMeta.project_id) as
         | { assignment_mode: string }
@@ -145,7 +145,7 @@ export function createMeetingLeaderSelectionTools(deps: LeaderSelectionDeps) {
         }
 
         if (includePlanning) {
-          // 기획팀장은 항상 포함
+          // The planning lead is always included
           const planningLeader = findTeamLeader("planning", constrainedAgentIds) ?? findTeamLeader("planning", null);
           if (planningLeader && !seen.has(planningLeader.id)) {
             leaders.unshift(planningLeader);

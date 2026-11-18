@@ -99,7 +99,6 @@ export function normalizeNewProjectNameInput(text: string): string | null {
   if (!value) return null;
 
   value = value
-    .replace(/^(프로젝트\s*)?(이름|명)\s*[:-]?\s*/i, "")
     .replace(/^(project\s*)?name\s*[:-]?\s*/i, "")
     .replace(/^(name)\s*[:-]?\s*/i, "")
     .trim();
@@ -112,7 +111,7 @@ export function normalizeNewProjectNameInput(text: string): string | null {
 
   value = value.replace(/["']/g, "").replace(/\s+/g, " ").trim();
   if (!value) return null;
-  if (/^(신규|new|새(로운)?\s*프로젝트|project|프로젝트)$/i.test(value)) return null;
+  if (/^(new|project)$/i.test(value)) return null;
   return value.slice(0, 80);
 }
 
@@ -123,8 +122,6 @@ function parseProjectKindFromModelOutput(text: string): "existing" | "new" | nul
   if (/\bEXISTING\b/.test(upper)) return "existing";
   if (/\bNEW\b/.test(upper)) return "new";
 
-  if (/(기존|既存|已有)/.test(normalized)) return "existing";
-  if (/(신규|새 프로젝트|새로|新規|新项目|新しい)/.test(normalized)) return "new";
   return detectProjectKindChoice(normalized);
 }
 
@@ -134,14 +131,7 @@ export async function inferProjectKindWithModel(
   lang: Lang,
   userReply: string,
 ): Promise<"existing" | "new" | null> {
-  const localeInstruction =
-    lang === "en"
-      ? "Respond in English."
-      : lang === "ja"
-        ? "Respond in Japanese."
-        : lang === "zh"
-          ? "Respond in Chinese."
-          : "Respond in Korean.";
+  const localeInstruction = "Respond in English.";
 
   const prompt = [
     "[Project Kind Classifier]",
@@ -199,24 +189,15 @@ export function loadRecentExistingProjects(
 }
 
 function latestProjectMarker(lang: Lang): string {
-  if (lang === "en") return " [LATEST]";
-  if (lang === "ja") return " [最新]";
-  if (lang === "zh") return " [最新]";
-  return " [최신]";
+  return " [LATEST]";
 }
 
 function projectPathLabel(lang: Lang): string {
-  if (lang === "en") return "Path";
-  if (lang === "ja") return "パス";
-  if (lang === "zh") return "路径";
-  return "경로";
+  return "Path";
 }
 
 function projectNameLabel(lang: Lang): string {
-  if (lang === "en") return "Name";
-  if (lang === "ja") return "名前";
-  if (lang === "zh") return "名称";
-  return "이름";
+  return "Name";
 }
 
 function resolveExistingProjectDisplayName(
@@ -274,7 +255,7 @@ function extractNumberSelection(text: string): number | null {
   if (/3️⃣/.test(trimmed) || compact === "3") return 3;
   if (/4️⃣/.test(trimmed) || compact === "4") return 4;
   if (/5️⃣/.test(trimmed) || compact === "5") return 5;
-  const numeric = normalized.match(/(?:^|\s)([1-9])(?:번|번째)?(?:으로|로)?(?:\s|$)/);
+  const numeric = normalized.match(/(?:^|\s)([1-9])(?:\s|$)/);
   if (!numeric?.[1]) return null;
   const value = Number.parseInt(numeric[1], 10);
   return Number.isFinite(value) ? value : null;
@@ -340,7 +321,7 @@ function extractProjectNameCandidates(text: string): string[] {
     if (!rawValue) return;
     const cleaned = normalizeLooseProjectName(rawValue);
     if (!cleaned || cleaned.length < 2 || cleaned.length > 80) return;
-    if (/^(기존|신규|새|project|프로젝트|name)$/i.test(cleaned)) return;
+    if (/^(project|name)$/i.test(cleaned)) return;
     const key = cleaned.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
@@ -348,7 +329,7 @@ function extractProjectNameCandidates(text: string): string[] {
   };
 
   for (const match of text.matchAll(
-    /(?:프로젝트\s*(?:이름|명)?|project\s*name|name)\s*[:=]?\s*["'`]?([A-Za-z0-9][A-Za-z0-9._-]{1,79})["'`]?/gi,
+    /(?:project\s*name|name)\s*[:=]?\s*["'`]?([A-Za-z0-9][A-Za-z0-9._-]{1,79})["'`]?/gi,
   )) {
     add(match[1]);
   }

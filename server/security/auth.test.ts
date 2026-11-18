@@ -53,7 +53,7 @@ function mockRequest(headers: Record<string, string | undefined>): Request {
 }
 
 describe("auth helpers", () => {
-  it("loopback 판별이 정확하다", () => {
+  it("detects loopback addresses correctly", () => {
     expect(isLoopbackHostname("localhost")).toBe(true);
     expect(isLoopbackHostname("127.0.0.1")).toBe(true);
     expect(isLoopbackHostname("example.com")).toBe(false);
@@ -66,7 +66,7 @@ describe("auth helpers", () => {
     expect(isLoopbackRequest({ socket: { remoteAddress: "10.1.2.3" } })).toBe(false);
   });
 
-  it("쿠키/토큰 파싱과 인증 판별이 동작한다", () => {
+  it("parses cookies and tokens and checks auth", () => {
     const reqWithBearer = mockRequest({
       authorization: `Bearer ${SESSION_AUTH_TOKEN}`,
     });
@@ -89,11 +89,11 @@ describe("auth helpers", () => {
     expect(parsed).toMatchObject({
       a: "1",
       b: "hello world",
-      c: "あ",
+      c: "\u3042",
     });
   });
 
-  it("origin/path/secure-cookie 규칙을 판별한다", () => {
+  it("applies the origin, path and secure-cookie rules", () => {
     expect(isTrustedOrigin("http://localhost:8800")).toBe(true);
     expect(isTrustedOrigin("https://dev.ts.net")).toBe(true);
     expect(isTrustedOrigin("file://tmp/test")).toBe(false);
@@ -160,7 +160,7 @@ describe("auth helpers", () => {
     expect(verifySessionToken(createSessionToken("password"))).not.toBeNull();
   });
 
-  it("IncomingMessage 인증/원본 판별이 동작한다", () => {
+  it("checks auth and origin on an IncomingMessage", () => {
     const incoming = {
       headers: {
         authorization: `Bearer ${SESSION_AUTH_TOKEN}`,
@@ -175,13 +175,13 @@ describe("auth helpers", () => {
     expect(isIncomingMessageOriginTrusted(incoming)).toBe(true);
   });
 
-  it("safeSecretEquals는 값이 같을 때만 true다", () => {
+  it("safeSecretEquals is true only for equal values", () => {
     expect(safeSecretEquals("abc123", "abc123")).toBe(true);
     expect(safeSecretEquals("abc123", "abc124")).toBe(false);
     expect(safeSecretEquals("short", "much-longer")).toBe(false);
   });
 
-  it("csrf / task-interrupt 제어 토큰 검증이 동작한다", () => {
+  it("validates csrf and task-interrupt control tokens", () => {
     const csrf = getCsrfToken();
     const req = {
       ...mockRequest({
@@ -336,7 +336,7 @@ describe("installSecurityMiddleware", () => {
     expect(bearerRes.headers["set-cookie"]?.[0]).toContain(`${SESSION_COOKIE_NAME}=`);
   });
 
-  it("세션 발급 후 보호 API 접근을 허용한다", async () => {
+  it("allows protected API access after a session is issued", async () => {
     const app = express();
     installSecurityMiddleware(app);
     app.get("/api/protected", (_req, res) => {

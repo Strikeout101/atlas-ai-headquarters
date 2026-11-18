@@ -312,7 +312,7 @@ function createDeps(seed?: {
     broadcast: vi.fn(),
     notifyCeo,
     pickL: (bundle: any, lang: string) => bundle[lang] ?? bundle.en ?? bundle.ko,
-    l: (ko: string[], en: string[], ja: string[], zh: string[]) => ({ ko, en, ja, zh }),
+    l: (en: string[]) => ({ en }),
     stopRequestedTasks,
     stopRequestModeByTask,
     interruptPidTree,
@@ -361,7 +361,7 @@ describe("registerTaskExecutionControlRoutes", () => {
     vi.useRealTimers();
   });
 
-  it("pause 요청 시 active pid에 interrupt를 보내고 pending으로 전환한다", () => {
+  it("pause interrupts the active pid and moves the task to pending", () => {
     const harness = createDeps({ activePid: 4321 });
     registerTaskExecutionControlRoutes(harness.deps);
 
@@ -413,7 +413,7 @@ describe("registerTaskExecutionControlRoutes", () => {
     );
   });
 
-  it("cancel 요청 시 kill과 rollback/정리를 수행한다", () => {
+  it("cancel kills the process and rolls back and cleans up", () => {
     const harness = createDeps({ activePid: 9876 });
     registerTaskExecutionControlRoutes(harness.deps);
 
@@ -445,7 +445,7 @@ describe("registerTaskExecutionControlRoutes", () => {
     expect(harness.spies.endTaskExecutionSession).toHaveBeenCalledWith("task-1", "stop_cancelled");
   });
 
-  it("pending 상태 재개 시 auto resume을 예약하고 기존 session_id를 반환한다", () => {
+  it("resuming from pending schedules an auto resume and returns the existing session_id", () => {
     vi.useFakeTimers();
     const harness = createDeps({
       task: { status: "pending" },
@@ -490,7 +490,7 @@ describe("registerTaskExecutionControlRoutes", () => {
     );
   });
 
-  it("pause -> inject -> resume 통합 흐름이 순차 처리된다", () => {
+  it("pause -> inject -> resume runs in order", () => {
     vi.useFakeTimers();
     const sessionId = "session-qa-inject";
     const harness = createDeps({ activePid: 5678, sessionId, agent: { status: "idle" } });

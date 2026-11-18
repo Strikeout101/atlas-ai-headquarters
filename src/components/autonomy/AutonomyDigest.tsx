@@ -44,14 +44,12 @@ export default function AutonomyDigest() {
   if (!digest?.events.length && !failed) return null;
   return (
     <section
-      aria-label={t({ ko: "자리를 비운 동안", en: "While you were away", ja: "不在中の動き", zh: "您离开期间" })}
+      aria-label={t({ en: "While you were away" })}
       className="rounded-xl border p-5"
       style={{ borderColor: "var(--th-border)", background: "var(--th-card-bg)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">
-          {t({ ko: "자리를 비운 동안", en: "While you were away", ja: "不在中の動き", zh: "您离开期间" })}
-        </h3>
+        <h3 className="text-sm font-semibold">{t({ en: "While you were away" })}</h3>
         {!!digest?.events.length && (
           <button
             type="button"
@@ -67,20 +65,17 @@ export default function AutonomyDigest() {
               setDigest({ events: [], counts: {} });
             }}
           >
-            {t({ ko: "읽음으로 표시", en: "Mark read", ja: "既読にする", zh: "标为已读" })}
+            {t({ en: "Mark read" })}
           </button>
         )}
       </div>
       {failed && (
         <p role="alert" className="mt-3 text-sm">
           {t({
-            ko: "활동을 불러오지 못했습니다.",
             en: "Could not load autonomy activity.",
-            ja: "活動を読み込めませんでした。",
-            zh: "无法加载自主活动。",
           })}{" "}
           <button type="button" onClick={() => void refresh()} className="underline">
-            {t({ ko: "다시 시도", en: "Retry", ja: "再試行", zh: "重试" })}
+            {t({ en: "Retry" })}
           </button>
         </p>
       )}
@@ -108,10 +103,7 @@ export default function AutonomyDigest() {
           {digest.events.length > 6 && (
             <p className="mt-2 text-xs">
               {t({
-                ko: "전체 활동은 자율 운영에서 확인하세요.",
                 en: "See Autonomy for the full activity log.",
-                ja: "全活動は自律運用で確認できます。",
-                zh: "在自主运行中查看完整活动记录。",
               })}
             </p>
           )}

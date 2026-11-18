@@ -200,14 +200,14 @@ function resolveProjectProgressTarget(
 
 function resolveProgressStatusLabel(status: string, lang: Lang): string {
   const labels: Record<string, Record<Lang, string>> = {
-    inbox: { ko: "접수", en: "Inbox", ja: "受信", zh: "收件" },
-    planned: { ko: "계획", en: "Planned", ja: "計画", zh: "计划" },
-    collaborating: { ko: "협업", en: "Collaborating", ja: "協業", zh: "协作" },
-    in_progress: { ko: "진행", en: "In Progress", ja: "進行中", zh: "进行中" },
-    review: { ko: "검토", en: "Review", ja: "レビュー", zh: "评审" },
-    pending: { ko: "보류", en: "Pending", ja: "保留", zh: "待处理" },
-    done: { ko: "완료", en: "Done", ja: "完了", zh: "完成" },
-    cancelled: { ko: "취소", en: "Cancelled", ja: "取消", zh: "取消" },
+    inbox: { en: "Inbox" },
+    planned: { en: "Planned" },
+    collaborating: { en: "Collaborating" },
+    in_progress: { en: "In Progress" },
+    review: { en: "Review" },
+    pending: { en: "Pending" },
+    done: { en: "Done" },
+    cancelled: { en: "Cancelled" },
   };
   return labels[status]?.[lang] ?? status;
 }
@@ -302,16 +302,9 @@ export function buildProjectProgressSummary(
       lang,
       projectFound: false,
       content: deps.pickL(
-        deps.l(
-          [
-            "진행 현황을 조회할 프로젝트를 아직 찾지 못했습니다. 프로젝트 이름이나 경로를 함께 알려주시면 바로 확인하겠습니다.",
-          ],
-          [
-            "I couldn't identify which project to inspect yet. Share the project name or path and I'll check immediately.",
-          ],
-          ["進捗を確認する対象プロジェクトが見つかりません。プロジェクト名またはパスを送ってください。"],
-          ["还没找到要查询的项目。请提供项目名称或路径，我马上确认。"],
-        ),
+        deps.l([
+          "I couldn't identify which project to inspect yet. Share the project name or path and I'll check immediately.",
+        ]),
         lang,
       ),
     };
@@ -319,23 +312,12 @@ export function buildProjectProgressSummary(
 
   const rows = loadProjectProgressTasks(deps, target);
   const projectName =
-    target.projectName ||
-    target.projectPath ||
-    target.projectId ||
-    deps.pickL(deps.l(["(미지정)"], ["(unknown)"]), lang);
+    target.projectName || target.projectPath || target.projectId || deps.pickL(deps.l(["(unknown)"]), lang);
   if (rows.length === 0) {
     return {
       lang,
       projectFound: true,
-      content: deps.pickL(
-        deps.l(
-          [`프로젝트 '${projectName}'에 등록된 태스크가 아직 없습니다.`],
-          [`There are no tasks registered yet for project '${projectName}'.`],
-          [`プロジェクト '${projectName}' にはまだ登録されたタスクがありません。`],
-          [`项目 '${projectName}' 目前还没有已登记任务。`],
-        ),
-        lang,
-      ),
+      content: deps.pickL(deps.l([`There are no tasks registered yet for project '${projectName}'.`]), lang),
     };
   }
 
@@ -353,47 +335,23 @@ export function buildProjectProgressSummary(
     .filter((entry) => entry.count > 0)
     .map((entry) => {
       const label = resolveProgressStatusLabel(entry.status, lang);
-      if (lang === "ko") return `${label} ${entry.count}건`;
-      if (lang === "ja") return `${label} ${entry.count}件`;
-      if (lang === "zh") return `${label} ${entry.count}项`;
+
       return `${label} ${entry.count}`;
     })
-    .join(lang === "ko" || lang === "ja" || lang === "zh" ? " / " : ", ");
+    .join(", ");
 
   const recentRows = rows.slice(0, 5);
   const recentLines = recentRows.map((row, index) => {
     const statusLabel = resolveProgressStatusLabel(row.status, lang);
-    const assignee =
-      lang === "ko"
-        ? deps.normalizeTextField(row.assignee_name_ko) || deps.normalizeTextField(row.assignee_name)
-        : deps.normalizeTextField(row.assignee_name);
-    if (lang === "ko") {
-      return `${index + 1}. [${statusLabel}] ${row.title}${assignee ? ` · 담당: ${assignee}` : ""}`;
-    }
-    if (lang === "ja") {
-      return `${index + 1}. [${statusLabel}] ${row.title}${assignee ? ` · 担当: ${assignee}` : ""}`;
-    }
-    if (lang === "zh") {
-      return `${index + 1}. [${statusLabel}] ${row.title}${assignee ? ` · 负责人: ${assignee}` : ""}`;
-    }
+    const assignee = deps.normalizeTextField(row.assignee_name);
+
     return `${index + 1}. [${statusLabel}] ${row.title}${assignee ? ` · owner: ${assignee}` : ""}`;
   });
 
   const header = deps.pickL(
-    deps.l(
-      [
-        `프로젝트 진행 현황입니다.\n- 프로젝트: ${projectName}\n- 전체: ${total}건 / 완료율: ${completionRate}%\n- 상태: ${statusSummary}\n\n최근 업데이트:\n${recentLines.join("\n")}`,
-      ],
-      [
-        `Here is the current project progress.\n- Project: ${projectName}\n- Total: ${total} / Completion: ${completionRate}%\n- Status: ${statusSummary}\n\nRecent updates:\n${recentLines.join("\n")}`,
-      ],
-      [
-        `現在のプロジェクト進捗です。\n- プロジェクト: ${projectName}\n- 全体: ${total}件 / 完了率: ${completionRate}%\n- 状態: ${statusSummary}\n\n最近の更新:\n${recentLines.join("\n")}`,
-      ],
-      [
-        `当前项目进度如下。\n- 项目: ${projectName}\n- 总计: ${total}项 / 完成率: ${completionRate}%\n- 状态: ${statusSummary}\n\n最近更新:\n${recentLines.join("\n")}`,
-      ],
-    ),
+    deps.l([
+      `Here is the current project progress.\n- Project: ${projectName}\n- Total: ${total} / Completion: ${completionRate}%\n- Status: ${statusSummary}\n\nRecent updates:\n${recentLines.join("\n")}`,
+    ]),
     lang,
   );
 
@@ -422,15 +380,7 @@ export function sendProjectProgressReply(
     return;
   }
 
-  const leadFallback = deps.pickL(
-    deps.l(
-      ["네 대표님, 현재 프로젝트 진행 현황 정리했습니다."],
-      ["Got it. Here's the current project progress summary."],
-      ["了解しました。現在のプロジェクト進捗をまとめました。"],
-      ["收到，以下是当前项目进度汇总。"],
-    ),
-    summary.lang,
-  );
+  const leadFallback = deps.pickL(deps.l(["Got it. Here's the current project progress summary."]), summary.lang);
 
   void (async () => {
     const lead = await deps.composeInCharacterAutoMessage(

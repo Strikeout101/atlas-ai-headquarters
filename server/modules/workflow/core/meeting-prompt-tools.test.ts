@@ -6,7 +6,7 @@ function createAgent(overrides: Partial<AgentRow> = {}): AgentRow {
   return {
     id: "agent-1",
     name: "DORO",
-    name_ko: "도로롱",
+    name_ko: "",
     role: "junior",
     personality: null,
     status: "idle",
@@ -42,7 +42,7 @@ describe("buildDirectReplyPrompt", () => {
   it("includes character persona block when personality exists", () => {
     const tools = createTools();
     const agent = createAgent({
-      personality: "Playful design specialist. Call CEO '대표님' and keep warm expressive tone.",
+      personality: "Playful design specialist. Call the CEO 'boss' and keep a warm, expressive tone.",
     });
     const built = tools.buildDirectReplyPrompt(agent, "Can you help me now?", "chat");
     expect(built.prompt).toContain("[Character Persona - Highest Priority]");
@@ -62,30 +62,30 @@ describe("buildDirectReplyPrompt", () => {
 
 describe("buildMeetingPrompt", () => {
   it("names the agent's department in the prompt", () => {
-    const getDeptName = vi.fn(() => "씬 엔진팀");
+    const getDeptName = vi.fn(() => "Scene Engine Team");
     const tools = createMeetingPromptTools({
       getDeptName,
       getDeptRoleConstraint: () => "",
-      getRoleLabel: () => "팀장",
+      getRoleLabel: () => "Team Lead",
       getRecentConversationContext: () => "",
-      getAgentDisplayName: (agent) => agent.name_ko,
+      getAgentDisplayName: (agent) => agent.name,
       formatMeetingTranscript: () => "",
       compactTaskDescriptionForMeeting: () => "",
-      normalizeMeetingLang: () => "ko",
-      localeInstruction: () => "한국어로 응답하세요.",
-      resolveLang: () => "ko",
+      normalizeMeetingLang: () => "en",
+      localeInstruction: () => "Reply in English.",
+      resolveLang: () => "en",
     });
     const prompt = tools.buildMeetingPrompt(createAgent({ department_id: "dev", role: "team_leader" }), {
       meetingType: "planned",
       round: 1,
-      taskTitle: "기능 개발",
-      taskDescription: "킥오프",
+      taskTitle: "Feature work",
+      taskDescription: "Kickoff",
       transcript: [],
-      turnObjective: "킥오프",
-      lang: "ko",
+      turnObjective: "Kickoff",
+      lang: "en",
     });
     expect(getDeptName).toHaveBeenCalledWith("dev");
-    expect(prompt).toContain("씬 엔진팀");
+    expect(prompt).toContain("Scene Engine Team");
     expect(prompt).not.toContain("Remotion");
   });
 });

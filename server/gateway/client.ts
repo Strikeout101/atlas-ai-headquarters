@@ -24,7 +24,7 @@ const execFileAsync = promisify(execFile);
 const wakeDebounce = new Map<string, number>();
 let cachedMessengerConfig: { loadedAt: number; value: MessengerRuntimeConfig } | null = null;
 
-type GatewayLang = "ko" | "en" | "ja" | "zh";
+type GatewayLang = "en";
 export type { MessengerChannel };
 
 type PersistedSession = {
@@ -927,41 +927,19 @@ function queueWake(params: { key: string; text: string; debounceMs?: number }) {
   });
 }
 
-function detectGatewayLang(text: string): GatewayLang {
-  const ko = text.match(/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/g)?.length ?? 0;
-  const ja = text.match(/[\u3040-\u309F\u30A0-\u30FF]/g)?.length ?? 0;
-  const zh = text.match(/[\u4E00-\u9FFF]/g)?.length ?? 0;
-  const total = text.replace(/\s/g, "").length || 1;
-  if (ko / total > 0.15) return "ko";
-  if (ja / total > 0.15) return "ja";
-  if (zh / total > 0.3) return "zh";
-  return "en";
-}
-
-function normalizeGatewayLang(lang: string | null | undefined, title: string): GatewayLang {
-  if (lang === "ko" || lang === "en" || lang === "ja" || lang === "zh") return lang;
-  if (title.trim()) return detectGatewayLang(title);
+function normalizeGatewayLang(_lang: string | null | undefined, _title: string): GatewayLang {
   return "en";
 }
 
 function resolveStatusLabel(status: string, lang: GatewayLang): string {
   if (status === "in_progress") {
-    if (lang === "en") return "Started";
-    if (lang === "ja") return "開始";
-    if (lang === "zh") return "开始";
-    return "진행 시작";
+    return "Started";
   }
   if (status === "review") {
-    if (lang === "en") return "In Review";
-    if (lang === "ja") return "レビュー中";
-    if (lang === "zh") return "审核中";
-    return "검토 중";
+    return "In Review";
   }
   if (status === "done") {
-    if (lang === "en") return "Completed";
-    if (lang === "ja") return "完了";
-    if (lang === "zh") return "完成";
-    return "완료";
+    return "Completed";
   }
   return status;
 }

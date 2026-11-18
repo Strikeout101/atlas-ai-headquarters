@@ -29,8 +29,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
     Promise.allSettled([getTaskDiff(taskId), getTaskVerifyCommit(taskId)]).then(([diffResult, verifyResult]) => {
       if (diffResult.status === "fulfilled") {
         const d = diffResult.value;
-        if (!d.ok)
-          setError(d.error || t({ ko: "알 수 없는 오류", en: "Unknown error", ja: "不明なエラー", zh: "未知错误" }));
+        if (!d.ok) setError(d.error || t({ en: "Unknown error" }));
         else setDiffData(d);
       } else {
         setError(diffResult.reason instanceof Error ? diffResult.reason.message : String(diffResult.reason));
@@ -38,8 +37,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
 
       if (verifyResult.status === "fulfilled") {
         const v = verifyResult.value;
-        if (!v.ok)
-          setVerifyError(v.error || t({ ko: "검증 실패", en: "Verification failed", ja: "検証失敗", zh: "校验失败" }));
+        if (!v.ok) setVerifyError(v.error || t({ en: "Verification failed" }));
         else setVerifyData(v);
       } else {
         setVerifyError(
@@ -63,10 +61,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
     if (
       !confirm(
         t({
-          ko: "이 브랜치를 메인에 병합하시겠습니까?",
           en: "Merge this branch into main?",
-          ja: "このブランチを main にマージしますか？",
-          zh: "要将此分支合并到 main 吗？",
         }),
       )
     )
@@ -76,14 +71,12 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
       const result = await mergeTask(taskId);
       setActionResult(
         result.ok
-          ? `${t({ ko: "병합 완료", en: "Merge completed", ja: "マージ完了", zh: "合并完成" })}: ${result.message}`
-          : `${t({ ko: "병합 실패", en: "Merge failed", ja: "マージ失敗", zh: "合并失败" })}: ${result.message}`,
+          ? `${t({ en: "Merge completed" })}: ${result.message}`
+          : `${t({ en: "Merge failed" })}: ${result.message}`,
       );
       if (result.ok) setTimeout(onClose, 1500);
     } catch (e: unknown) {
-      setActionResult(
-        `${t({ ko: "오류", en: "Error", ja: "エラー", zh: "错误" })}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      setActionResult(`${t({ en: "Error" })}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setMerging(false);
     }
@@ -93,10 +86,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
     if (
       !confirm(
         t({
-          ko: "이 브랜치의 변경사항을 모두 폐기하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
           en: "Discard all changes in this branch? This action cannot be undone.",
-          ja: "このブランチの変更をすべて破棄しますか？この操作は元に戻せません。",
-          zh: "要丢弃此分支的所有更改吗？此操作无法撤销。",
         }),
       )
     )
@@ -107,18 +97,13 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
       setActionResult(
         result.ok
           ? t({
-              ko: "브랜치가 폐기되었습니다.",
               en: "Branch was discarded.",
-              ja: "ブランチを破棄しました。",
-              zh: "分支已丢弃。",
             })
-          : `${t({ ko: "폐기 실패", en: "Discard failed", ja: "破棄失敗", zh: "丢弃失败" })}: ${result.message}`,
+          : `${t({ en: "Discard failed" })}: ${result.message}`,
       );
       if (result.ok) setTimeout(onClose, 1500);
     } catch (e: unknown) {
-      setActionResult(
-        `${t({ ko: "오류", en: "Error", ja: "エラー", zh: "错误" })}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      setActionResult(`${t({ en: "Error" })}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setDiscarding(false);
     }
@@ -134,27 +119,24 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
   const verifyVerdictLabel = (() => {
     switch (verifyData?.verdict) {
       case "ok":
-        return t({ ko: "통과", en: "Passed", ja: "成功", zh: "通过" });
+        return t({ en: "Passed" });
       case "dirty_without_commit":
-        return t({ ko: "미커밋 변경", en: "Uncommitted changes", ja: "未コミット変更", zh: "未提交变更" });
+        return t({ en: "Uncommitted changes" });
       case "commit_but_no_code":
-        return t({ ko: "코드 외 변경", en: "No code changes", ja: "コード変更なし", zh: "无代码变更" });
+        return t({ en: "No code changes" });
       case "no_commit":
-        return t({ ko: "커밋 없음", en: "No commit", ja: "コミットなし", zh: "无提交" });
+        return t({ en: "No commit" });
       case "no_worktree":
-        return t({ ko: "워크트리 없음", en: "No worktree", ja: "ワークツリーなし", zh: "无工作树" });
+        return t({ en: "No worktree" });
       default:
-        return t({ ko: "확인 불가", en: "Unknown", ja: "不明", zh: "未知" });
+        return t({ en: "Unknown" });
     }
   })();
 
   const commitLabel =
     verifyData && typeof verifyData.commitCount === "number"
       ? t({
-          ko: `${verifyData.commitCount}개 커밋`,
           en: `${verifyData.commitCount} commit${verifyData.commitCount === 1 ? "" : "s"}`,
-          ja: `${verifyData.commitCount}件のコミット`,
-          zh: `${verifyData.commitCount} 个提交`,
         })
       : null;
 
@@ -167,9 +149,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700 px-5 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-white">
-              {t({ ko: "Git 변경사항", en: "Git Diff", ja: "Git 差分", zh: "Git 差异" })}
-            </span>
+            <span className="text-lg font-bold text-white">{t({ en: "Git Diff" })}</span>
             {diffData?.branchName && (
               <span className="rounded-full bg-purple-900 px-2.5 py-0.5 text-xs text-purple-300">
                 {diffData.branchName}
@@ -182,19 +162,19 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
               disabled={merging || discarding || !diffData?.hasWorktree}
               className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-green-600 disabled:opacity-40"
             >
-              {merging ? "..." : t({ ko: "병합", en: "Merge", ja: "マージ", zh: "合并" })}
+              {merging ? "..." : t({ en: "Merge" })}
             </button>
             <button
               onClick={handleDiscard}
               disabled={merging || discarding || !diffData?.hasWorktree}
               className="rounded-lg bg-red-800 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-40"
             >
-              {discarding ? "..." : t({ ko: "폐기", en: "Discard", ja: "破棄", zh: "丢弃" })}
+              {discarding ? "..." : t({ en: "Discard" })}
             </button>
             <button
               onClick={onClose}
               className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-              title={t({ ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" })}
+              title={t({ en: "Close" })}
             >
               X
             </button>
@@ -211,23 +191,17 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
           {loading ? (
             <div className="flex items-center justify-center py-12 text-slate-400">
               {t({
-                ko: "변경사항 불러오는 중...",
                 en: "Loading diff...",
-                ja: "差分を読み込み中...",
-                zh: "正在加载差异...",
               })}
             </div>
           ) : error ? (
             <div className="flex items-center justify-center py-12 text-red-400">
-              {t({ ko: "오류", en: "Error", ja: "エラー", zh: "错误" })}: {error}
+              {t({ en: "Error" })}: {error}
             </div>
           ) : !diffData?.hasWorktree ? (
             <div className="flex items-center justify-center py-12 text-slate-500">
               {t({
-                ko: "이 작업의 워크트리를 찾을 수 없습니다. (Git 프로젝트 아님 또는 이미 병합됨)",
                 en: "No worktree found for this task (non-git project or already merged)",
-                ja: "このタスクのワークツリーが見つかりません（Git プロジェクトではない、または既にマージ済み）",
-                zh: "找不到该任务的 worktree（非 Git 项目或已合并）",
               })}
             </div>
           ) : (
@@ -237,10 +211,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-semibold">
                       {t({
-                        ko: "최종 브랜치 검증",
                         en: "Final Branch Verification",
-                        ja: "最終ブランチ検証",
-                        zh: "最终分支校验",
                       })}
                     </h3>
                     <span className="rounded-full bg-black/20 px-2 py-0.5 text-xs font-medium">
@@ -261,10 +232,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
                   {verifyData.uncommittedFiles && verifyData.uncommittedFiles.length > 0 && (
                     <p className="mt-2 text-xs">
                       {t({
-                        ko: `미커밋 변경 ${verifyData.uncommittedFiles.length}건`,
                         en: `${verifyData.uncommittedFiles.length} uncommitted file(s)`,
-                        ja: `未コミット変更 ${verifyData.uncommittedFiles.length}件`,
-                        zh: `${verifyData.uncommittedFiles.length} 个未提交文件`,
                       })}
                     </p>
                   )}
@@ -273,10 +241,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
               {verifyError && (
                 <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
                   {t({
-                    ko: "브랜치 검증 정보를 불러오지 못했습니다",
                     en: "Branch verification could not be loaded",
-                    ja: "ブランチ検証情報を取得できませんでした",
-                    zh: "无法加载分支校验信息",
                   })}
                   : {verifyError}
                 </div>
@@ -284,9 +249,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
               {/* Stat summary */}
               {diffData.stat && (
                 <div>
-                  <h3 className="mb-1 text-sm font-semibold text-slate-300">
-                    {t({ ko: "요약", en: "Summary", ja: "概要", zh: "摘要" })}
-                  </h3>
+                  <h3 className="mb-1 text-sm font-semibold text-slate-300">{t({ en: "Summary" })}</h3>
                   <pre className="rounded-lg bg-slate-800 p-3 text-xs text-slate-300 overflow-x-auto">
                     {diffData.stat}
                   </pre>
@@ -295,9 +258,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
               {/* Full diff */}
               {diffData.diff && (
                 <div>
-                  <h3 className="mb-1 text-sm font-semibold text-slate-300">
-                    {t({ ko: "Diff", en: "Diff", ja: "差分", zh: "差异" })}
-                  </h3>
+                  <h3 className="mb-1 text-sm font-semibold text-slate-300">{t({ en: "Diff" })}</h3>
                   <pre className="max-h-[50vh] overflow-auto rounded-lg bg-slate-950 p-3 text-xs leading-relaxed">
                     {diffData.diff.split("\n").map((line, i) => {
                       let cls = "text-slate-400";
@@ -318,10 +279,7 @@ function DiffModal({ taskId, onClose }: DiffModalProps) {
               {!diffData.stat && !diffData.diff && (
                 <div className="text-center text-slate-500 py-8">
                   {t({
-                    ko: "변경사항이 없습니다",
                     en: "No changes detected",
-                    ja: "変更はありません",
-                    zh: "未检测到更改",
                   })}
                 </div>
               )}

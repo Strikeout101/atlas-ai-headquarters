@@ -26,7 +26,7 @@ export default function EmojiPicker({
   onChange,
   size = "md",
 }: {
-  tr: (ko: string, en: string) => string;
+  tr: (en: string) => string;
   value: string;
   onChange: (emoji: string) => void;
   size?: "sm" | "md";
@@ -67,7 +67,7 @@ export default function EmojiPicker({
           {EMOJI_GROUPS.map((group) => (
             <div key={group.labelEn} className="mb-2 last:mb-0">
               <div className="text-[11.5px] font-semibold mb-1" style={{ color: "var(--th-text-muted)" }}>
-                {tr(group.label, group.labelEn)}
+                {tr(group.labelEn)}
               </div>
               <div className="grid grid-cols-8 gap-0.5">
                 {group.emojis.map((emoji) => (

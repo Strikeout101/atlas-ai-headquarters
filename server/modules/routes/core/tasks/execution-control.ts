@@ -257,7 +257,7 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
         try {
           pendingCallback();
         } catch {
-          // 콜백 실패 시에도 큐 정리는 계속
+          // Keep cleaning the queue even if the callback failed
         }
       }
       crossDeptNextCallbacks.delete(id);
@@ -332,20 +332,9 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
       if (targetStatus === "pending" && statusChanged) {
         notifyCeo(
           pickL(
-            l(
-              [
-                `'${task.title}' 작업이 보류 상태로 전환되었습니다. 세션은 유지되며 재개 시 이어서 진행됩니다.${rolledBack ? " 코드 변경분은 git rollback 처리되었습니다." : ""}`,
-              ],
-              [
-                `'${task.title}' was moved to pending. The session is preserved and will continue on resume.${rolledBack ? " Code changes were rolled back via git." : ""}`,
-              ],
-              [
-                `'${task.title}' は保留状態に変更されました。セッションは維持され、再開時に継続します。${rolledBack ? " コード変更は git でロールバックされました。" : ""}`,
-              ],
-              [
-                `'${task.title}' 已转为待处理状态。会话会被保留，恢复后将继续执行。${rolledBack ? " 代码变更已通过 git 回滚。" : ""}`,
-              ],
-            ),
+            l([
+              `'${task.title}' was moved to pending. The session is preserved and will continue on resume.${rolledBack ? " Code changes were rolled back via git." : ""}`,
+            ]),
             lang,
           ),
           id,
@@ -353,16 +342,7 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
       } else if (targetStatus !== "pending") {
         notifyCeo(
           pickL(
-            l(
-              [
-                `'${task.title}' 작업이 취소되었습니다.${rolledBack ? " 코드 변경분은 git rollback 처리되었습니다." : ""}`,
-              ],
-              [`'${task.title}' was cancelled.${rolledBack ? " Code changes were rolled back via git." : ""}`],
-              [
-                `'${task.title}' はキャンセルされました。${rolledBack ? " コード変更は git でロールバックされました。" : ""}`,
-              ],
-              [`'${task.title}' 已取消。${rolledBack ? " 代码变更已通过 git 回滚。" : ""}`],
-            ),
+            l([`'${task.title}' was cancelled.${rolledBack ? " Code changes were rolled back via git." : ""}`]),
             lang,
           ),
           id,
@@ -426,20 +406,9 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
     if (targetStatus === "pending") {
       notifyCeo(
         pickL(
-          l(
-            [
-              `'${task.title}' 작업이 보류 상태로 전환되었습니다. 인터럽트(SIGINT)로 브레이크를 걸었고 세션은 유지됩니다.${rolledBack ? " 코드 변경분은 git rollback 처리되었습니다." : ""}`,
-            ],
-            [
-              `'${task.title}' was moved to pending. A graceful interrupt (SIGINT) was sent and the session is preserved.${rolledBack ? " Code changes were rolled back via git." : ""}`,
-            ],
-            [
-              `'${task.title}' は保留状態に変更されました。SIGINT による中断を送り、セッションは維持されます。${rolledBack ? " コード変更は git でロールバックされました。" : ""}`,
-            ],
-            [
-              `'${task.title}' 已转为待处理状态。已发送 SIGINT 中断，且会话将被保留。${rolledBack ? " 代码变更已通过 git 回滚。" : ""}`,
-            ],
-          ),
+          l([
+            `'${task.title}' was moved to pending. A graceful interrupt (SIGINT) was sent and the session is preserved.${rolledBack ? " Code changes were rolled back via git." : ""}`,
+          ]),
           lang,
         ),
         id,
@@ -447,16 +416,7 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
     } else {
       notifyCeo(
         pickL(
-          l(
-            [
-              `'${task.title}' 작업이 취소되었습니다.${rolledBack ? " 코드 변경분은 git rollback 처리되었습니다." : ""}`,
-            ],
-            [`'${task.title}' was cancelled.${rolledBack ? " Code changes were rolled back via git." : ""}`],
-            [
-              `'${task.title}' はキャンセルされました。${rolledBack ? " コード変更は git でロールバックされました。" : ""}`,
-            ],
-            [`'${task.title}' 已取消。${rolledBack ? " 代码变更已通过 git 回滚。" : ""}`],
-          ),
+          l([`'${task.title}' was cancelled.${rolledBack ? " Code changes were rolled back via git." : ""}`]),
           lang,
         ),
         id,
@@ -547,31 +507,15 @@ export function registerTaskExecutionControlRoutes(deps: TaskExecutionControlRou
     if (autoResumed) {
       notifyCeo(
         pickL(
-          l(
-            [`'${task.title}' 작업이 복구되었습니다. (${targetStatus}) 기존 세션을 유지한 채 자동 재개를 시작합니다.`],
-            [
-              `'${task.title}' was resumed. (${targetStatus}) Auto-resume is starting with the existing session preserved.`,
-            ],
-            [`'${task.title}' が復旧されました。(${targetStatus}) 既存セッションを保持したまま自動再開します。`],
-            [`'${task.title}' 已恢复。(${targetStatus}) 将在保留原会话的情况下自动继续执行。`],
-          ),
+          l([
+            `'${task.title}' was resumed. (${targetStatus}) Auto-resume is starting with the existing session preserved.`,
+          ]),
           lang,
         ),
         id,
       );
     } else {
-      notifyCeo(
-        pickL(
-          l(
-            [`'${task.title}' 작업이 복구되었습니다. (${targetStatus})`],
-            [`'${task.title}' was resumed. (${targetStatus})`],
-            [`'${task.title}' が復旧されました。(${targetStatus})`],
-            [`'${task.title}' 已恢复。(${targetStatus})`],
-          ),
-          lang,
-        ),
-        id,
-      );
+      notifyCeo(pickL(l([`'${task.title}' was resumed. (${targetStatus})`]), lang), id);
     }
 
     res.json({

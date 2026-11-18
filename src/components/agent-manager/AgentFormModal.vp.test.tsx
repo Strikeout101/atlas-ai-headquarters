@@ -9,9 +9,8 @@ describe("VP agent editor", () => {
     render(
       <I18nProvider language="en">
         <AgentFormModal
-          isKo={false}
           locale="en"
-          tr={(_ko, en) => en}
+          tr={(en: string) => en}
           form={{ ...BLANK, name: "Codex VP", role: "vp", cli_provider: "codex" }}
           setForm={vi.fn()}
           departments={[]}
@@ -31,9 +30,8 @@ describe("VP agent editor", () => {
     render(
       <I18nProvider language="en">
         <AgentFormModal
-          isKo={false}
           locale="en"
-          tr={(_ko, en) => en}
+          tr={(en: string) => en}
           form={{ ...BLANK, cli_provider: "api", cli_fallback_provider: "claude" }}
           setForm={vi.fn()}
           departments={[]}

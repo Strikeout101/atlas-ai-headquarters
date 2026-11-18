@@ -23,27 +23,18 @@ function setupDb(): DatabaseSync {
 }
 
 describe("language-policy detectTargetDepartments", () => {
-  it("detects related departments by their custom localized names", () => {
+  it("detects related departments by their custom names", () => {
     const db = setupDb();
     try {
-      db.prepare("INSERT INTO settings (key, value) VALUES ('language', '\"ko\"')").run();
-      db.prepare(
-        "INSERT INTO departments (id, name, name_ko, name_ja, name_zh) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)",
-      ).run(
+      db.prepare("INSERT INTO departments (id, name) VALUES (?, ?), (?, ?)").run(
         "planning",
         "Pre-production",
-        "프리프로덕션팀",
-        "プリプロ班",
-        "前期策划组",
         "dev",
         "Scene Engine",
-        "씬 엔진팀",
-        "シーン設計",
-        "场景引擎组",
       );
 
       const { detectTargetDepartments } = initializeCollabLanguagePolicy({ db });
-      const found = detectTargetDepartments("프리프로덕션팀과 씬 엔진팀이 함께 콘티를 준비해줘");
+      const found = detectTargetDepartments("Pre-production and Scene Engine should prepare the storyboard together");
 
       expect(found).toContain("planning");
       expect(found).toContain("dev");
@@ -52,20 +43,13 @@ describe("language-policy detectTargetDepartments", () => {
     }
   });
 
-  it("팀/부서 접미어 없이도 부서명을 감지한다", () => {
+  it("detects a department name without its team suffix", () => {
     const db = setupDb();
     try {
-      db.prepare("INSERT INTO settings (key, value) VALUES ('language', '\"ko\"')").run();
-      db.prepare("INSERT INTO departments (id, name, name_ko, name_ja, name_zh) VALUES (?, ?, ?, ?, ?)").run(
-        "planning",
-        "Pre-production",
-        "프리프로덕션팀",
-        "プリプロ班",
-        "前期策划组",
-      );
+      db.prepare("INSERT INTO departments (id, name) VALUES (?, ?)").run("planning", "Pre-production Team");
 
       const { detectTargetDepartments } = initializeCollabLanguagePolicy({ db });
-      const found = detectTargetDepartments("프리프로덕션 이슈를 먼저 검토해줘");
+      const found = detectTargetDepartments("Look at the pre-production issue first");
 
       expect(found).toContain("planning");
     } finally {

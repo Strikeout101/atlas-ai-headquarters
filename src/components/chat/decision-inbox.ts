@@ -17,7 +17,7 @@ export interface DecisionInboxItem {
   projectName?: string | null;
 }
 
-const DECISION_REPLY_RE = /\[의사결정\s*회신\]|\[Decision Reply\]|\[意思決定返信\]|\[决策回复\]/i;
+const DECISION_REPLY_RE = /\[Decision Reply\]/i;
 
 export function isDecisionReplyContent(content: string): boolean {
   return DECISION_REPLY_RE.test(content);
@@ -61,7 +61,7 @@ export function buildDecisionInboxItems(messages: Message[], agents: Agent[]): D
       kind: "agent_request",
       agentId: msg.sender_id,
       agentName: matchedAgent?.name || senderName || msg.sender_id,
-      agentNameKo: matchedAgent?.name_ko || matchedAgent?.name || senderName || msg.sender_id,
+      agentNameKo: matchedAgent?.name || senderName || msg.sender_id,
       agentAvatar: matchedAgent?.avatar_emoji || senderAvatar,
       requestContent: msg.content,
       options: parsed.options,

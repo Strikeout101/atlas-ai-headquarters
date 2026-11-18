@@ -83,7 +83,7 @@ export function useViewRoute(): [View, (next: View) => void] {
   return [view, setView];
 }
 
-type Localized = { ko: string; en: string; ja: string; zh: string };
+type Localized = { en: string };
 
 export type NavSection = "primary" | "workspaces" | "system";
 
@@ -108,70 +108,70 @@ export const NAV_ITEMS: NavItem[] = [
     view: "dashboard",
     icon: Inbox,
     section: "primary",
-    label: { ko: "오늘", en: "Today", ja: "今日", zh: "今日" },
+    label: { en: "Today" },
     keywords: "home dashboard needs you overview decisions running",
   },
   {
     view: "tasks",
     icon: ListChecks,
     section: "primary",
-    label: { ko: "업무", en: "Work", ja: "業務", zh: "工作" },
+    label: { en: "Work" },
     keywords: "tasks board projects kanban",
   },
   {
     view: "autonomy",
     icon: Target,
     section: "primary",
-    label: { ko: "자율 운영", en: "Autonomy", ja: "自律運用", zh: "自主运行" },
+    label: { en: "Autonomy" },
     keywords: "goals opportunities schedules research ledger digest limits",
   },
   {
     view: "tech",
     icon: Laptop,
     section: "workspaces",
-    label: { ko: "기술 서비스", en: "Tech Services", ja: "テックサービス", zh: "技术服务" },
+    label: { en: "Tech Services" },
     keywords: "business tickets clients contacts devices repairs small business",
   },
   {
     view: "events",
     icon: CalendarDays,
     section: "workspaces",
-    label: { ko: "이벤트 및 렌탈", en: "Events and Rentals", ja: "イベント・レンタル", zh: "活动与租赁" },
+    label: { en: "Events and Rentals" },
     keywords: "business rentals quotes party bounce events calendar primrose",
   },
   {
     view: "ventures",
     icon: Store,
     section: "workspaces",
-    label: { ko: "벤처", en: "Ventures", ja: "ベンチャー", zh: "创业项目" },
+    label: { en: "Ventures" },
     keywords: "business ai etsy shop digital products game assets itch dashboards online store",
   },
   {
     view: "revenue",
     icon: Receipt,
     section: "workspaces",
-    label: { ko: "매출", en: "Revenue", ja: "売上", zh: "收入" },
+    label: { en: "Revenue" },
     keywords: "receipts payments costs finance pipeline deals square spending verified",
   },
   {
     view: "outreach",
     icon: Send,
     section: "workspaces",
-    label: { ko: "아웃리치", en: "Outreach", ja: "アウトリーチ", zh: "外联" },
+    label: { en: "Outreach" },
     keywords: "business drafts email social sms marketing promotion do not contact",
   },
   {
     view: "homelab",
     icon: Server,
     section: "workspaces",
-    label: { ko: "홈랩", en: "Homelab", ja: "ホームラボ", zh: "家庭实验室" },
+    label: { en: "Homelab" },
     keywords: "ssh hosts servers proxmox approvals",
   },
   {
     view: "agents",
     icon: Bot,
     section: "system",
-    label: { ko: "팀", en: "Team", ja: "チーム", zh: "团队" },
+    label: { en: "Team" },
     keywords: "agents staff employees departments hire",
     activeFor: ["skills", "model_director", "vp_decisions", "knowledge"],
   },
@@ -180,7 +180,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BookOpen,
     section: "system",
     inSidebar: false,
-    label: { ko: "문서고", en: "Library", ja: "ライブラリ", zh: "文档库" },
+    label: { en: "Library" },
     keywords: "skills knowledge learn",
   },
   {
@@ -188,14 +188,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Clapperboard,
     section: "system",
     inSidebar: false,
-    label: { ko: "모델 디렉터", en: "Model Director", ja: "モデルディレクター", zh: "模型主管" },
+    label: { en: "Model Director" },
     keywords: "models routing upgrades llm",
   },
   {
     view: "office",
     icon: Building2,
     section: "system",
-    label: { ko: "오피스", en: "Office", ja: "オフィス", zh: "办公室" },
+    label: { en: "Office" },
     keywords: "map pixel office rooms",
   },
   {
@@ -203,7 +203,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Bot,
     section: "system",
     inSidebar: false,
-    label: { ko: "VP 결정", en: "VP decisions", ja: "VPの決定", zh: "VP决策" },
+    label: { en: "VP decisions" },
     keywords: "vice president reviews approvals audit denials escalations",
   },
   {
@@ -211,18 +211,18 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Brain,
     section: "system",
     inSidebar: false,
-    label: { ko: "지식", en: "Knowledge", ja: "ナレッジ", zh: "知识" },
+    label: { en: "Knowledge" },
     keywords: "memory memories lessons facts systems registry checklist hosts network agents know",
   },
   {
     view: "settings",
     icon: Settings,
     section: "system",
-    label: { ko: "설정", en: "Settings", ja: "設定", zh: "设置" },
+    label: { en: "Settings" },
     keywords: "preferences providers oauth api security password",
   },
 ];
 
 export const NAV_SECTION_LABELS: Record<Exclude<NavSection, "primary" | "system">, Localized> = {
-  workspaces: { ko: "워크스페이스", en: "Workspaces", ja: "ワークスペース", zh: "工作区" },
+  workspaces: { en: "Workspaces" },
 };

@@ -81,9 +81,9 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
       if (!normalized) return "";
       return normalized.length > max ? `${normalized.slice(0, max - 3).trimEnd()}...` : normalized;
     };
-    const taskLabel = pickL(l(["작업"], ["Task"], ["タスク"], ["任务"]), lang);
-    const selectedLabel = pickL(l(["선택"], ["Picked"], ["選択"], ["已选"]), lang);
-    const noteLabel = pickL(l(["추가의견"], ["Note"], ["追加意見"], ["追加意见"]), lang);
+    const taskLabel = pickL(l(["Task"]), lang);
+    const selectedLabel = pickL(l(["Picked"]), lang);
+    const noteLabel = pickL(l(["Note"]), lang);
     const out: string[] = [];
     const seen = new Set<string>();
 
@@ -120,42 +120,15 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
   ): string {
     const topTasks = taskTitles.slice(0, 6);
     const lines = topTasks.map((title, idx) => `${idx + 1}. ${title}`);
-    const noTaskLine = pickL(
-      l(
-        ["- 검토 항목 정보 없음"],
-        ["- No review-item details available"],
-        ["- レビュー項目情報なし"],
-        ["- 无可用评审项信息"],
-      ),
-      lang,
-    );
+    const noTaskLine = pickL(l(["- No review-item details available"]), lang);
     const taskBlock = lines.length > 0 ? lines.join("\n") : noTaskLine;
-    const noRoundDecisionLine = pickL(
-      l(
-        ["- 라운드 의사결정 이력 없음"],
-        ["- No round-level decision history yet"],
-        ["- ラウンド判断履歴なし"],
-        ["- 暂无轮次决策记录"],
-      ),
-      lang,
-    );
+    const noRoundDecisionLine = pickL(l(["- No round-level decision history yet"]), lang);
     const roundDecisionBlock =
       roundDecisionLines.length > 0 ? roundDecisionLines.slice(0, 8).join("\n") : noRoundDecisionLine;
     return pickL(
-      l(
-        [
-          `프로젝트 '${projectName}' 검토 항목을 기획팀장 기준으로 취합했습니다.\n- 주요 검토 포인트를 기준으로 대표 항목을 선택한 뒤 팀장 회의를 시작하세요.\n- 필요 시 추가요청 입력으로 보완 작업을 먼저 열 수 있습니다.\n\n검토 대상:\n${taskBlock}\n\n최근 리뷰 라운드 의사결정:\n${roundDecisionBlock}`,
-        ],
-        [
-          `Planning-lead consolidation is complete for project '${projectName}'.\n- Choose representative review item(s) from key checkpoints, then start the team-lead meeting.\n- If needed, open remediation first with Add Follow-up Request.\n\nReview targets:\n${taskBlock}\n\nRecent review-round decisions:\n${roundDecisionBlock}`,
-        ],
-        [
-          `プロジェクト'${projectName}'のレビュー項目を企画リード基準で集約しました。\n- 主要チェックポイントを基準に代表項目を選択してからチームリーダー会議を開始してください。\n- 必要に応じて追加要請入力で先に補完作業を開けます。\n\nレビュー対象:\n${taskBlock}\n\n最近のレビューラウンド判断:\n${roundDecisionBlock}`,
-        ],
-        [
-          `项目'${projectName}'的评审项已按规划负责人标准完成汇总。\n- 请先按关键检查点选择代表项，再启动组长评审会议。\n- 如有需要，可先通过追加请求开启补充整改。\n\n评审目标:\n${taskBlock}\n\n最近评审轮次决策:\n${roundDecisionBlock}`,
-        ],
-      ),
+      l([
+        `Planning-lead consolidation is complete for project '${projectName}'.\n- Choose representative review item(s) from key checkpoints, then start the team-lead meeting.\n- If needed, open remediation first with Add Follow-up Request.\n\nReview targets:\n${taskBlock}\n\nRecent review-round decisions:\n${roundDecisionBlock}`,
+      ]),
       lang,
     );
   }
@@ -174,7 +147,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
       .replace(/\s+(?=-\s)/g, "\n");
 
     if (!text.includes("\n") && text.length > 220) {
-      text = text.replace(/([.!?])\s+/g, "$1\n").replace(/(합니다\.|입니다\.|됩니다\.|습니다\.|요\.)\s+/g, "$1\n");
+      text = text.replace(/([.!?])\s+/g, "$1\n");
     }
 
     return text.replace(/\n{3,}/g, "\n\n").trim();
@@ -203,7 +176,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
           | undefined)
       : undefined;
     const picked = stateAgent ?? fallbackLead;
-    const defaultName = pickL(l(["기획팀장"], ["Planning Lead"], ["企画リード"], ["规划负责人"]), lang);
+    const defaultName = pickL(l(["Planning Lead"]), lang);
     const normalizePlanningLeadAvatar = (rawAvatar: string | null | undefined): string => {
       const avatar = String(rawAvatar ?? "").trim();
       if (!avatar || avatar === "🧠") return "🧑‍💼";
@@ -212,7 +185,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
     return {
       agent_id: picked?.id ?? null,
       agent_name: (picked?.name || decisionState?.planner_agent_name || defaultName).trim(),
-      agent_name_ko: (picked?.name_ko || decisionState?.planner_agent_name || "기획팀장").trim(),
+      agent_name_ko: (picked?.name_ko || decisionState?.planner_agent_name || "Planning Lead").trim(),
       agent_avatar: normalizePlanningLeadAvatar(picked?.avatar_emoji),
     };
   }
@@ -274,15 +247,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
           return normalized.length > max ? `${normalized.slice(0, max - 3).trimEnd()}...` : normalized;
         };
         const roundDecisionLines = getProjectReviewRoundDecisionContext(projectId, lang, 8);
-        const noRoundDecisionPromptLine = pickL(
-          l(
-            ["- 라운드 의사결정 이력 없음"],
-            ["- No round-level decision history yet"],
-            ["- ラウンド判断履歴なし"],
-            ["- 暂无轮次决策记录"],
-          ),
-          lang,
-        );
+        const noRoundDecisionPromptLine = pickL(l(["- No round-level decision history yet"]), lang);
         const roundDecisionPromptBlock =
           roundDecisionLines.length > 0 ? roundDecisionLines.join("\n") : noRoundDecisionPromptLine;
         const fallbackSummary = buildProjectReviewPlanningFallbackSummary(
@@ -364,15 +329,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
           });
         }
       } catch {
-        const failMsg = pickL(
-          l(
-            ["기획팀장 의견 취합이 일시 지연되었습니다. 자동 재시도 중입니다."],
-            ["Planning-lead consolidation is temporarily delayed. Auto retry in progress."],
-            ["企画リード意見の集約が一時遅延しました。自動再試行中です。"],
-            ["规划负责人意见汇总暂时延迟，正在自动重试。"],
-          ),
-          lang,
-        );
+        const failMsg = pickL(l(["Planning-lead consolidation is temporarily delayed. Auto retry in progress."]), lang);
         const ts = nowMs();
         db.prepare(
           `

@@ -33,7 +33,7 @@ import OfficeAtmosphere from "./OfficeAtmosphere";
 import SceneWarmup, { useLoadingProgress, type WarmupPhase } from "./SceneWarmup";
 import { LOCALE_TEXT, pickLocale } from "../office-view/themes-locale";
 
-type Language = "ko" | "en" | "ja" | "zh";
+type Language = "en";
 
 interface AtlasOfficeProps {
   onReturnToOriginal: () => void;
@@ -396,19 +396,22 @@ export default function AtlasOffice({
       }, 900),
     ];
   }, [pose]);
-  const handleZone = useCallback((id: InteractionId) => {
-    if (id === "elevator") {
-      rideElevator();
-      return;
-    }
-    let text = ZONE_MESSAGES[id] ?? "";
-    if (id === "arcade") {
-      arcadeOnRef.current = !arcadeOnRef.current;
-      setArcadeOn(arcadeOnRef.current);
-      text = arcadeOnRef.current ? "Arcade lights on" : "Arcade lights off";
-    }
-    setToast({ text, id: Date.now() });
-  }, [rideElevator]);
+  const handleZone = useCallback(
+    (id: InteractionId) => {
+      if (id === "elevator") {
+        rideElevator();
+        return;
+      }
+      let text = ZONE_MESSAGES[id] ?? "";
+      if (id === "arcade") {
+        arcadeOnRef.current = !arcadeOnRef.current;
+        setArcadeOn(arcadeOnRef.current);
+        text = arcadeOnRef.current ? "Arcade lights on" : "Arcade lights off";
+      }
+      setToast({ text, id: Date.now() });
+    },
+    [rideElevator],
+  );
   useEffect(() => {
     if (!toast) return;
     const timeout = window.setTimeout(() => setToast(null), 2200);

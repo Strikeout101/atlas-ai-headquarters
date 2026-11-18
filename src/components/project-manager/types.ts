@@ -7,10 +7,7 @@ import type {
 } from "../../api";
 
 export interface I18nTextMap {
-  ko: string;
   en: string;
-  ja: string;
-  zh: string;
 }
 
 export type ProjectI18nTranslate = (messages: I18nTextMap) => string;

@@ -48,10 +48,7 @@ export function WorkforceRibbon({ agents, taskById, language, numberFormatter, t
           </span>
           <span className="text-[15px]" style={{ color: "var(--th-text-secondary)" }}>
             {t({
-              ko: `/ ${agents.length}명 근무 중`,
               en: `of ${agents.length} agents working`,
-              ja: `/ ${agents.length}名 稼働中`,
-              zh: `/ ${agents.length} 名代理工作中`,
             })}
           </span>
         </div>
@@ -74,18 +71,11 @@ export function WorkforceRibbon({ agents, taskById, language, numberFormatter, t
           style={{ border: "1px dashed var(--th-border-strong)", color: "var(--th-text-muted)" }}
         >
           {t({
-            ko: "아직 에이전트가 없습니다. 에이전트 화면에서 추가하세요.",
             en: "No agents yet. Add one from the Agents screen.",
-            ja: "エージェントがまだいません。エージェント画面から追加してください。",
-            zh: "还没有代理。请在代理页面添加。",
           })}
         </div>
       ) : (
-        <ol
-          className="ax-ribbon mt-5"
-          aria-label={t({ ko: "에이전트 상태", en: "Agent status", ja: "エージェント状態", zh: "代理状态" })}
-          onMouseLeave={() => setFocusId(null)}
-        >
+        <ol className="ax-ribbon mt-5" aria-label={t({ en: "Agent status" })} onMouseLeave={() => setFocusId(null)}>
           {ordered.map((agent, index) => (
             <li
               key={agent.id}
@@ -123,10 +113,7 @@ export function WorkforceRibbon({ agents, taskById, language, numberFormatter, t
           </>
         ) : (
           t({
-            ko: "막대를 선택하면 에이전트 정보를 볼 수 있습니다.",
             en: "Select a segment to see who it is and what they're on.",
-            ja: "セグメントを選ぶと担当者と作業内容が表示されます。",
-            zh: "选择色块，查看代理及其当前任务。",
           })
         )}
       </p>

@@ -92,10 +92,10 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
   if (!open) return null;
 
   const groupLabel: Record<CommandGroup, string> = {
-    navigate: t({ ko: "이동", en: "Go to", ja: "移動", zh: "跳转" }),
-    actions: t({ ko: "작업", en: "Actions", ja: "操作", zh: "操作" }),
-    agents: t({ ko: "에이전트", en: "Agents", ja: "エージェント", zh: "代理" }),
-    tasks: t({ ko: "업무", en: "Tasks", ja: "タスク", zh: "任务" }),
+    navigate: t({ en: "Go to" }),
+    actions: t({ en: "Actions" }),
+    agents: t({ en: "Agents" }),
+    tasks: t({ en: "Tasks" }),
   };
 
   const runAt = (index: number) => {
@@ -135,7 +135,7 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t({ ko: "명령 모음", en: "Command bar", ja: "コマンドバー", zh: "命令栏" })}
+        aria-label={t({ en: "Command bar" })}
         className="flex max-h-[70vh] w-full max-w-[600px] flex-col overflow-hidden rounded-xl"
         style={{
           background: "var(--th-bg-elevated)",
@@ -152,10 +152,7 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t({
-              ko: "페이지, 작업, 에이전트, 업무 검색…",
               en: "Search pages, actions, agents and tasks…",
-              ja: "ページ・操作・エージェント・タスクを検索…",
-              zh: "搜索页面、操作、代理和任务…",
             })}
             className="h-full flex-1 bg-transparent text-[14px] focus:outline-none"
             style={{ color: "var(--th-text-primary)" }}
@@ -176,7 +173,7 @@ export default function CommandPalette({ open, onClose, commands }: CommandPalet
         <ul ref={listRef} id={listId} role="listbox" className="flex-1 overflow-y-auto py-1.5">
           {results.length === 0 && (
             <li className="px-4 py-6 text-center text-[13px]" style={{ color: "var(--th-text-muted)" }}>
-              {t({ ko: "일치하는 항목이 없습니다.", en: "Nothing matches.", ja: "一致なし。", zh: "没有匹配项。" })}
+              {t({ en: "Nothing matches." })}
             </li>
           )}
           {results.map((item, index) => {

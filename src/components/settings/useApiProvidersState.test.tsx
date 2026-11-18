@@ -108,7 +108,7 @@ describe("useApiProvidersState model assignment", () => {
 
   it("loads every agent and department when assigning an API model", async () => {
     apiMocks.getAgents.mockResolvedValueOnce([{ id: "agent-dev" }, { id: "agent-ops" }]);
-    apiMocks.getDepartments.mockResolvedValueOnce([{ id: "planning", name: "Planning", name_ko: "기획" }]);
+    apiMocks.getDepartments.mockResolvedValueOnce([{ id: "planning", name: "Planning", name_ko: "" }]);
 
     const { result } = renderHook(() => useApiProvidersState({ tab: "api", t }));
     await waitFor(() => {
@@ -121,6 +121,6 @@ describe("useApiProvidersState model assignment", () => {
     expect(apiMocks.getAgents).toHaveBeenCalledWith();
     expect(apiMocks.getDepartments).toHaveBeenCalledWith();
     expect(result.current.apiAssignAgents).toEqual([{ id: "agent-dev" }, { id: "agent-ops" }]);
-    expect(result.current.apiAssignDepts).toEqual([{ id: "planning", name: "Planning", name_ko: "기획" }]);
+    expect(result.current.apiAssignDepts).toEqual([{ id: "planning", name: "Planning", name_ko: "" }]);
   });
 });

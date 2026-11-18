@@ -35,33 +35,11 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
       .slice(0, 6)
       .map((note, idx) => `${idx + 1}. ${clip(note)}`)
       .filter(Boolean);
-    const optionBlock =
-      lines.length > 0
-        ? lines.join("\n")
-        : pickL(
-            l(
-              ["- 취합할 라운드 의견이 없습니다."],
-              ["- No round opinions to consolidate."],
-              ["- 集約対象のラウンド意見がありません。"],
-              ["- 暂无可汇总的轮次意见。"],
-            ),
-            lang,
-          );
+    const optionBlock = lines.length > 0 ? lines.join("\n") : pickL(l(["- No round opinions to consolidate."]), lang);
     return pickL(
-      l(
-        [
-          `라운드 ${reviewRound} 의견을 기획팀장이 우선 취합했습니다.\n작업: '${taskTitle}'\n${projectName ? `프로젝트: '${projectName}'\n` : ""}아래 번호 중 우선순위가 높은 보완 항목을 먼저 선택하고, 필요 시 추가 의견을 함께 넣어 보완 라운드를 여세요.\n\n검토 선택지:\n${optionBlock}`,
-        ],
-        [
-          `Planning lead pre-consolidated round ${reviewRound} opinions.\nTask: '${taskTitle}'\n${projectName ? `Project: '${projectName}'\n` : ""}Pick the highest-priority remediation options first, and add an extra note only when needed.\n\nCandidate options:\n${optionBlock}`,
-        ],
-        [
-          `企画リードがラウンド${reviewRound}意見を先行集約しました。\nタスク: '${taskTitle}'\n${projectName ? `プロジェクト: '${projectName}'\n` : ""}優先度の高い補完項目から選択し、必要な場合のみ追加意見を入力してください。\n\n候補選択肢:\n${optionBlock}`,
-        ],
-        [
-          `规划负责人已先行汇总第 ${reviewRound} 轮意见。\n任务：'${taskTitle}'\n${projectName ? `项目：'${projectName}'\n` : ""}请先选择优先级最高的补充整改项，必要时再补充追加意见。\n\n候选选项：\n${optionBlock}`,
-        ],
-      ),
+      l([
+        `Planning lead pre-consolidated round ${reviewRound} opinions.\nTask: '${taskTitle}'\n${projectName ? `Project: '${projectName}'\n` : ""}Pick the highest-priority remediation options first, and add an extra note only when needed.\n\nCandidate options:\n${optionBlock}`,
+      ]),
       lang,
     );
   }
@@ -109,10 +87,7 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
           const sourceBlock =
             input.optionNotes.length > 0
               ? input.optionNotes.map((note, idx) => `${idx + 1}) ${clip(note, 320)}`).join("\n")
-              : pickL(
-                  l(["- 라운드 의견 없음"], ["- No round opinions"], ["- ラウンド意見なし"], ["- 无轮次意见"]),
-                  input.lang,
-                );
+              : pickL(l(["- No round opinions"]), input.lang);
           const prompt = [
             `You are the planning lead (${planningLeader.name}).`,
             `Task: '${input.taskTitle}'`,
@@ -174,27 +149,14 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
             project_id: input.projectId,
             snapshot_hash: getProjectReviewDecisionState(input.projectId)?.snapshot_hash ?? null,
             event_type: "planning_summary",
-            summary: pickL(
-              l(
-                [`라운드 ${input.reviewRound} 기획팀장 취합\n${plannerSummary}`],
-                [`Round ${input.reviewRound} planning consolidation\n${plannerSummary}`],
-                [`ラウンド${input.reviewRound} 企画リード集約\n${plannerSummary}`],
-                [`第 ${input.reviewRound} 轮规划负责人汇总\n${plannerSummary}`],
-              ),
-              input.lang,
-            ),
+            summary: pickL(l([`Round ${input.reviewRound} planning consolidation\n${plannerSummary}`]), input.lang),
             task_id: input.taskId,
             meeting_id: input.meetingId,
           });
         }
       } catch {
         const failMsg = pickL(
-          l(
-            ["리뷰 라운드 기획팀장 취합이 일시 지연되었습니다. 자동 재시도 중입니다."],
-            ["Review-round planning consolidation is temporarily delayed. Auto retry in progress."],
-            ["レビューラウンド企画リード集約が一時遅延しました。自動再試行中です。"],
-            ["评审轮次规划汇总暂时延迟，正在自动重试。"],
-          ),
+          l(["Review-round planning consolidation is temporarily delayed. Auto retry in progress."]),
           input.lang,
         );
         const ts = nowMs();

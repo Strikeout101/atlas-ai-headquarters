@@ -14,7 +14,7 @@ type ParentTaskRow = {
 
 interface PromptDeps {
   db: any;
-  l: (ko: string[], en: string[], ja?: string[], zh?: string[]) => L10n;
+  l: (en: string[]) => L10n;
   pickL: (pool: L10n, lang: Lang) => string;
   resolveLang: (text?: string, fallback?: Lang) => Lang;
   getDeptName: (deptId: string) => string;
@@ -84,9 +84,7 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
         const dept = st.target_department_id
           ? getDeptName(st.target_department_id)
           : getDeptName(parentDept?.department_id ?? "");
-        const marker = assignedIds.has(st.id)
-          ? pickL(l([" ← 당신의 담당"], [" <- assigned to you"], [" ← あなたの担당"], [" <- 你的负责项"]), lang)
-          : "";
+        const marker = assignedIds.has(st.id) ? pickL(l([" <- assigned to you"]), lang) : "";
         return `${icon} ${st.title} (${dept} - ${st.status})${marker}`;
       })
       .join("\n");
@@ -159,12 +157,7 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
       }
 
       const completedLabel = pickL(
-        l(
-          ["[모체 팀 및 이전 팀 완료 산출물 — 반드시 참고하여 작업하세요]"],
-          ["[Completed artifacts from origin & prior teams — use these as reference for your work]"],
-          ["[元チーム及び先行チーム完了成果物 — 必ず参照して作業してください]"],
-          ["[主体团队及前序团队已完成产出物 — 请务必参考进行工作]"],
-        ),
+        l(["[Completed artifacts from origin & prior teams — use these as reference for your work]"]),
         lang,
       );
       completedArtifactsBlock = `${completedLabel}\n${artifactSections.join("\n\n")}`;
@@ -180,45 +173,16 @@ export function createSubtaskDelegationPromptBuilder(deps: PromptDeps) {
     const deptPromptBlock = deptPrompt ? `[Department Shared Prompt]\n${deptPrompt}` : "";
     const conversationCtx = getRecentConversationContext(execAgent.id);
     const agentDisplayName = getAgentDisplayName(execAgent, lang);
-    const header = pickL(
-      l(
-        [`[프로젝트 협업 업무 - ${targetDeptName}]`],
-        [`[Project collaboration task - ${targetDeptName}]`],
-        [`[プロジェクト協業タスク - ${targetDeptName}]`],
-        [`[项目协作任务 - ${targetDeptName}]`],
-      ),
-      lang,
-    );
-    const originalTaskLabel = pickL(l(["원본 업무"], ["Original task"], ["元タスク"], ["原始任务"]), lang);
-    const ceoRequestLabel = pickL(l(["CEO 요청"], ["CEO request"], ["CEO依頼"], ["CEO指示"]), lang);
-    const allSubtasksLabel = pickL(
-      l(["전체 서브태스크 현황"], ["All subtask status"], ["全サブタスク状況"], ["全部 SubTask 状态"]),
-      lang,
-    );
-    const deptOwnedLabel = pickL(
-      l(
-        [`[${targetDeptName} 담당 업무 묶음]`],
-        [`[${targetDeptName} owned batch]`],
-        [`[${targetDeptName}担当タスク一式]`],
-        [`[${targetDeptName}负责项集合]`],
-      ),
-      lang,
-    );
-    const checklistLabel = pickL(
-      l(["순차 실행 체크리스트"], ["Sequential execution checklist"], ["順次実行チェックリスト"], ["顺序执行清单"]),
-      lang,
-    );
+    const header = pickL(l([`[Project collaboration task - ${targetDeptName}]`]), lang);
+    const originalTaskLabel = pickL(l(["Original task"]), lang);
+    const ceoRequestLabel = pickL(l(["CEO request"]), lang);
+    const allSubtasksLabel = pickL(l(["All subtask status"]), lang);
+    const deptOwnedLabel = pickL(l([`[${targetDeptName} owned batch]`]), lang);
+    const checklistLabel = pickL(l(["Sequential execution checklist"]), lang);
     const finalInstruction = pickL(
-      l(
-        [
-          "위 순차 체크리스트를 1번부터 끝까지 순서대로 처리하고, 중간에 분할하지 말고 한 번의 작업 흐름으로 완료하세요.",
-        ],
-        [
-          "Execute the checklist in order from 1 to end, and finish it in one continuous run without splitting into separate requests.",
-        ],
-        ["上記チェックリストを1番から順番に実行し、分割せず1回の作業フローで完了してください。"],
-        ["请按 1 到末尾顺序执行清单，不要拆分为多次请求，在一次连续流程中完成。"],
-      ),
+      l([
+        "Execute the checklist in order from 1 to end, and finish it in one continuous run without splitting into separate requests.",
+      ]),
       lang,
     );
 

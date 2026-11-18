@@ -209,7 +209,7 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
   };
 }
 
-const LANGUAGE_NAMES: Record<string, string> = { ko: "Korean", en: "English", ja: "Japanese", zh: "Chinese" };
+const LANGUAGE_NAMES: Record<string, string> = { en: "English" };
 
 export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, language = "en"): string {
   const list = (items: Array<{ title: string; status: string }>) =>

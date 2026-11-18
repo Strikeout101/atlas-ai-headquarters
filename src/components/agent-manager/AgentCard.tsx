@@ -8,7 +8,6 @@ import type { Translator } from "./types";
 interface AgentCardProps {
   agent: Agent;
   spriteMap: Map<string, number>;
-  isKo: boolean;
   locale: string;
   tr: Translator;
   departments: Department[];
@@ -23,7 +22,6 @@ interface AgentCardProps {
 export default function AgentCard({
   agent,
   spriteMap,
-  isKo,
   locale,
   tr,
   departments,
@@ -60,14 +58,14 @@ export default function AgentCard({
             <span className="text-[10px] shrink-0" style={{ color: "var(--th-text-muted)" }}>
               {(() => {
                 const primary = localeName(locale, agent);
-                const sub = locale === "en" ? agent.name_ko || "" : agent.name;
+                const sub = agent.name_ko || "";
                 return primary !== sub ? sub : "";
               })()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <span className={`text-[10px] px-1.5 py-0.5 rounded-md border font-medium ${ROLE_BADGE[agent.role] || ""}`}>
-              {isKo ? ROLE_LABEL[agent.role]?.ko : ROLE_LABEL[agent.role]?.en}
+              {ROLE_LABEL[agent.role]?.en}
             </span>
             {dept && (
               <span
@@ -114,14 +112,14 @@ export default function AgentCard({
                 disabled={saving || agent.status === "working"}
                 className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-40 transition-colors"
               >
-                {tr("해고", "Fire")}
+                {tr("Fire")}
               </button>
               <button
                 onClick={onDeleteCancel}
                 className="px-2 py-0.5 rounded text-[10px] transition-colors"
                 style={{ color: "var(--th-text-muted)" }}
               >
-                {tr("취소", "No")}
+                {tr("No")}
               </button>
             </>
           ) : (
@@ -129,7 +127,7 @@ export default function AgentCard({
               onClick={onDeleteClick}
               className="px-1.5 py-0.5 rounded text-xs hover:bg-red-500/15 hover:text-red-400 transition-colors"
               style={{ color: "var(--th-text-muted)" }}
-              title={tr("해고", "Fire")}
+              title={tr("Fire")}
             >
               <X size={13} strokeWidth={2} />
             </button>

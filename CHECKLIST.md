@@ -215,12 +215,14 @@ See docs/operations.md for running, updating, backing up and restoring ATLAS.
 - [ ] **P2** Health alerts: if the server, a mailbox, a sync or a VP stops working, notify the owner (section 7).
 - [x] **P2** (2026-11-18, service writes `logs/server/atlas-YYYY-MM-DD.log`, kept 14 days; task logs in `logs/` are not pruned) Save server logs to files and rotate the logs folder.
 - [ ] **P2** Check that CI runs and passes on the fork (`.github/workflows/ci.yml` is inherited from upstream). The GitHub CLI is not installed here, so this needs a look at the Actions tab on GitHub.
-- [ ] **P1 YOU** Switch to the ATLAS service: close the dev server window (the one started by the old `start-atlas.bat`), run `.\scripts\atlas-service\atlas-service.ps1 install` in PowerShell from the ATLAS folder, then check the phone address on port 8800 still works. (Claude can do this on your OK.)
+- [x] **P1** (2026-11-18, done by Claude on the owner's OK: dev server stopped with no tasks running, login task `ATLAS` installed, service running the latest commit on port 8800 on all addresses) Switch to the ATLAS service.
+- [ ] **P2 YOU** Open ATLAS on the phone (home VPN, this PC's address, port 8800) once to confirm it still loads under the service.
 - [ ] **P2 YOU** Pick a folder off this PC for backup copies (NAS share, external drive or OneDrive) in Settings > General > Backups.
 - [ ] **P3** Move the live database out of the repo folder into a data folder.
 
 ## 13. Repo and docs cleanup
 
+- [x] **P2** (2026-11-18, owner request: English only) Remove Korean, Japanese and Chinese from the project: UI text, the language picker, agent prompts and replies, chat keyword matching, seeds, tests, AGENTS.md and upstream sample media. Agents always reply in English; translated name columns are cleared on startup (the columns stay so old databases still load).
 - [x] **P2** (2026-11-18, `README.md`: what ATLAS is, running it, checks, license; the jp/ko/zh copies were removed) Rewrite `README.md` for ATLAS (it is still entirely the upstream claw-empire README, plus the jp, ko and zh copies).
 - [x] **P2** (2026-11-18: removed; still in git history and the `upstream` remote; `docs/README.md` updated) Remove or archive upstream leftovers: `docs/releases`, `docs/plans`, `docs/decision-inbox-checkpoint-2026-02-22.md`, Linux `deploy/`, Docker files if unused, `install.sh` and `install.ps1`, and the old launcher `scripts/run-claw-empire-dev-local.cmd`.
 - [x] **P3** (2026-11-18, decided: keep in git. The ATLAS office loads these files at runtime; they take 34 MB of a 38 MB pack and the largest is 7 MB. LFS would need a history rewrite to save anything. Revisit if one file nears 50 MB or the pack passes 1 GB.) `public/models` (53 MB of GLB files) is committed to git. Decide whether to move it to Git LFS or out of the repo (ties into the 3D work later).

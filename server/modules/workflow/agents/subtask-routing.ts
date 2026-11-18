@@ -18,7 +18,7 @@ type SubtaskRoutingDeps = {
   findTeamLeader: (departmentId: string, candidateAgentIds?: string[] | null) => any;
   getDeptName: (departmentId: string) => string;
   pickL: (choices: any, lang: string) => string;
-  l: (ko: string[], en: string[], ja: string[], zh: string[]) => any;
+  l: (en: string[]) => any;
   broadcast: (event: string, payload: unknown) => void;
   appendTaskLog: (taskId: string | null, kind: string, message: string) => void;
   notifyCeo: (message: string, taskId: string | null, messageType?: string) => void;
@@ -52,7 +52,7 @@ export function createSubtaskRoutingTools(deps: SubtaskRoutingDeps) {
     let best: { id: string; index: number; len: number } | null = null;
     for (const dept of deptRows) {
       if (dept.id === parentDeptId) continue;
-      const variants = [dept.name, dept.name_ko, dept.name_ko.replace(/팀$/, "")];
+      const variants = [dept.name];
       for (const variant of variants) {
         const token = variant.trim().toLowerCase();
         if (!token) continue;
@@ -124,30 +124,12 @@ export function createSubtaskRoutingTools(deps: SubtaskRoutingDeps) {
     const raw = String(rawTarget).trim();
     if (!raw) return null;
     const token = normalizeDeptAliasToken(raw);
-    const nullAliases = new Set([
-      "null",
-      "none",
-      "owner",
-      "ownerdept",
-      "ownerdepartment",
-      "same",
-      "sameasowner",
-      "자체",
-      "내부",
-      "동일부서",
-      "원부서",
-      "없음",
-      "无",
-      "同部门",
-      "同部門",
-    ]);
+    const nullAliases = new Set(["null", "none", "owner", "ownerdept", "ownerdepartment", "same", "sameasowner"]);
     if (nullAliases.has(token)) return null;
 
     for (const dept of deptRows) {
       const aliases = new Set<string>(
-        [dept.id, dept.name, dept.name_ko, dept.name_ko.replace(/팀$/g, ""), dept.name.replace(/\s*team$/i, "")].map(
-          (v) => normalizeDeptAliasToken(v),
-        ),
+        [dept.id, dept.name, dept.name.replace(/\s*team$/i, "")].map((v) => normalizeDeptAliasToken(v)),
       );
       if (aliases.has(token)) {
         return dept.id === ownerDeptId ? null : dept.id;
@@ -266,7 +248,7 @@ export function createSubtaskRoutingTools(deps: SubtaskRoutingDeps) {
       }>;
       if (deptRows.length === 0) return;
 
-      const deptGuide = deptRows.map((dept) => `- ${dept.id}: ${dept.name_ko || dept.name} (${dept.name})`).join("\n");
+      const deptGuide = deptRows.map((dept) => `- ${dept.id}: ${dept.name} (${dept.name})`).join("\n");
       const subtaskGuide = subtasks
         .map((st, idx) => {
           const compactDesc = (st.description ?? "").replace(/\s+/g, " ").trim();
@@ -339,15 +321,7 @@ export function createSubtaskRoutingTools(deps: SubtaskRoutingDeps) {
           const targetDeptName = getDeptName(normalizedTargetDept);
           const targetLeader = findTeamLeader(normalizedTargetDept, constrainedAgentIds);
           nextStatus = "blocked";
-          nextBlockedReason = pickL(
-            l(
-              [`${targetDeptName} 협업 대기`],
-              [`Waiting for ${targetDeptName} collaboration`],
-              [`${targetDeptName}の協業待ち`],
-              [`等待${targetDeptName}协作`],
-            ),
-            lang,
-          );
+          nextBlockedReason = pickL(l([`Waiting for ${targetDeptName} collaboration`]), lang);
           if (targetLeader) nextAssignee = targetLeader.id;
         } else {
           if (subtask.status === "blocked") nextStatus = "pending";
@@ -375,19 +349,7 @@ export function createSubtaskRoutingTools(deps: SubtaskRoutingDeps) {
         const summaryText = [...summaryByDept.entries()].map(([deptId, cnt]) => `${deptId}:${cnt}`).join(", ");
         appendTaskLog(taskId, "system", `Planning leader rerouted ${updated} subtasks (${phase}) => ${summaryText}`);
         notifyCeo(
-          pickL(
-            l(
-              [
-                `'${task.title}' 서브태스크 분배를 기획팀장이 재판정하여 ${updated}건을 재배치했습니다. (${summaryText})`,
-              ],
-              [`Planning leader rerouted ${updated} subtasks for '${task.title}'. (${summaryText})`],
-              [
-                `'${task.title}' のサブタスク配分を企画リーダーが再判定し、${updated}件を再配置しました。（${summaryText}）`,
-              ],
-              [`规划负责人已重新判定'${task.title}'的子任务分配，并重分配了${updated}项。（${summaryText}）`],
-            ),
-            lang,
-          ),
+          pickL(l([`Planning leader rerouted ${updated} subtasks for '${task.title}'. (${summaryText})`]), lang),
           taskId,
         );
       }

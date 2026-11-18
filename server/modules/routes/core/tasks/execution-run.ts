@@ -365,25 +365,12 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     const continuationCtx = getTaskContinuationContext(id);
     const continuationInstruction = continuationCtx
       ? pickL(
-          l(
-            ["연속 실행: 동일 소유 컨텍스트를 유지하고, 불필요한 파일 재탐색 없이 미해결 항목만 반영하세요."],
-            [
-              "Continuation run: keep the same ownership context, avoid re-reading unrelated files, and apply only unresolved deltas.",
-            ],
-            ["継続実行: 同一オーナーシップを維持し、不要な再探索を避けて未解決差分のみ反映してください。"],
-            ["连续执行：保持同一责任上下文，避免重复阅读无关文件，仅处理未解决差异。"],
-          ),
+          l([
+            "Continuation run: keep the same ownership context, avoid re-reading unrelated files, and apply only unresolved deltas.",
+          ]),
           taskLang,
         )
-      : pickL(
-          l(
-            ["반복적인 착수 멘트 없이 바로 실행하세요."],
-            ["Execute directly without repeated kickoff narration."],
-            ["繰り返しの開始ナレーションなしで直ちに実行してください。"],
-            ["无需重复开场说明，直接执行。"],
-          ),
-          taskLang,
-        );
+      : pickL(l(["Execute directly without repeated kickoff narration."]), taskLang);
     const projectStructureBlock = continuationCtx
       ? ""
       : projectContext
@@ -392,20 +379,8 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     const needsPlanInstruction = provider === "gemini" || provider === "copilot" || provider === "antigravity";
     const subtaskInstruction = needsPlanInstruction
       ? `\n\n${pickL(
-          l(
-            [
-              `[작업 계획 출력 규칙]
-작업을 시작하기 전에 아래 JSON 형식으로 계획을 출력하세요:
-\`\`\`json
-{"subtasks": [{"title": "서브태스크 제목1"}, {"title": "서브태스크 제목2"}]}
-\`\`\`
-각 서브태스크를 완료할 때마다 아래 형식으로 보고하세요:
-\`\`\`json
-{"subtask_done": "완료된 서브태스크 제목"}
-\`\`\``,
-            ],
-            [
-              `[Task Plan Output Rules]
+          l([
+            `[Task Plan Output Rules]
 Before starting work, print a plan in the JSON format below:
 \`\`\`json
 {"subtasks": [{"title": "Subtask title 1"}, {"title": "Subtask title 2"}]}
@@ -414,30 +389,7 @@ Whenever you complete a subtask, report it in this format:
 \`\`\`json
 {"subtask_done": "Completed subtask title"}
 \`\`\``,
-            ],
-            [
-              `[作業計画の出力ルール]
-作業開始前に、次の JSON 形式で計画を出力してください:
-\`\`\`json
-{"subtasks": [{"title": "サブタスク1"}, {"title": "サブタスク2"}]}
-\`\`\`
-各サブタスクを完了するたびに、次の形式で報告してください:
-\`\`\`json
-{"subtask_done": "完了したサブタスク"}
-\`\`\``,
-            ],
-            [
-              `[任务计划输出规则]
-开始工作前，请按下述 JSON 格式输出计划:
-\`\`\`json
-{"subtasks": [{"title": "子任务1"}, {"title": "子任务2"}]}
-\`\`\`
-每完成一个子任务，请按下述格式汇报:
-\`\`\`json
-{"subtask_done": "已完成的子任务"}
-\`\`\``,
-            ],
-          ),
+          ]),
           taskLang,
         )}\n`
       : "";
@@ -455,20 +407,9 @@ Whenever you complete a subtask, report it in this format:
         ? `\n[Sub-agent model preference] When spawning sub-agents (Task tool), prefer using model: ${subModel}${subReasoningLevel ? ` with reasoning effort: ${subReasoningLevel}` : ""}`
         : "";
     const runInstruction = pickL(
-      l(
-        [
-          "위 작업을 충분히 완수하세요. 위 대화 맥락과 프로젝트 구조를 참고해도 좋지만, 프로젝트 구조 탐색에 시간을 쓰지 마세요. 필요한 구조는 이미 제공되었습니다.",
-        ],
-        [
-          "Please complete the task above thoroughly. Use the continuation brief, conversation context, and project structure above if relevant. Do NOT spend time exploring the project structure again unless required by unresolved checklist items.",
-        ],
-        [
-          "上記タスクを丁寧に完了してください。必要に応じて継続要約・会話コンテキスト・プロジェクト構成を参照できますが、未解決チェックリストに必要な場合を除き、構成探索に時間を使わないでください。",
-        ],
-        [
-          "请完整地完成上述任务。可按需参考连续执行摘要、会话上下文和项目结构，但除非未解决清单确有需要，不要再次花时间探索项目结构。",
-        ],
-      ),
+      l([
+        "Please complete the task above thoroughly. Use the continuation brief, conversation context, and project structure above if relevant. Do NOT spend time exploring the project structure again unless required by unresolved checklist items.",
+      ]),
       taskLang,
     );
 
@@ -585,27 +526,8 @@ Whenever you complete a subtask, report it in this format:
       notifyTaskStatus(id, task.title, "in_progress", taskLang);
 
       const assigneeName = getAgentDisplayName(agent as unknown as AgentRow, taskLang);
-      const worktreeNote = pickL(
-        l(
-          [` (격리 브랜치: climpire/${id.slice(0, 8)})`],
-          [` (isolated branch: climpire/${id.slice(0, 8)})`],
-          [` (分離ブランチ: climpire/${id.slice(0, 8)})`],
-          [`（隔离分支: climpire/${id.slice(0, 8)}）`],
-        ),
-        taskLang,
-      );
-      notifyCeo(
-        pickL(
-          l(
-            [`${assigneeName}가 '${task.title}' 작업을 시작했습니다.${worktreeNote}`],
-            [`${assigneeName} started work on '${task.title}'.${worktreeNote}`],
-            [`${assigneeName}が '${task.title}' の作業を開始しました。${worktreeNote}`],
-            [`${assigneeName} 已开始处理 '${task.title}'。${worktreeNote}`],
-          ),
-          taskLang,
-        ),
-        id,
-      );
+      const worktreeNote = pickL(l([` (isolated branch: climpire/${id.slice(0, 8)})`]), taskLang);
+      notifyCeo(pickL(l([`${assigneeName} started work on '${task.title}'.${worktreeNote}`]), taskLang), id);
 
       const taskRow = db.prepare("SELECT department_id FROM tasks WHERE id = ?").get(id) as
         | { department_id: string | null }
@@ -642,27 +564,8 @@ Whenever you complete a subtask, report it in this format:
       notifyTaskStatus(id, task.title, "in_progress", taskLang);
 
       const assigneeName = getAgentDisplayName(agent as unknown as AgentRow, taskLang);
-      const worktreeNote = pickL(
-        l(
-          [` (격리 브랜치: climpire/${id.slice(0, 8)})`],
-          [` (isolated branch: climpire/${id.slice(0, 8)})`],
-          [` (分離ブランチ: climpire/${id.slice(0, 8)})`],
-          [`（隔离分支: climpire/${id.slice(0, 8)}）`],
-        ),
-        taskLang,
-      );
-      notifyCeo(
-        pickL(
-          l(
-            [`${assigneeName}가 '${task.title}' 작업을 시작했습니다.${worktreeNote}`],
-            [`${assigneeName} started work on '${task.title}'.${worktreeNote}`],
-            [`${assigneeName}が '${task.title}' の作業を開始しました。${worktreeNote}`],
-            [`${assigneeName} 已开始处理 '${task.title}'。${worktreeNote}`],
-          ),
-          taskLang,
-        ),
-        id,
-      );
+      const worktreeNote = pickL(l([` (isolated branch: climpire/${id.slice(0, 8)})`]), taskLang);
+      notifyCeo(pickL(l([`${assigneeName} started work on '${task.title}'.${worktreeNote}`]), taskLang), id);
 
       const taskRow = db.prepare("SELECT department_id FROM tasks WHERE id = ?").get(id) as
         | { department_id: string | null }
@@ -692,27 +595,8 @@ Whenever you complete a subtask, report it in this format:
     notifyTaskStatus(id, task.title, "in_progress", taskLang);
 
     const assigneeName = getAgentDisplayName(agent as unknown as AgentRow, taskLang);
-    const worktreeNote = pickL(
-      l(
-        [` (격리 브랜치: climpire/${id.slice(0, 8)})`],
-        [` (isolated branch: climpire/${id.slice(0, 8)})`],
-        [` (分離ブランチ: climpire/${id.slice(0, 8)})`],
-        [`（隔离分支: climpire/${id.slice(0, 8)}）`],
-      ),
-      taskLang,
-    );
-    notifyCeo(
-      pickL(
-        l(
-          [`${assigneeName}가 '${task.title}' 작업을 시작했습니다.${worktreeNote}`],
-          [`${assigneeName} started work on '${task.title}'.${worktreeNote}`],
-          [`${assigneeName}が '${task.title}' の作業を開始しました。${worktreeNote}`],
-          [`${assigneeName} 已开始处理 '${task.title}'。${worktreeNote}`],
-        ),
-        taskLang,
-      ),
-      id,
-    );
+    const worktreeNote = pickL(l([` (isolated branch: climpire/${id.slice(0, 8)})`]), taskLang);
+    notifyCeo(pickL(l([`${assigneeName} started work on '${task.title}'.${worktreeNote}`]), taskLang), id);
 
     const taskRow = db.prepare("SELECT department_id FROM tasks WHERE id = ?").get(id) as
       | { department_id: string | null }

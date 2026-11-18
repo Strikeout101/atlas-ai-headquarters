@@ -30,7 +30,7 @@ export default function PhoneTabBar({
 
   return (
     <nav
-      aria-label={t({ ko: "주 메뉴", en: "Main", ja: "メイン", zh: "主菜单" })}
+      aria-label={t({ en: "Main" })}
       className="fixed inset-x-0 bottom-0 z-30 flex backdrop-blur-md"
       style={{
         height: "calc(3.5rem + env(safe-area-inset-bottom, 0px))",
@@ -58,10 +58,7 @@ export default function PhoneTabBar({
                   className="absolute -right-3 -top-1.5 min-w-[16px] rounded-full px-1 text-center text-[10px] font-semibold tabular-nums leading-4"
                   style={{ background: "var(--ax-signal)", color: "var(--ax-signal-ink)" }}
                   aria-label={t({
-                    ko: `${badge}건 대기`,
                     en: `${badge} waiting`,
-                    ja: `${badge} 件待ち`,
-                    zh: `${badge} 项待处理`,
                   })}
                 >
                   {badge > 99 ? "99+" : badge}
@@ -81,7 +78,7 @@ export default function PhoneTabBar({
         style={{ color: onTab ? "var(--th-text-muted)" : "var(--th-text-heading)" }}
       >
         <Menu size={20} strokeWidth={1.75} style={{ color: onTab ? undefined : "var(--ax-signal)" }} />
-        <span>{t({ ko: "메뉴", en: "Menu", ja: "メニュー", zh: "菜单" })}</span>
+        <span>{t({ en: "Menu" })}</span>
       </button>
     </nav>
   );

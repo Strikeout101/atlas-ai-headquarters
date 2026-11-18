@@ -42,9 +42,9 @@ export function ensureVpAgents(db: DatabaseSync): void {
     ).run(
       `atlas-vp-${provider}`,
       `${provider === "codex" ? "Codex" : "Claude"} VP`,
-      `${provider} 부사장`,
-      `${provider} 副社長`,
-      `${provider} 副总裁`,
+      "",
+      "",
+      "",
       provider,
       "Independently review approvals for the owner. Preserve spending, legal, customer-facing and default-department owner approval floors. Escalate uncertain decisions with a concrete reason.",
     );

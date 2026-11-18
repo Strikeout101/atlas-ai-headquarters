@@ -208,7 +208,6 @@ export function useSkillsLibraryState({ agents, localeTag, t }: { agents: Agent[
   const learnInProgress = learnJob?.status === "queued" || learnJob?.status === "running";
   const learnInProgressRef = useRef(learnInProgress);
   learnInProgressRef.current = learnInProgress;
-  const preferKoreanName = localeTag.startsWith("ko");
 
   useEffect(() => {
     return () => {
@@ -420,7 +419,6 @@ export function useSkillsLibraryState({ agents, localeTag, t }: { agents: Agent[
     learnedProvidersBySkill,
     modalLearnedProviders,
     learnInProgress,
-    preferKoreanName,
     openCustomSkillModal: customState.openCustomSkillModal,
     closeCustomSkillModal: customState.closeCustomSkillModal,
     handleCustomFileSelect: customState.handleCustomFileSelect,

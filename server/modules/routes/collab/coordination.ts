@@ -89,7 +89,7 @@ export function initializeCollabCoordination(ctx: RuntimeContext): any {
    * Detect project path from CEO message.
    * Recognizes:
    * 1. Absolute paths: /home/user/Projects/foo, ~/Projects/bar
-   * 2. Project names: "climpire 프로젝트", "claw-kanban에서"
+   * 2. Project names: "the atlas project", "in claw-kanban"
    * 3. Known project directories under ~/Projects
    */
   function detectProjectPath(message: string): string | null {
@@ -261,10 +261,7 @@ export function initializeCollabCoordination(ctx: RuntimeContext): any {
       const detectedFromContext = detectProjectPath(contextHint);
       if (detectedFromContext) return { projectPath: detectedFromContext, source: "project_context" };
 
-      const newProjectHint =
-        /신규\s*프로젝트|새\s*프로젝트|new project|greenfield|from scratch|新規.*プロジェクト|新项目/i.test(
-          contextHint,
-        );
+      const newProjectHint = /new project|greenfield|from scratch/i.test(contextHint);
       if (newProjectHint) {
         return { projectPath: getDefaultProjectRoot(), source: "new_project_default" };
       }

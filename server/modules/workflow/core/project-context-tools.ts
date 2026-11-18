@@ -22,21 +22,21 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
   const { db, isGitRepo, taskWorktrees } = deps;
 
   const MVP_CODE_REVIEW_POLICY_BASE_LINES = [
-    "[MVP Code Review Policy / 코드 리뷰 정책]",
-    "- CRITICAL/HIGH: fix immediately / 즉시 수정",
-    "- MEDIUM/LOW: warning report only, no code changes / 경고 보고서만, 코드 수정 금지",
+    "[MVP Code Review Policy]",
+    "- CRITICAL/HIGH: fix immediately",
+    "- MEDIUM/LOW: warning report only, no code changes",
   ];
   const EXECUTION_CONTINUITY_POLICY_LINES = [
-    "[Execution Continuity / 실행 연속성]",
-    "- Continue from the latest state without self-introduction or kickoff narration / 자기소개·착수 멘트 없이 최신 상태에서 바로 이어서 작업",
-    "- Reuse prior codebase understanding and read only files needed for this delta / 기존 코드베이스 이해를 재사용하고 이번 변경에 필요한 파일만 확인",
-    "- Focus on unresolved checklist items and produce concrete diffs first / 미해결 체크리스트 중심으로 즉시 코드 변경부터 진행",
-    "[Git Workflow Guardrail / Git 워크플로우 가드레일]",
-    "- Do NOT run git merge/rebase/cherry-pick/push during task execution. Merge is performed only by the system after final review approval / 작업 실행 중 git merge/rebase/cherry-pick/push 금지. 병합은 최종 리뷰 승인 후 시스템이 수행",
+    "[Execution Continuity]",
+    "- Continue from the latest state without self-introduction or kickoff narration",
+    "- Reuse prior codebase understanding and read only files needed for this delta",
+    "- Focus on unresolved checklist items and produce concrete diffs first",
+    "[Git Workflow Guardrail]",
+    "- Do NOT run git merge/rebase/cherry-pick/push during task execution. Merge is performed only by the system after final review approval",
   ];
 
   const WARNING_FIX_OVERRIDE_LINE =
-    "- Exception override: User explicitly requested warning-level fixes for this task. You may fix the requested MEDIUM/LOW items / 예외: 이 작업에서 사용자 요청 시 MEDIUM/LOW도 해당 요청 범위 내에서 수정 가능";
+    "- Exception override: User explicitly requested warning-level fixes for this task. You may fix the requested MEDIUM/LOW items";
 
   function hasExplicitWarningFixRequest(...textParts: Array<string | null | undefined>): boolean {
     const text = textParts
@@ -46,11 +46,11 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
     if (/\[(ALLOW_WARNING_FIX|WARN_FIX)\]/i.test(text)) return true;
 
     const requestHint =
-      /\b(please|can you|need to|must|should|fix this|fix these|resolve this|address this|fix requested|warning fix)\b|해줘|해주세요|수정해|수정해야|고쳐|고쳐줘|해결해|반영해|조치해|수정 요청/i;
+      /\b(please|can you|need to|must|should|fix this|fix these|resolve this|address this|fix requested|warning fix)\b/i;
     if (!requestHint.test(text)) return false;
 
     const warningFixPair =
-      /\b(fix|resolve|address|patch|remediate|correct)\b[\s\S]{0,60}\b(warning|warnings|medium|low|minor|non-critical|lint)\b|\b(warning|warnings|medium|low|minor|non-critical|lint)\b[\s\S]{0,60}\b(fix|resolve|address|patch|remediate|correct)\b|(?:경고|워닝|미디엄|로우|마이너|사소|비치명|린트)[\s\S]{0,40}(?:수정|고쳐|해결|반영|조치)|(?:수정|고쳐|해결|반영|조치)[\s\S]{0,40}(?:경고|워닝|미디엄|로우|마이너|사소|비치명|린트)/i;
+      /\b(fix|resolve|address|patch|remediate|correct)\b[\s\S]{0,60}\b(warning|warnings|medium|low|minor|non-critical|lint)\b|\b(warning|warnings|medium|low|minor|non-critical|lint)\b[\s\S]{0,60}\b(fix|resolve|address|patch|remediate|correct)\b/i;
     return warningFixPair.test(text);
   }
 

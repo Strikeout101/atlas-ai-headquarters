@@ -55,34 +55,34 @@ export const AGENT_STATUS_ORDER: AgentStatus[] = ["working", "break", "idle", "o
 export function agentStatusLabel(status: AgentStatus, t: TFunction) {
   switch (status) {
     case "working":
-      return t({ ko: "근무 중", en: "Working", ja: "稼働中", zh: "工作中" });
+      return t({ en: "Working" });
     case "break":
-      return t({ ko: "휴식", en: "On break", ja: "休憩中", zh: "休息中" });
+      return t({ en: "On break" });
     case "idle":
-      return t({ ko: "대기", en: "Idle", ja: "待機", zh: "空闲" });
+      return t({ en: "Idle" });
     case "offline":
-      return t({ ko: "오프라인", en: "Offline", ja: "オフライン", zh: "离线" });
+      return t({ en: "Offline" });
   }
 }
 
 export function taskStatusLabel(status: string, t: TFunction) {
   switch (status) {
     case "inbox":
-      return t({ ko: "수신함", en: "Inbox", ja: "受信箱", zh: "收件箱" });
+      return t({ en: "Inbox" });
     case "planned":
-      return t({ ko: "계획됨", en: "Planned", ja: "計画済み", zh: "已计划" });
+      return t({ en: "Planned" });
     case "collaborating":
-      return t({ ko: "협업 중", en: "Collaborating", ja: "協業中", zh: "协作中" });
+      return t({ en: "Collaborating" });
     case "in_progress":
-      return t({ ko: "진행 중", en: "In progress", ja: "進行中", zh: "进行中" });
+      return t({ en: "In progress" });
     case "review":
-      return t({ ko: "검토 중", en: "Review", ja: "レビュー", zh: "审核" });
+      return t({ en: "Review" });
     case "done":
-      return t({ ko: "완료", en: "Done", ja: "完了", zh: "完成" });
+      return t({ en: "Done" });
     case "pending":
-      return t({ ko: "보류", en: "On hold", ja: "保留", zh: "待处理" });
+      return t({ en: "On hold" });
     case "cancelled":
-      return t({ ko: "취소됨", en: "Cancelled", ja: "キャンセル", zh: "已取消" });
+      return t({ en: "Cancelled" });
     default:
       return status;
   }

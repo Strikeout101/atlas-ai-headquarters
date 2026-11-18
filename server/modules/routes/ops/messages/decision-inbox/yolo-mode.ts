@@ -65,11 +65,11 @@ function extractSummarySuggestedOptionNumbers(summary: string, validNumbers: Set
     const value = Number.parseInt(match[1] || "", 10);
     if (Number.isFinite(value)) addIfValid(value);
   }
-  for (const match of text.matchAll(/(?:option|옵션|번호|pick(?:s)?|선택)\s*[:#-]?\s*([1-9]\d?)/gi)) {
+  for (const match of text.matchAll(/(?:option|pick(?:s)?)\s*[:#-]?\s*([1-9]\d?)/gi)) {
     const value = Number.parseInt(match[1] || "", 10);
     if (Number.isFinite(value)) addIfValid(value);
   }
-  for (const match of text.matchAll(/(?:recommend(?:ed)?|권장|추천|pick(?:s)?)\s*[:：-]\s*([^\n]+)/gi)) {
+  for (const match of text.matchAll(/(?:recommend(?:ed)?|pick(?:s)?)\s*[:：-]\s*([^\n]+)/gi)) {
     const block = String(match[1] || "");
     for (const numMatch of block.matchAll(/([1-9]\d?)/g)) {
       const value = Number.parseInt(numMatch[1] || "", 10);

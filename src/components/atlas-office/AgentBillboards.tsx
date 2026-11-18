@@ -1,4 +1,13 @@
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import {
+  Component,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import { SRGBColorSpace, Vector3, type Group, type Mesh, type MeshBasicMaterial, type Texture } from "three";
@@ -28,15 +37,12 @@ export interface AgentSpeech {
   until: number;
 }
 
-type Language = "ko" | "en" | "ja" | "zh";
+type Language = "en";
 
 export function localName(
   entity: { name: string; name_ko: string; name_ja?: string | null; name_zh?: string | null },
   language: Language,
 ): string {
-  if (language === "ko") return entity.name_ko || entity.name;
-  if (language === "ja") return entity.name_ja || entity.name;
-  if (language === "zh") return entity.name_zh || entity.name;
   return entity.name;
 }
 
@@ -283,8 +289,7 @@ function AtlasAgent({
     // Seat state: stand up before walking off, sit down once at the seat and facing the right way.
     const seatState = seat.current;
     seatState.elapsed += dt;
-    const transitionDone =
-      clipFinished.current || seatState.elapsed > (modelReady ? SIT_TRANSITION_TIMEOUT : 0);
+    const transitionDone = clipFinished.current || seatState.elapsed > (modelReady ? SIT_TRANSITION_TIMEOUT : 0);
     if (seatState.state === "seated" && !wantsSeat) {
       seatState.state = "standingUp";
       seatState.elapsed = 0;
@@ -297,7 +302,9 @@ function AtlasAgent({
       seatState.state = "standing";
       seatState.elapsed = 0;
     } else if (seatState.state === "standing" && wantsSeat) {
-      const facingError = Math.abs(Math.atan2(Math.sin(sitYaw - modelYaw.current), Math.cos(sitYaw - modelYaw.current)));
+      const facingError = Math.abs(
+        Math.atan2(Math.sin(sitYaw - modelYaw.current), Math.cos(sitYaw - modelYaw.current)),
+      );
       if (facingError < SIT_FACING_TOLERANCE || !modelReady) {
         seatState.state = "sittingDown";
         seatState.elapsed = 0;
@@ -357,7 +364,11 @@ function AtlasAgent({
         ? (sitYaw ?? plan.use?.yaw ?? restingYaw(plan.activity, position.current.x, position.current.z))
         : null;
       // Seated agents keep facing the way they sat down; standing agents turn toward travel or their focus.
-      const wanted = isSeated ? modelYaw.current : moving ? Math.atan2(heading.current[0], heading.current[1]) : (rest ?? modelYaw.current);
+      const wanted = isSeated
+        ? modelYaw.current
+        : moving
+          ? Math.atan2(heading.current[0], heading.current[1])
+          : (rest ?? modelYaw.current);
       const diff = Math.atan2(Math.sin(wanted - modelYaw.current), Math.cos(wanted - modelYaw.current));
       modelYaw.current += diff * (1 - Math.exp(-TURN_RATE * dt));
       model.current.rotation.y = modelYaw.current;
@@ -621,25 +632,27 @@ export default function AgentBillboards({
   return (
     <>
       {makingCoffee && <CoffeeSteam />}
-      {pods.filter((pod) => pod.floor === floor).map((pod) => {
-        const department = pod.departmentId ? departmentsById.get(pod.departmentId) : undefined;
-        const [x, z] = pod.center;
-        return (
-          <FaceCamera key={`${pod.departmentId ?? "unassigned"}:${pod.deskIndices[0]}`} position={[x, 2.3, z - 0.1]}>
-            <LabelPlate
-              lines={[department ? localName(department, language) : "Unassigned"]}
-              style={{
-                background: "rgba(13, 17, 23, 0.6)",
-                color: "#e2e8f0",
-                accent: department?.color ?? "#7895a2",
-                caps: true,
-                fontSize: 27,
-              }}
-              position={[0, 0, 0]}
-            />
-          </FaceCamera>
-        );
-      })}
+      {pods
+        .filter((pod) => pod.floor === floor)
+        .map((pod) => {
+          const department = pod.departmentId ? departmentsById.get(pod.departmentId) : undefined;
+          const [x, z] = pod.center;
+          return (
+            <FaceCamera key={`${pod.departmentId ?? "unassigned"}:${pod.deskIndices[0]}`} position={[x, 2.3, z - 0.1]}>
+              <LabelPlate
+                lines={[department ? localName(department, language) : "Unassigned"]}
+                style={{
+                  background: "rgba(13, 17, 23, 0.6)",
+                  color: "#e2e8f0",
+                  accent: department?.color ?? "#7895a2",
+                  caps: true,
+                  fontSize: 27,
+                }}
+                position={[0, 0, 0]}
+              />
+            </FaceCamera>
+          );
+        })}
       {agents.map((agent) => {
         const plan = plans.get(agent.id);
         if (!plan || (plan.floor !== floor && !allFloors)) return null;
