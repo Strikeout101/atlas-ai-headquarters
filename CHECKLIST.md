@@ -201,13 +201,17 @@ Approval rules are settings per business (Settings > Businesses > Approvals and 
 
 ## 12. Reliability and operations
 
-- [ ] **P1** Run ATLAS as a Windows service or scheduled task that starts at boot and restarts after a crash. Today it stops when the console window closes.
-- [ ] **P1** Automatic database backups (daily, keep 30 days, plus a copy off the PC such as the homelab or cloud). Include a restore test. Today backups are manual snapshots only.
-- [ ] **P1** Turn off or redirect the auto-updater. It points at the upstream claw-empire releases, which would overwrite this fork. It is off now; make sure it stays off.
+See docs/operations.md for running, updating, backing up and restoring ATLAS.
+
+- [x] **P1** (2026-11-18, `scripts/atlas-service/`: login task, stable build of the latest commit on port 8800, crash and hang restarts, Update with rollback; Settings > General > Service) Run ATLAS as a Windows service or scheduled task that starts at boot and restarts after a crash. Today it stops when the console window closes.
+- [x] **P1** (2026-11-18, Settings > General > Backups: daily, 30 days, newest three always kept, restore test on every copy, optional copy to any folder; `restore-backup.ps1`) Automatic database backups (daily, keep 30 days, plus a copy off the PC such as the homelab or cloud). Include a restore test. Today backups are manual snapshots only.
+- [x] **P1** (2026-11-18, `update-auto/upstream-lock.ts`: never checks or applies upstream unless `ATLAS_ALLOW_UPSTREAM_UPDATE=1`; toggle removed from Settings) Turn off or redirect the auto-updater. It points at the upstream claw-empire releases, which would overwrite this fork. It is off now; make sure it stays off.
 - [ ] **P2** HTTPS for phone access (Tailscale Serve or a local certificate). Today it is plain HTTP over the VPN.
 - [ ] **P2** Health alerts: if the server, a mailbox, a sync or a VP stops working, notify the owner (section 7).
-- [ ] **P2** Save server logs to files and rotate the logs folder.
-- [ ] **P2** Check that CI runs and passes on the fork (`.github/workflows/ci.yml` is inherited from upstream).
+- [x] **P2** (2026-11-18, service writes `logs/server/atlas-YYYY-MM-DD.log`, kept 14 days; task logs in `logs/` are not pruned) Save server logs to files and rotate the logs folder.
+- [ ] **P2** Check that CI runs and passes on the fork (`.github/workflows/ci.yml` is inherited from upstream). The GitHub CLI is not installed here, so this needs a look at the Actions tab on GitHub.
+- [ ] **P1 YOU** Switch to the ATLAS service: close the dev server window (the one started by the old `start-atlas.bat`), run `.\scripts\atlas-service\atlas-service.ps1 install` in PowerShell from the ATLAS folder, then check the phone address on port 8800 still works. (Claude can do this on your OK.)
+- [ ] **P2 YOU** Pick a folder off this PC for backup copies (NAS share, external drive or OneDrive) in Settings > General > Backups.
 - [ ] **P3** Move the live database out of the repo folder into a data folder.
 
 ## 13. Repo and docs cleanup
@@ -244,6 +248,7 @@ Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the
 
 - 2026-11-16: Phone layout with dashboard only (no 3D office on phones) and password-protected access over the home VPN. Committed 2026-11-17.
 - 2026-11-17: First full feature review and this checklist.
+- 2026-11-18: Section 12 reliability: ATLAS service with crash restarts and safe updates, automatic restore-tested backups, upstream updater locked, server log rotation.
 - 2026-11-18: Section 10 approvals: client importance, deal-size limit, structured routing facts, policy-driven VP prompt, trust-ramp suggestions, spending budgets.
 - 2026-11-17: Agent knowledge and memory (section 2): systems registry, filled business profiles, knowledge block in task prompts, persistent memory with owner review, `knowledge.get` / `memory.*` tools, Team > Knowledge page, docs index. `SETUP-INFO-NEEDED.txt` moved out of git.
 - [X] **P1 YOU** Open ATLAS on the phone over the home VPN and confirm the login page loads at the PC's LAN address on port 8800. ## 11/17 Cofirmed 

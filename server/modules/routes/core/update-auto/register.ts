@@ -16,6 +16,7 @@ import {
   type UpdateApplyResult,
   type UpdateStatusPayload,
 } from "./apply-update.ts";
+import { UPSTREAM_UPDATE_LOCK_ERROR, UPSTREAM_UPDATE_LOCK_MESSAGE, upstreamUpdatesLocked } from "./upstream-lock.ts";
 
 export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
   const __ctx: RuntimeContext = ctx;
@@ -28,7 +29,8 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
   const readSettingString = __ctx.readSettingString;
   const killPidTree = __ctx.killPidTree;
 
-  const UPDATE_CHECK_ENABLED = String(process.env.UPDATE_CHECK_ENABLED ?? "1").trim() !== "0";
+  const UPSTREAM_LOCKED = upstreamUpdatesLocked();
+  const UPDATE_CHECK_ENABLED = !UPSTREAM_LOCKED && String(process.env.UPDATE_CHECK_ENABLED ?? "1").trim() !== "0";
   const UPDATE_CHECK_REPO = String(process.env.UPDATE_CHECK_REPO ?? "GreenSheep01201/claw-empire").trim();
   const UPDATE_CHECK_TTL_MS = Math.max(
     60_000,
@@ -220,7 +222,7 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
         checked_at: now,
         enabled: false,
         repo: UPDATE_CHECK_REPO,
-        error: null,
+        error: UPSTREAM_LOCKED ? UPSTREAM_UPDATE_LOCK_ERROR : null,
       };
     }
 
@@ -297,7 +299,7 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
   };
 
   async function runAutoUpdateCycle(): Promise<void> {
-    if (!autoUpdateSchedulerReady) return;
+    if (!autoUpdateSchedulerReady || UPSTREAM_LOCKED) return;
     refreshAutoUpdateActiveState();
     if (!autoUpdateActive) {
       autoUpdateState.next_check_at = Date.now() + AUTO_UPDATE_CHECK_INTERVAL_MS;
@@ -359,7 +361,11 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
 
   {
     const dep = validateAutoUpdateDependencies();
-    if (!dep.ok) {
+    if (UPSTREAM_LOCKED) {
+      autoUpdateSchedulerReady = false;
+      autoUpdateActive = false;
+      autoUpdateState.last_error = UPSTREAM_UPDATE_LOCK_ERROR;
+    } else if (!dep.ok) {
       autoUpdateSchedulerReady = false;
       autoUpdateActive = false;
       autoUpdateState.last_error = `missing_dependencies:${dep.missing.join(",")}`;
@@ -445,6 +451,10 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
 
     const body = req.body ?? {};
     const enabled = parseUpdateBooleanFlag(body, "enabled");
+    if (UPSTREAM_LOCKED && enabled)
+      return res
+        .status(409)
+        .json({ ok: false, error: UPSTREAM_UPDATE_LOCK_ERROR, message: UPSTREAM_UPDATE_LOCK_MESSAGE });
     writeAutoUpdateEnabledSetting(enabled);
     autoUpdateActive = autoUpdateSchedulerReady ? enabled : false;
 
@@ -476,6 +486,10 @@ export function registerUpdateAutoRoutes(ctx: RuntimeContext): void {
       return res.status(401).json({ ok: false, error: "unauthorized" });
     }
 
+    if (UPSTREAM_LOCKED)
+      return res
+        .status(409)
+        .json({ ok: false, error: UPSTREAM_UPDATE_LOCK_ERROR, message: UPSTREAM_UPDATE_LOCK_MESSAGE });
     const body = req.body ?? {};
     const dryRun = parseUpdateBooleanFlag(body, "dry_run");
     const force = parseUpdateBooleanFlag(body, "force");

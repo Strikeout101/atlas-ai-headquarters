@@ -1,6 +1,10 @@
 @echo off
-title ATLAS AI Headquarters (dev server)
+title ATLAS AI Headquarters
 cd /d "%~dp0"
+
+rem Starts the ATLAS service (a stable build of the latest commit on port 8800) if it is not running, then opens it.
+rem To have it start at every login instead: powershell -ExecutionPolicy Bypass -File scripts\atlas-service\atlas-service.ps1 install
+rem For development with live reload use start-atlas-dev.bat (only while the service is stopped).
 
 where pnpm >nul 2>nul
 if errorlevel 1 (
@@ -9,24 +13,18 @@ if errorlevel 1 (
   where pnpm >nul 2>nul || (echo Could not enable pnpm. Install it with: npm install -g pnpm & pause & exit /b 1)
 )
 
-netstat -ano | findstr /R /C:":8790 .*LISTENING" >nul
-if not errorlevel 1 (
-  echo Port 8790 is already in use - is the original claw-empire server still running?
-  echo Close that window first, then run this again.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\atlas-service\atlas-service.ps1" start
+if errorlevel 1 (pause & exit /b 1)
+
+echo.
+echo ATLAS is starting. The first start builds a release, which takes a few minutes.
+echo It opens at http://127.0.0.1:8800 (phones on the home VPN: this PC's LAN address, port 8800).
+echo Check on it any time with: powershell -File scripts\atlas-service\atlas-service.ps1 status
+echo.
+powershell -NoProfile -Command "for ($i=0; $i -lt 300; $i++) { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8800/api/health | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 } }; exit 1"
+if errorlevel 1 (
+  echo ATLAS did not answer yet. See %LOCALAPPDATA%\ATLAS\supervisor.log
   pause
   exit /b 1
 )
-
-if not exist node_modules (
-  echo Installing packages - first run only, this takes a few minutes...
-  call pnpm install || (echo Install failed. & pause & exit /b 1)
-)
-
-echo.
-echo Starting... the browser opens at http://127.0.0.1:8800 once the server is up.
-echo Phones on the home VPN can use this PC's LAN address on port 8800 and the existing password.
-echo Keep this window open while you test. Close it (or press Ctrl+C) to stop the server.
-echo.
-start "" cmd /c "timeout /t 12 >nul & start http://127.0.0.1:8800"
-call pnpm dev
-pause
+start "" http://127.0.0.1:8800

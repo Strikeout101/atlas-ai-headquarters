@@ -1,6 +1,7 @@
 import type { CliProvider } from "../../types";
 import type { LocalSettings, SetLocalSettings, TFunction } from "./types";
 import SettingsSection from "./SettingsSection";
+import ServiceAndBackups from "./ServiceAndBackups";
 
 interface GeneralSettingsTabProps {
   t: TFunction;
@@ -104,23 +105,7 @@ export default function GeneralSettingsTab({ t, form, setForm, saved, onSave }: 
             })}
           />
 
-          <ToggleSettingCard
-            label={t({
-              ko: "자동 업데이트 (전역)",
-              en: "Auto Update (Global)",
-              ja: "Auto Update（全体）",
-              zh: "自动更新（全局）",
-            })}
-            checked={form.autoUpdateEnabled}
-            onToggle={() => setForm({ ...form, autoUpdateEnabled: !form.autoUpdateEnabled })}
-            title={t({
-              ko: "서버 전체 자동 업데이트 루프를 켜거나 끕니다.",
-              en: "Enable or disable auto-update loop for the whole server.",
-              ja: "サーバー全体の自動更新ループを有効/無効にします。",
-              zh: "启用或禁用整个服务器的自动更新循环。",
-            })}
-          />
-
+          {/* Upstream auto-update is locked in ATLAS; updates come from the Service section below. */}
           <ToggleSettingCard
             label={t({ ko: "OAuth 자동 스왑", en: "OAuth Auto Swap", ja: "OAuth 自動スワップ", zh: "OAuth 自动切换" })}
             checked={form.oauthAutoSwap !== false}
@@ -195,6 +180,8 @@ export default function GeneralSettingsTab({ t, form, setForm, saved, onSave }: 
           {t({ ko: "저장", en: "Save", ja: "保存", zh: "保存" })}
         </button>
       </div>
+
+      <ServiceAndBackups />
     </>
   );
 }

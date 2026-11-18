@@ -52,6 +52,7 @@ import { ensureCodePushSchema } from "./modules/code-pushes.ts";
 import { ensureRecordChangeSchema } from "./modules/record-changes.ts";
 import { ensureTrustRampSchema } from "./modules/trust-ramp.ts";
 import { ensureSpendBudgetSchema } from "./modules/spend-budgets.ts";
+import { ensureBackupSchema, startBackupScheduler } from "./modules/db-backups.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
@@ -79,6 +80,9 @@ ensureCodePushSchema(db);
 ensureRecordChangeSchema(db);
 ensureTrustRampSchema(db);
 ensureSpendBudgetSchema(db);
+ensureBackupSchema(db);
+// Daily database backups with a restore test (Settings > General > Backups).
+startBackupScheduler(db, dbPath);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 ensureVpAgents(db);

@@ -27709,6 +27709,223 @@
           }
         }
       }
+    },
+    "/api/system/service": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "ATLAS service status",
+        "description": "Whether ATLAS runs as the stable service, the running commit, restarts, the last update result and how many commits the repo is ahead. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "managed": true,
+                  "state": {
+                    "current_sha": "19c9c15…",
+                    "restarts": 0
+                  },
+                  "commits_behind": 2
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/service/{action}": {
+      "post": {
+        "tags": ["settings"],
+        "summary": "Ask the service to update or restart",
+        "description": "update builds the latest commit, switches over and rolls back if it is not healthy within 90s; restart restarts the running version. The supervisor carries it out; the response only confirms the request. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["update", "restart"]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Requested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "request": {
+                    "action": "update",
+                    "requested_at": 0
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ATLAS is not running as a service"
+          }
+        }
+      }
+    },
+    "/api/backups": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Backup settings, recent runs and files",
+        "description": "Daily database backups with a restore test (integrity check and matching row counts). Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Backups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/settings": {
+      "patch": {
+        "tags": ["settings"],
+        "summary": "Change backup settings",
+        "description": "copy_dir is an absolute folder off this PC (NAS share, external drive, synced cloud folder); null keeps backups on this PC only. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23
+                  },
+                  "keep_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650
+                  },
+                  "copy_dir": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "additionalProperties": false
+              },
+              "example": {
+                "hour": 3,
+                "keep_days": 30
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/run": {
+      "post": {
+        "tags": ["settings"],
+        "summary": "Back up now",
+        "description": "Runs one backup with its restore test and the off-PC copy. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Backup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/test-folder": {
+      "post": {
+        "tags": ["settings"],
+        "summary": "Check a backup folder",
+        "description": "Writes and removes a probe file. Changes no settings. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "copy_dir": {
+                    "type": "string"
+                  }
+                },
+                "required": ["copy_dir"],
+                "additionalProperties": false
+              },
+              "example": {
+                "copy_dir": "\\nas\backupsatlas"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "error": null
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

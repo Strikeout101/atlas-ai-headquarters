@@ -3,6 +3,7 @@ import { registerFinanceRoutes } from "./ops/finance.ts";
 import { registerListingRoutes } from "./ops/listings.ts";
 import { registerKnowledgeRoutes } from "./ops/knowledge.ts";
 import { registerApprovalSettingsRoutes } from "./ops/approval-settings.ts";
+import { registerSystemRoutes } from "./ops/system.ts";
 import { registerGitHubAccountRoutes } from "./ops/github-accounts.ts";
 import { registerAutonomyRoutes } from "./ops/autonomy.ts";
 import { registerOrgRequestRoutes } from "./ops/org-requests.ts";
@@ -251,6 +252,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   registerListingRoutes(app, db, broadcast);
   registerKnowledgeRoutes(app, db, broadcast);
   registerApprovalSettingsRoutes(app, db, broadcast);
+  registerSystemRoutes(app, db, dbPath);
   registerGitHubAccountRoutes(app, db, broadcast);
   registerControlRoutes(app, db, {
     nowMs,

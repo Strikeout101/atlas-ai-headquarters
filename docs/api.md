@@ -236,6 +236,19 @@ or
 | POST   | `/api/update-auto-config`                 | Toggle auto update                                               |
 | POST   | `/api/update-apply`                       | Trigger update apply flow immediately                            |
 
+### Service and Backups
+
+| Method | Path                                     | Purpose                                                                                |
+| ------ | ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| GET    | `/api/system/service`                    | Service status: running commit, restarts, last update, commits waiting                 |
+| POST   | `/api/system/service/update`, `/restart` | Ask the supervisor to update to the latest commit (rolls back if unhealthy) or restart |
+| GET    | `/api/backups`                           | Backup settings, recent runs (with restore-test result) and files                      |
+| PATCH  | `/api/backups/settings`                  | `enabled`, `hour`, `keep_days`, `copy_dir` (absolute folder off this PC or null)       |
+| POST   | `/api/backups/run`                       | Back up now                                                                            |
+| POST   | `/api/backups/test-folder`               | Check a folder can be written to                                                       |
+
+All need the owner password session (CSRF for changes); agent task tokens are refused. The inherited upstream update routes (`/api/update-*`) are locked unless `ATLAS_ALLOW_UPSTREAM_UPDATE=1`. See docs/operations.md.
+
 ### Accounts and Approvals
 
 | Method       | Path                                          | Purpose                                                                                                                                                                                                                        |
