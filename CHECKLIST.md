@@ -173,9 +173,9 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 10. Autonomy and approvals (moving from testing to real running)
 
-Today every rule is hard-coded. Tech and Rental customer-facing work always goes to the owner. There is no client importance, deal size or trust level.
+In progress (Claude, from 2026-11-18). Approval levels per business are now settings. There is no client importance, deal size or trust level yet.
 
-- [ ] **P1** **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
+- [x] **P1** (2026-11-17, Settings > Businesses > Approvals: customer sends, record changes, code pushes; deal size and client tier still to add) **Approval policy settings page:** per business and per action, choose owner, VPs, or automatic. Keep hard floors for money movement, new paid accounts, accepting terms and destructive SSH.
 - [ ] **P1** **Client importance:** add a tier on contacts (normal, important, VIP). Important and VIP clients always go to the owner; normal clients follow the policy.
 - [ ] **P1** **Deal size thresholds:** deals and quotes above an amount go to the owner; below it, VPs or automatic. Answer From strike: 1K for now
 - [ ] **P1** Remove the hard-coded line in the VP review prompt that forces every Tech and Rental customer item to escalate. Read the policy instead.
