@@ -217,6 +217,7 @@ See docs/operations.md for running, updating, backing up and restoring ATLAS.
 - [ ] **P2** Check that CI runs and passes on the fork (`.github/workflows/ci.yml` is inherited from upstream). The GitHub CLI is not installed here, so this needs a look at the Actions tab on GitHub.
 - [x] **P1** (2026-11-18, done by Claude on the owner's OK: dev server stopped with no tasks running, login task `ATLAS` installed, service running the latest commit on port 8800 on all addresses) Switch to the ATLAS service.
 - [ ] **P2 YOU** Open ATLAS on the phone (home VPN, this PC's address, port 8800) once to confirm it still loads under the service.
+- [ ] **P1 YOU** Update the service to the latest commit: Settings > General > Service > **Update to latest commit** (or run `.scriptsatlas-serviceatlas-service.ps1 update` in your own PowerShell). It still runs f0baf01, from before the English-only change. Claude's shell is sandboxed, so its update requests never reach the real service folder. (The 939b919 commit message blames a console window for this; the real cause was the sandbox. Running hidden is still the better setup.)
 - [ ] **P2 YOU** Pick a folder off this PC for backup copies (NAS share, external drive or OneDrive) in Settings > General > Backups.
 - [ ] **P3** Move the live database out of the repo folder into a data folder.
 
