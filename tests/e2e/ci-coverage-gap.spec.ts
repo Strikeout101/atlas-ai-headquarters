@@ -459,6 +459,12 @@ test.describe("CI coverage gap expansion", () => {
     };
     const cookieHeader = await establishApiSession(request);
     const ws = await connectWsWithSessionCookie(cookieHeader);
+    // The runtime database is shared by every later spec, so put the language back afterwards.
+    const before = (await (await request.get("/api/settings")).json()) as { settings: Record<string, unknown> };
+    const restoreSettings = {
+      language: before.settings.language ?? "en",
+      uiDensity: before.settings.uiDensity, // dropped from the JSON when it was never set
+    };
 
     try {
       const receivedTypes = new Set<string>();
@@ -559,6 +565,7 @@ test.describe("CI coverage gap expansion", () => {
       expect(badDecisionReplyRes.status()).toBe(404);
     } finally {
       ws.close();
+      await request.put("/api/settings", { data: restoreSettings });
       await cleanupE2EResources(request, cleanup);
     }
   });

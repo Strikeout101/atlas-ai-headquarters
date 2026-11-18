@@ -125,7 +125,7 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
         });
       }
     } catch (reportErr) {
-      console.error("[Claw-Empire] task_report broadcast error:", reportErr);
+      console.error("[ATLAS] task_report broadcast error:", reportErr);
     }
   }
 

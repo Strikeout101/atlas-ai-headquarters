@@ -67,10 +67,10 @@ export default function GitHubOAuthAppConfig({ t }: { t: TFunction }) {
           <li>GitHub → Settings → Developer settings → OAuth Apps → New OAuth App</li>
           <li>
             {t({
-              ko: "Application name: 아무 이름 (예: My Climpire)",
-              en: "Application name: any name (e.g. My Climpire)",
-              ja: "Application name: 任意の名前（例: My Climpire）",
-              zh: "Application name: 任意名称（如 My Climpire）",
+              ko: "Application name: 아무 이름 (예: My ATLAS)",
+              en: "Application name: any name (e.g. My ATLAS)",
+              ja: "Application name: 任意の名前（例: My ATLAS）",
+              zh: "Application name: 任意名称（如 My ATLAS）",
             })}
           </li>
           <li>Homepage URL: http://localhost:8800</li>

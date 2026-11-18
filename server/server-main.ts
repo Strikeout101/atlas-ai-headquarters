@@ -93,7 +93,7 @@ ensureVpAgents(db);
   const cleanup = removeOfficePacks(db);
   if (cleanup.agents || cleanup.tasks || cleanup.droppedTables.length) {
     console.log(
-      `[Claw-Empire] Removed office packs: ${cleanup.agents} agent(s), ${cleanup.tasks} task(s), tables: ${cleanup.droppedTables.join(", ") || "none"}`,
+      `[ATLAS] Removed office packs: ${cleanup.agents} agent(s), ${cleanup.tasks} task(s), tables: ${cleanup.droppedTables.join(", ") || "none"}`,
     );
   }
 }

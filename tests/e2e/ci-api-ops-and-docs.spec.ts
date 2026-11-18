@@ -557,7 +557,7 @@ test.describe("CI API ops and docs coverage", () => {
 
     const swaggerUi = await request.get("/api/docs");
     expect(swaggerUi.ok()).toBe(true);
-    await expect(swaggerUi.text()).resolves.toContain("Claw-Empire API Docs");
+    await expect(swaggerUi.text()).resolves.toContain("ATLAS API Docs");
 
     const openapi = await expectOkJson<{
       openapi: string;

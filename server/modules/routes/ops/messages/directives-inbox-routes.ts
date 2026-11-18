@@ -521,7 +521,7 @@ export function registerDirectiveAndInboxRoutes(
     const shouldRouteToSessionAgent = Boolean(sessionRoute && routedAgent);
     if (sessionRoute && !routedAgent) {
       console.warn(
-        `[Claw-Empire] inbox session route ignored: mapped agent not found (agent_id=${sessionRoute.agentId}, channel=${sessionRoute.channel}, target=${sessionRoute.targetId})`,
+        `[ATLAS] inbox session route ignored: mapped agent not found (agent_id=${sessionRoute.agentId}, channel=${sessionRoute.channel}, target=${sessionRoute.targetId})`,
       );
     }
     if (!isDirective && !shouldRouteToSessionAgent) {

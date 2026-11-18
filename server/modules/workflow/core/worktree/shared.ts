@@ -261,9 +261,9 @@ export function autoCommitWorktreePendingChanges(
       "git",
       [
         "-c",
-        "user.name=Claw-Empire",
+        "user.name=ATLAS",
         "-c",
-        "user.email=claw-empire@local",
+        "user.email=atlas@local",
         "commit",
         "-m",
         `chore: auto-commit pending task changes (${taskId.slice(0, 8)})`,

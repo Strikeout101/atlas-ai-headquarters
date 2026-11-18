@@ -229,7 +229,7 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
             stdio: "pipe",
             timeout: 5000,
           });
-          console.log(`[Claw-Empire] Created dev branch from main for task ${taskId.slice(0, 8)}`);
+          console.log(`[ATLAS] Created dev branch from main for task ${taskId.slice(0, 8)}`);
         }
       } catch {
         try {

@@ -144,9 +144,7 @@ export function parseTrustedNetworks(entries: readonly string[]): TrustedNetwork
 
 const configuredTrustedNetworks = parseTrustedNetworks(TRUSTED_NETWORKS);
 if (configuredTrustedNetworks.rejected.length > 0) {
-  console.warn(
-    `[Claw-Empire] Ignoring invalid TRUSTED_NETWORKS entries: ${configuredTrustedNetworks.rejected.join(", ")}`,
-  );
+  console.warn(`[ATLAS] Ignoring invalid TRUSTED_NETWORKS entries: ${configuredTrustedNetworks.rejected.join(", ")}`);
 }
 
 export function getTrustedNetworkSummary(): { networks: string[]; allowedHosts: string[] } {

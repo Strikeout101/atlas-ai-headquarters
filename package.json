@@ -1,7 +1,7 @@
 {
   "name": "climpire",
   "version": "2.0.4",
-  "description": "Claw-Empire - AI Agent Company Simulation. Command your CLI agent empire from the CEO desk.",
+  "description": "ATLAS - AI headquarters that runs the businesses and homelab with teams of AI agents. Fork of claw-empire.",
   "type": "module",
   "scripts": {
     "assets:office-map": "node scripts/generate-office-map-assets.mjs",

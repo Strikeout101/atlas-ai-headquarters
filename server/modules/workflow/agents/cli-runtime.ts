@@ -321,7 +321,7 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
         kind === "idle"
           ? `no output for ${Math.round(timeoutMs / 1000)}s`
           : `exceeded max runtime ${Math.round(timeoutMs / 1000)}s`;
-      const msg = `[Claw-Empire] RUN TIMEOUT (${reason})`;
+      const msg = `[ATLAS] RUN TIMEOUT (${reason})`;
       safeWrite(`\n${msg}\n`);
       appendTaskLog(taskId, "error", msg);
       try {
@@ -353,8 +353,8 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
       finished = true;
       clearRunTimers();
       detachOutputListeners();
-      console.error(`[Claw-Empire] spawn error for ${provider} (task ${taskId}): ${err.message}`);
-      safeWrite(`\n[Claw-Empire] SPAWN ERROR: ${err.message}\n`);
+      console.error(`[ATLAS] spawn error for ${provider} (task ${taskId}): ${err.message}`);
+      safeWrite(`\n[ATLAS] SPAWN ERROR: ${err.message}\n`);
       safeEnd();
       activeProcesses.delete(taskId);
       appendTaskLog(taskId, "error", `Agent spawn failed: ${err.message}`);
