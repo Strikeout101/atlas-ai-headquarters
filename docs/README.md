@@ -6,6 +6,7 @@ Which documents describe ATLAS as it is now, and which are dated history. Pendin
 
 | Document                                                 | What it covers                                                                                                                                    |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [codebase-map.md](codebase-map.md)                       | Where each folder and module lives; start here before searching the code.                                                                         |
 | [agent-tools.md](agent-tools.md)                         | The agent tool gateway: every operation agents can call and the rules the server enforces. Agents read it with `knowledge.get {"topic":"tools"}`. |
 | [agent-task-system-guide.md](agent-task-system-guide.md) | How tasks, agents, delegation and runs work, traced from the code.                                                                                |
 | [task-flow.md](task-flow.md)                             | How a task moves through its states.                                                                                                              |

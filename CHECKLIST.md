@@ -7,9 +7,9 @@ Anything pending goes here, not in chat, not only in `tasks/todo.md` and not in 
 Today the owner approves almost everything because the system is being tested. That is temporary.
 In the end the owner approves only big deals, important clients, money and anything irreversible.
 
-**Not in scope for now:** the 3D office and gameplay. The foundation is in place and it is parked until after this list (see section 15).
+**Start with section E** (the business engine, which is the point of the redesign). **Not in scope for now:** the 3D office and gameplay. The foundation is in place and it is parked until after this list (see section 15).
 
-Last full review: 2026-11-17.
+Last full review: 2026-11-18 (added section E after checking the checklist against the original Starnet-based plan).
 
 ## How to use this file
 
@@ -27,17 +27,85 @@ Last full review: 2026-11-17.
 ## 0. What works today (short version)
 
 - **Tasks and agents:** CLI agents (Codex, Claude, Gemini, OpenCode, Kimi) run tasks in git worktrees. There are departments, meetings, reports, a task board and the Today page.
-- **Approvals:** two VPs review proposals, model upgrades, org changes and Ventures email or listings. Everything for Tech and Rental customers goes to the owner. Emergency pause and stop are available.
+- **Approvals:** two VPs review proposals, model upgrades, org changes and Ventures email or listings. Per-business approval levels, deal-size and client limits, spending budgets and a trust ramp are owner settings. Customer-facing work for Tech and Primrose and all spending go to the owner. Emergency pause and stop are available.
 - **Autonomy engine:** goals, scored opportunities, research schedules, a daily start cap and a usage-headroom gate. Nothing is configured yet and every routine is off.
 - **Businesses:** contacts, tickets (Tech), quotes (Rental), drafts, a deals pipeline, a ledger and spend requests. These are records only.
 - **Email:** three business mailboxes are connected and tested. Sending works after owner approval, one recipient, plain text. Nothing reads the inbox.
 - **Instagram:** the Primrose account row exists, read-only, but no access token is stored, so nothing is connected yet.
-- **Square:** read-only sync is on. Tech and Ventures locations are mapped; Primrose (Rental) is not mapped yet.
+- **Square:** read-only sync is on. Several Square accounts are supported; Tech and Ventures are mapped, Primrose (its own Square account) is not connected yet.
 - **Listings:** agents prepare Etsy and itch.io packages. The owner publishes them by hand.
 - **Homelab:** real SSH to one host. Read-only commands run automatically; everything else needs approval.
-- **Models:** Codex and Claude subscriptions; one local model host (`Precision`, address in `knowledge/systems.md`) is configured but no agent uses it. No model director agent is set. A usage cache tracks headroom.
-- **Phone access:** password login over the home VPN. Phones get the Today dashboard (no 3D office).
-- **Agent knowledge:** every task prompt carries the project goal, the business profile, a systems summary and relevant memories. Agents use `knowledge.get`, `memory.search` and `memory.add`. Review memories under Team > Knowledge.
+- **Models:** Codex and Claude subscriptions with a per-provider usage gate. Routing routine work to the local `Precision` host is built but off (its tool worker is not verified yet).
+- **Running:** a login service runs the latest committed build on port 8800 with crash restarts, updates with rollback and daily restore-tested backups. Phones use it over the home VPN with a password (Today dashboard, no 3D office). English only.
+- **Agent knowledge:** task prompts, meetings, chat replies and the think loop carry the project goal, business profile, systems summary and relevant memories. Lessons are checked at task end. Review memories under Team > Knowledge.
+
+---
+
+## E. Business engine: the Starnet integration (the main goal)
+
+**Why this section exists.** The redesign set out to turn ATLAS from a team that finishes assigned tasks into an engine that finds opportunities, makes products, sells them, gets paid and learns what works. It is based on the 10 features in the original plan, with `androoAGI/starnet` as the reference for autonomy logic and capabilities (nothing copied). The sections below this one are either inputs to the engine (accounts, channels, integrations) or polish. **When choosing work, items here come first.**
+
+**First income stream to run end to end: Ventures Etsy digital products** (owner decision 2026-11-18). Then reuse the same engine for Small Business Tech sites and dashboards, game assets and Primrose.
+
+### The 10 features: where they stand (reviewed 2026-11-18)
+
+| # | Feature | Status | What is missing |
+|---|---|---|---|
+| 1 | Goal engine (work toward targets like $X a month) | Built, not running | No goals set yet (owner waits for the engine to be complete). Money goals count only verified ledger income. Goals have no milestones. |
+| 2 | Opportunity discovery (research, score, queue) | Built | Scored queue, planner and research schedules exist. No Etsy niche-research routine yet. |
+| 3 | Business tools (do real work in real systems) | Partial | Web search and reading, approved email, GitHub, read-only Square, SSH, listing packages. **Missing: image studio, Etsy API.** |
+| 4 | Persistent work and schedules | Built | Interval schedules, auto-pause after repeated failures, daily start cap, usage gate. Missing: time-of-day schedules. |
+| 5 | Business project manager (one view per income stream) | Partial | Projects belong to businesses; deals and ledger link to opportunities. Missing: one page per stream with goal, products, spend and results. |
+| 6 | Product creation pipeline | Partial | Etsy and itch.io listing packages. **Missing: the end-to-end Etsy playbook.** |
+| 7 | Customer acquisition | Partial | Contacts, drafts, lead research schedules. For Etsy, traffic comes from search and social; social posting is not possible yet (section 5). |
+| 8 | Sales and fulfillment | Partial | Quotes and approved email. For Etsy: orders and customer messages are not read; Etsy delivers digital files itself. |
+| 9 | Revenue and profit | Partial | Ledger with verified Square payments. **Missing: Etsy orders, fees and payouts in the ledger; AI and tool costs as expenses; profit.** |
+| 10 | Experiments and optimization | Missing | Opportunity budgets are stored but not enforced; nothing tests variants or stops what does not sell. |
+
+Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP approvals (ATLAS's version of Starnet's consent rules), daily start cap, a ledger that records skips, the "while you were away" digest on Today, schedules that auto-pause, the trust ramp and the usage gate. Not yet: soft money budgets per run and per day with a one-click resume (see section 11), time-of-day schedules, protection against instructions hidden in content agents read, and goal milestones the owner confirms.
+
+### Build: Etsy first
+
+- [ ] **P1** **Etsy playbook.** One routine for Ventures:
+  - Research niches.
+  - Score each idea as an opportunity, with a budget and time limit.
+  - Make the product files, then mockups and preview images (studio).
+  - Build the listing package and send it for VP review.
+  - Publish through the API, or hand it to the owner while the API is not approved.
+  - Track views and sales.
+  - Build it on the existing opportunities, schedules, listing packages and approvals. Each step's result is recorded, so a generated product, a published listing, an order and a payout stay separate states.
+- [ ] **P1** **Image studio.** An agent tool that makes images (mockups, previews, social images, later game assets and video):
+  - The provider is a setting: a paid service or a model on the homelab or Precision.
+  - Each use is recorded as a cost and counted against a monthly cap set by the owner.
+  - Outputs go to the media library (section 5) with what made them and their license terms.
+- [ ] **P1** **Etsy API** (details in section 6): create and update listings as drafts, read orders, payments and fees into the ledger as verified income and costs.
+- [ ] **P1** **Experiments and auto-stop:**
+  - Enforce each opportunity's money and agent-time budget.
+  - Let agents try variants (titles, prices, images) and record the results.
+  - Have the planner keep, change or stop an opportunity by rules the owner can edit.
+  - Record every stop in the ledger with its reason.
+- [ ] **P1** **Costs and profit:**
+  - Count AI subscriptions as monthly costs, and per-use costs (studio, listing fees, ads) as expenses.
+  - Show profit per opportunity, per stream and per business.
+  - Profit goals (section 10) depend on this.
+- [ ] **P2** **Income stream page:** per stream, the goal against verified revenue, the products and opportunities with their status, spend, results and what the engine plans next.
+- [ ] **P2** **Time-of-day schedules** ("weekdays at 9", with a time zone). Refuse schedules that cannot be read exactly instead of guessing.
+- [ ] **P2** **Content guard:**
+  - Mark web pages, emails, listings and reviews that agents read as untrusted.
+  - Strip or flag text that tries to give instructions.
+  - Never let flagged content trigger a send, publish or spend without the owner.
+  - This matters once inbox sync (section 7) and Etsy messages are read.
+- [ ] **P2** **Goal milestones:** steps under each goal, done only when verified data or the owner confirms them, not when a task says so.
+- [ ] **P3** Browser automation (agents filling in web forms). Not chosen on 2026-11-18; revisit if Etsy refuses the API app.
+- [ ] **P3** Connector catalog (one-click plug-in tools such as Canva or Google Sheets, each with its own permission). Not chosen on 2026-11-18; later.
+
+### Owner steps for the Etsy path
+
+- [ ] **P1 YOU** Create or confirm the Ventures Etsy shop (billing, payout account, shop name), and apply for an Etsy developer app at etsy.com/developers. Enter the key in Settings once it is approved. Until then, agents prepare listings and you publish them.
+- [ ] **P1 YOU** Choose how images are made (a paid image service with a monthly cap, or a free model on the homelab or Precision) and set the monthly cap. Agents ask before going over it.
+- [ ] **P1 YOU** Set the Etsy listing-fee budget. Today it is $0, so every $0.20 listing waits for you (also in section 6).
+- [ ] **P2 YOU** When the playbook is ready, set the first Ventures goal (for example, verified revenue per month) and turn on its routines (see section 10).
+- [ ] **P3 YOU** Ventures videos: talk through the approach (free tools, a paid service, or you film and agents edit). Decided on 2026-11-18 to leave this until the first stream works.
 
 ---
 
@@ -46,7 +114,7 @@ Last full review: 2026-11-17.
 - [x] **P1** (2026-11-17, committed together with agent knowledge and memory) Commit the phone layout and VPN launcher work Codex finished on 2026-11-16 (bottom tabs, menu drawer, Office hidden on phones, `start-atlas.bat` now runs `pnpm dev`). It is verified but uncommitted.
 - [x] **P1** (2026-11-18, Codex, `autonomy-engine.ts` `autonomyTaskUsageBlockReason`: each run checks only the provider it is routed to; planning checks the selected VP. Claude-routed work still needs a valid Claude usage reading.) Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
 - [ ] **P2 YOU** Instagram: connect a token in Settings > Businesses and run Test. The account row exists but no token is stored.
-- [] **P2 YOU** Square: map the Primrose (Rental) location too. Only Tech and Ventures are mapped. #Note from Strike: Prirose uses another square account so I need ot be able to enter a second API for square
+- [ ] **P2 YOU** Square for Primrose: add Primrose's own Square account in Settings > Businesses > Square (several accounts are supported since 2026-11-17), press Test, map its location to Primrose and turn sync on.
 - [X] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17). 11/17
 - [ ] **P2** Register real projects (website repos) with their business set, so tasks get the right project goal and profile. There are no projects yet.
 - [ ] **P2** `tasks/todo.md` still says phases 5 and 6 are uncommitted, but both are committed (ed837fc and e18c0b0). Correct the notes.
@@ -72,6 +140,7 @@ Built 2026-11-17: agents now get a knowledge block (project goal, business profi
 
 - [x] **P1** **Multiple GitHub accounts.** Today GitHub uses a single "top priority" account, and it isn't connected yet (no GitHub account is saved). Support several accounts, each with a label and an owning business (Primrose vs personal), and pick the account by repo or project. Agents should push with the matching account, not the PC's global git login. Answer From strike: 11/18 Claude Finished this
 - [x] **P1 YOU** Connect both GitHub accounts once the step above exists (fine-grained tokens or a GitHub App per account, limited to the repos each needs). Answer From strike: 11/18 done
+- [ ] **P1 YOU** For worker isolation (next item): create a separate Windows user for agent workers when Claude or Codex is ready to build it. Only you can set its password.
 - [ ] **P1** **Worker isolation.** Agents run with permission checks turned off (`--dangerously-skip-permissions`, `--yolo`, `--auto`) as the same Windows user as ATLAS, so they can read `.env` and the database directly. Before agents get more powerful accounts, run them under a separate user or container that has no access to ATLAS secrets.
 - [ ] **P2** Scope agent business access by business and department. Today any agent can create, edit or delete records for all three businesses.
 - [ ] **P2** One credential area in Settings listing every connected account, its business, its last successful test and its expiry date, plus a warning before tokens expire.
@@ -93,6 +162,7 @@ Github - https://github.com/Strikeout101/small-business-tech-security
 Vercel - https://vercel.com/eddiealba2003-9416s-projects/small-business-tech-security-u9aq
 Registrar - Cloudflare
 - [ ] **P1** Register website repos as ATLAS projects with absolute paths and the correct GitHub account.
+- [ ] **P2 YOU** Create a Vercel access token for each Vercel account (Primrose and Small Business Tech) and enter them in Settings once the integration exists.
 - [ ] **P1** Add a Vercel integration (token per Vercel account or team): list projects, deployments, build logs, environment variable names (not values) and domains.
 - [ ] **P1** Website change flow: agent branch, then pull request, then Vercel preview URL, then automatic checks (build, links, a screenshot on phone and desktop), then merge. Small content edits merge automatically once trusted (section 10). Layout or pricing changes go to the owner.
 - [ ] **P2** Watch production: uptime checks, failed deployment alerts, SSL and domain expiry.
@@ -104,6 +174,7 @@ Registrar - Cloudflare
 
 Today Instagram can be read, and drafts exist as records only. No platform can be posted to.
 
+- [ ] **P2 YOU** For Instagram and Facebook publishing: create a Facebook Page for each business that posts, and a Meta developer app. Agents cannot do this for you.
 - [ ] **P1** Instagram publishing through the Graph API (needs a Facebook Page and a Meta app). Include photo, carousel, caption and a scheduled time, all under the approval policy.
 - [ ] **P1** Content calendar: planned posts per business with status, date, platform and the assets used.
 - [ ] **P2** Facebook Page posting (same Meta app).
@@ -112,20 +183,21 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 - [ ] **P2** OAuth login flow for social accounts, so tokens are not pasted by hand.
 - [ ] **P3** TikTok (deferred), then others as needed.
 - [ ] **P3** Post performance (reach, likes, follows) feeding goals and the next content plan.
-- [ ] **P2** Media library: brand assets, logos, photos of rentals and work, with tags agents can search.
+- [ ] **P1** (engine: the image studio saves here) Media library: brand assets, logos, photos of rentals and work, generated images with their source and license, with tags agents can search.
 
 ## 6. Selling pages and storefronts
 
 - [X] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites. Answer From strike: All the ones mentioned exept Gumroad
-- [ ] **P1** Etsy API publishing (needs an Etsy-approved developer app). Include listing create and update, inventory, prices within limits, and reading orders.
+- [ ] **P1** (engine, section E) Etsy API publishing (needs an Etsy-approved developer app; owner step in section E). Include listing create and update, inventory, prices within limits, and reading orders.
 - [ ] **P2** itch.io uploads with the butler tool.
 - [ ] **P2** Orders flow: new order, record it, fulfil it (digital delivery or a task), send the customer a message, and mark the deal paid only from verified payment evidence.
-- [ ] **P2** Raise the listing fee budget from $0 if you want VPs to approve normal Etsy listings. Today every $0.20 listing goes to the owner.
+- [ ] **P1 YOU** Raise the listing fee budget from $0 if you want VPs to approve normal Etsy listings. Today every $0.20 listing goes to the owner (also in section E).
 - [ ] **P3** Square catalog and invoices (read first, then create invoices under the approval policy).
 
 ## 7. Communication
 
 - [ ] **P1** Inbox sync (IMAP) for the three mailboxes. New mail becomes a thread linked to a contact. Agents classify it and draft replies.
+- [ ] **P1 YOU** Create a Telegram bot with @BotFather and enter its token in Settings (needed for phone notifications, next item).
 - [ ] **P1** Owner notifications on the phone: Telegram bot (the code exists, but no token is set) and/or web push. These are for approvals waiting, failures, money and big leads.
 - [ ] **P2** Email: support STARTTLS on port 587, CC, attachments (quotes as PDF), HTML with a signature, and threads (reply in the same conversation).
 - [ ] **P2** SMS provider (Twilio or similar) for reminders and replies. Draft records already exist.
@@ -152,7 +224,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ### AI Ventures
 
-- [ ] **P2** A pipeline from idea to product to listing to sale, with results tracked per product.
+- [ ] **P2** (now the section E Etsy playbook) A pipeline from idea to product to listing to sale, with results tracked per product.
 - [ ] **P3** Asset generation and quality checks before a listing is prepared.
 
 ### Shared
@@ -164,6 +236,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 ## 9. Homelab
 
 - [X] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now. Answer From strike: Has been answered in SETUP-INFO-NEEDED
+- [ ] **P2 YOU** On each homelab host, create a dedicated agent login with only the sudo it needs (Claude can give you the exact commands).
 - [ ] **P2** Switch from password to SSH key auth, using a dedicated agent login per host with only the sudo it needs.
 - [ ] **P2** Turn on `restrict_agents` and grant hosts to the homelab department only.
 - [ ] **P2** Proxmox API (read: nodes, VMs, containers, storage, backups). Changes under policy.
@@ -185,8 +258,8 @@ Approval rules are settings per business (Settings > Businesses > Approvals and 
 - [ ] **P2** Send paths for social posts and SMS under the same policy (today they cannot be sent at all). Routing is ready (`social_send`, `customer_send` follow `customer_sends`); the send itself lands with Instagram publishing (section 5) and an SMS provider (section 7).
 - [ ] **P3** Trust ramp from VPs to no approval (`vp` to `none`) for record changes and code pushes, once there is a track record of VP decisions.
 - [~] **P2** Owner override and undo: an audit list of everything done automatically, with a way to flag a mistake that turns into a lesson (section 2). Answer From strike: I do not want to do this until we have most of the autonomy features/logic/etc. configured
-- [ ] **P2 YOU** Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines. Answer From strike: I do not want to do this until all/most the autonomy setting/features/logic are in place
-- [ ] **P3** Profit goals (needs costs plus verified revenue).
+- [ ] **P2 YOU** (after section E's Etsy playbook) Set up the autonomy engine for real: pick projects, write goals, turn on chosen routines. Answer From strike: I do not want to do this until all/most the autonomy setting/features/logic are in place
+- [ ] **P3** Profit goals (needs costs plus verified revenue; costs are a section E item).
 - [ ] **P3** Money movement (refunds, payouts, deposits) stays manual until you decide otherwise.
 
 ## 11. Models and workers

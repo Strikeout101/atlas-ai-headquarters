@@ -74,6 +74,11 @@ These rules are additive and do NOT delete existing orchestration rules below.
 - When you finish an item, tick it and note the date and where it lives. Do not delete unfinished items.
 - Mark items only the owner can do with **YOU**. Never put secrets or customer private data in it.
 
+## Codebase Map (`docs/codebase-map.md`)
+
+- Read `docs/codebase-map.md` before searching the codebase; it says where each area lives.
+- When you add, move or remove a module or folder, update its line in the same change.
+
 ## Task Management
 
 1. Plan first: write checklist in `tasks/todo.md`.
