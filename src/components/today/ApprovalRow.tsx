@@ -100,6 +100,14 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
               {item.client_tier === "vip" ? "VIP client" : "Important client"}
             </span>
           )}
+          {item.untrusted_content && (
+            <span
+              className="rounded-full border border-red-500/50 px-1.5 text-[11px] font-medium text-red-500"
+              title="The task behind this request read a web page or message that tried to give it instructions. Check it carefully."
+            >
+              Read suspicious content
+            </span>
+          )}
           {item.changes_client_tier && (
             <span className="rounded-full border border-amber-500/40 px-1.5 text-[11px] font-medium text-amber-500">
               Changes client importance

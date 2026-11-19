@@ -8,6 +8,9 @@ import { isBusinessKey } from "../../businesses.ts";
 import { currencyMinorDigits } from "../../finance-store.ts";
 import { experimentRules, restartOpportunity, saveExperimentRules } from "../../experiments.ts";
 import { ensurePlaybookSchema, getPlaybook, listPlaybooks, resetPlaybook, savePlaybook } from "../../playbooks.ts";
+import { nextCronRun, validTimeZone } from "../../schedule-time.ts";
+import { addMilestone, deleteMilestone, listMilestones, setMilestoneDone } from "../../goal-milestones.ts";
+import { streamOverview } from "../../streams.ts";
 
 type Body = Record<string, unknown>;
 const SCORE_FIELDS = ["demand_score", "revenue_score", "cost_score", "difficulty_score", "time_to_launch_score"];
@@ -47,6 +50,8 @@ const RESOURCES = {
       "next_run_at",
       "enabled",
       "playbook",
+      "cron",
+      "timezone",
     ],
   },
 } as const;
@@ -118,6 +123,16 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
     return;
   }
   if (!["research", "lead_research"].includes(String(row.kind))) fail("invalid_schedule_kind");
+  // Time-of-day rule: validated exactly (no guessing); its next run replaces the interval's.
+  if (typeof row.cron === "string" && row.cron.trim()) {
+    row.cron = row.cron.trim().replace(/s+/g, " ");
+    row.timezone = typeof row.timezone === "string" && row.timezone.trim() ? row.timezone.trim() : "America/New_York";
+    if (!validTimeZone(row.timezone)) fail("invalid_schedule_timezone");
+    row.next_run_at = nextCronRun(String(row.cron), String(row.timezone), Date.now());
+  } else {
+    row.cron = null;
+    row.timezone = null;
+  }
   if (row.playbook !== null && row.playbook !== undefined && row.playbook !== "") {
     if (typeof row.playbook !== "string" || !getPlaybook(db, row.playbook)) fail("playbook_not_found");
   } else row.playbook = null;
@@ -157,6 +172,8 @@ function defaults(resource: Resource, now: number): Body {
     next_run_at: now + 86400000,
     enabled: 0,
     playbook: null,
+    cron: null,
+    timezone: null,
   };
 }
 
@@ -173,6 +190,7 @@ export function registerAutonomyRoutes(
       ...autonomyOverview(db),
       experiment_rules: experimentRules(db),
       playbooks: listPlaybooks(db),
+      milestones: listMilestones(db),
     }),
   );
   const ownerJson =
@@ -200,6 +218,30 @@ export function registerAutonomyRoutes(
   app.post(
     "/api/autonomy/opportunities/:id/restart",
     ownerJson((req) => ({ item: restartOpportunity(db, String(req.params.id)) })),
+  );
+  // One income stream (business) on one page.
+  app.get("/api/streams", (req, res) => {
+    try {
+      res.json({ ok: true, ...streamOverview(db, req.query.business) });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "stream_read_failed" });
+    }
+  });
+  // Goal milestones: progress ones complete from verified data, manual ones only when the owner confirms.
+  app.post(
+    "/api/autonomy/goals/:id/milestones",
+    ownerJson((req) => ({ item: addMilestone(db, String(req.params.id), bodyOf(req)) })),
+  );
+  app.post(
+    "/api/autonomy/milestones/:id/done",
+    ownerJson((req) => ({ item: setMilestoneDone(db, String(req.params.id), bodyOf(req).done) })),
+  );
+  app.post(
+    "/api/autonomy/milestones/:id/delete",
+    ownerJson((req) => {
+      deleteMilestone(db, String(req.params.id));
+      return { id: req.params.id };
+    }),
   );
   // Playbooks: view, edit, reset to the default, and add the research schedule (created switched off).
   app.put(

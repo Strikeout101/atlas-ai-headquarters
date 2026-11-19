@@ -49,18 +49,18 @@ Last full review: 2026-11-18 (added section E after checking the checklist again
 
 ### The 10 features: where they stand (reviewed 2026-11-18)
 
-| # | Feature | Status | What is missing |
-|---|---|---|---|
-| 1 | Goal engine (work toward targets like $X a month) | Built, not running | No goals set yet (owner waits for the engine to be complete). Money goals count only verified ledger income. Goals have no milestones. |
-| 2 | Opportunity discovery (research, score, queue) | Built | Scored queue, VP planner, research schedules, and `opportunity.propose` for research agents (2026-11-18). |
-| 3 | Business tools (do real work in real systems) | Partial | Web, email, GitHub, Square, SSH, listing packages, image studio (free mockups; AI images off until set up), Etsy API (built, not yet tested live). Missing: video. |
-| 4 | Persistent work and schedules | Built | Interval schedules, auto-pause after repeated failures, daily start cap, usage gate. Missing: time-of-day schedules. |
-| 5 | Business project manager (one view per income stream) | Partial | Projects belong to businesses; deals and ledger link to opportunities. Missing: one page per stream with goal, products, spend and results. |
-| 6 | Product creation pipeline | Built, not running | Etsy playbook (research → build → mockups → listing → approval → Etsy draft/publish), editable in Autonomy > Playbooks (2026-11-18). Starts once a research schedule and goal are switched on. |
-| 7 | Customer acquisition | Partial | Contacts, drafts, lead research schedules. For Etsy, traffic comes from search and social; social posting is not possible yet (section 5). |
-| 8 | Sales and fulfillment | Partial | Quotes and approved email. For Etsy: orders and customer messages are not read; Etsy delivers digital files itself. |
-| 9 | Revenue and profit | Built | Ledger with verified Square and Etsy money, fees and refunds; monthly costs; profit per business and opportunity (2026-11-18). Etsy mapping verified once live. |
-| 10 | Experiments and optimization | Built | Budgets, task and time limits enforced; variants measured from sales and favorites; owner stop rules; planner keeps, changes or stops (2026-11-18). |
+| #   | Feature                                               | Status             | What is missing                                                                                                                                                                                |
+| --- | ----------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Goal engine (work toward targets like $X a month)     | Built, not running | No goals set yet (owner waits for the engine to be complete). Money goals count only verified ledger income. Goals have no milestones.                                                         |
+| 2   | Opportunity discovery (research, score, queue)        | Built              | Scored queue, VP planner, research schedules, and `opportunity.propose` for research agents (2026-11-18).                                                                                      |
+| 3   | Business tools (do real work in real systems)         | Partial            | Web, email, GitHub, Square, SSH, listing packages, image studio (free mockups; AI images off until set up), Etsy API (built, not yet tested live). Missing: video.                             |
+| 4   | Persistent work and schedules                         | Built              | Interval schedules, auto-pause after repeated failures, daily start cap, usage gate. Missing: time-of-day schedules.                                                                           |
+| 5   | Business project manager (one view per income stream) | Partial            | Projects belong to businesses; deals and ledger link to opportunities. Missing: one page per stream with goal, products, spend and results.                                                    |
+| 6   | Product creation pipeline                             | Built, not running | Etsy playbook (research → build → mockups → listing → approval → Etsy draft/publish), editable in Autonomy > Playbooks (2026-11-18). Starts once a research schedule and goal are switched on. |
+| 7   | Customer acquisition                                  | Partial            | Contacts, drafts, lead research schedules. For Etsy, traffic comes from search and social; social posting is not possible yet (section 5).                                                     |
+| 8   | Sales and fulfillment                                 | Partial            | Quotes and approved email. For Etsy: orders and customer messages are not read; Etsy delivers digital files itself.                                                                            |
+| 9   | Revenue and profit                                    | Built              | Ledger with verified Square and Etsy money, fees and refunds; monthly costs; profit per business and opportunity (2026-11-18). Etsy mapping verified once live.                                |
+| 10  | Experiments and optimization                          | Built              | Budgets, task and time limits enforced; variants measured from sales and favorites; owner stop rules; planner keeps, changes or stops (2026-11-18).                                            |
 
 Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP approvals (ATLAS's version of Starnet's consent rules), daily start cap, a ledger that records skips, the "while you were away" digest on Today, schedules that auto-pause, the trust ramp and the usage gate. Not yet: soft money budgets per run and per day with a one-click resume (see section 11), time-of-day schedules, protection against instructions hidden in content agents read, and goal milestones the owner confirms.
 
@@ -91,14 +91,15 @@ Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP appr
 - [ ] **P1** Verify the Etsy connection live once the developer app is approved: connect, push one real draft, check its images and file, publish, then confirm one order and its fees land in Revenue. Adjust `classifyLedgerEntry` in `server/modules/etsy.ts` to Etsy's real fee labels.
 - [ ] **P2** Run the real-model playbook check when a subscription is under the 80% usage limit: `pnpm exec tsx scripts/qa/etsy-playbook-planner.ts --run` (blocked on 2026-11-18: Claude 7-day at 94%, Codex also over the limit).
 - [ ] **P2** Owner create and edit of listing packages from the Listings panel (agents create them today; the owner can only approve, publish and withdraw).
-- [ ] **P2** **Income stream page:** per stream, the goal against verified revenue, the products and opportunities with their status, spend, results and what the engine plans next.
-- [ ] **P2** **Time-of-day schedules** ("weekdays at 9", with a time zone). Refuse schedules that cannot be read exactly instead of guessing.
-- [ ] **P2** **Content guard:**
+- [x] **P2** (2026-11-19, Revenue > Income streams, `server/modules/streams.ts`, `GET /api/streams`) **Income stream page:** per stream, the goal against verified revenue, the products and opportunities with their status, spend, results and what the engine plans next.
+- [x] **P2** (2026-11-19, `server/modules/schedule-time.ts`, Autonomy > Schedules "Time of day"; daylight-saving safe, unreadable rules refused) **Time-of-day schedules** ("weekdays at 9", with a time zone). Refuse schedules that cannot be read exactly instead of guessing.
+- [x] **P2** (2026-11-19, `server/modules/content-guard.ts`; covers `web.search`/`web.read` today, approvals from a flagged task or its delegated tasks go to the owner with a red badge) **Content guard:**
   - Mark web pages, emails, listings and reviews that agents read as untrusted.
   - Strip or flag text that tries to give instructions.
   - Never let flagged content trigger a send, publish or spend without the owner.
   - This matters once inbox sync (section 7) and Etsy messages are read.
-- [ ] **P2** **Goal milestones:** steps under each goal, done only when verified data or the owner confirms them, not when a task says so.
+- [ ] **P2** When inbox sync (section 7), Etsy messages or reviews are given to agents, pass them through `guardValue` and `recordUntrustedContent` in `content-guard.ts`, the same way the web tools do.
+- [x] **P2** (2026-11-19, `server/modules/goal-milestones.ts`, under each goal in Autonomy, shown on the stream page and to the planner) **Goal milestones:** steps under each goal, done only when verified data or the owner confirms them, not when a task says so.
 - [ ] **P3** Browser automation (agents filling in web forms). Not chosen on 2026-11-18; revisit if Etsy refuses the API app.
 - [ ] **P3** Connector catalog (one-click plug-in tools such as Canva or Google Sheets, each with its own permission). Not chosen on 2026-11-18; later.
 
@@ -118,7 +119,7 @@ Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP appr
 - [x] **P1** (2026-11-18, Codex, `autonomy-engine.ts` `autonomyTaskUsageBlockReason`: each run checks only the provider it is routed to; planning checks the selected VP. Claude-routed work still needs a valid Claude usage reading.) Claude subscription usage reads as "unauthenticated". Because of that, the autonomy engine blocks every autonomous start ("claude subscription usage is unavailable"). Fix the usage reader or make the gate use whichever providers are actually in use.
 - [ ] **P2 YOU** Instagram: connect a token in Settings > Businesses and run Test. The account row exists but no token is stored.
 - [ ] **P2 YOU** Square for Primrose: add Primrose's own Square account in Settings > Businesses > Square (several accounts are supported since 2026-11-17), press Test, map its location to Primrose and turn sync on.
-- [X] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17). 11/17
+- [x] **P2 YOU** Review the filled business profiles in Settings > Businesses (prices, hours, voice, rules were copied from `SETUP-INFO-NEEDED.txt` on 2026-11-17). 11/17
 - [ ] **P2** Register real projects (website repos) with their business set, so tasks get the right project goal and profile. There are no projects yet.
 - [ ] **P2** `tasks/todo.md` still says phases 5 and 6 are uncommitted, but both are committed (ed837fc and e18c0b0). Correct the notes.
 - [ ] **P2** Open items still sitting in `tasks/todo.md`: Ctrl+K commands for the emergency controls, Etsy API publishing, itch.io uploads, owner create/edit of listing packages. The Ventures mailbox test that the file still lists as pending has since passed. Keep these items here from now on.
@@ -153,17 +154,17 @@ Built 2026-11-17: agents now get a knowledge block (project goal, business profi
 
 Nothing exists for this yet.
 
-- [X] **P1 YOU** List each website with its repo, GitHub account, Vercel project, domain and registrar (for the systems registry).
-Primrose:
-URL - https://primrosevents.com/
-Github - https://github.com/primroseevents/primrose-website
-Vercel - https://vercel.com/primroseevents-s-projects1/primrose-website
-Registrar - Cloudflare
-Small Business Tech 
-URL - https://smallbusinessestech.com/
-Github - https://github.com/Strikeout101/small-business-tech-security
-Vercel - https://vercel.com/eddiealba2003-9416s-projects/small-business-tech-security-u9aq
-Registrar - Cloudflare
+- [x] **P1 YOU** List each website with its repo, GitHub account, Vercel project, domain and registrar (for the systems registry).
+      Primrose:
+      URL - https://primrosevents.com/
+      Github - https://github.com/primroseevents/primrose-website
+      Vercel - https://vercel.com/primroseevents-s-projects1/primrose-website
+      Registrar - Cloudflare
+      Small Business Tech
+      URL - https://smallbusinessestech.com/
+      Github - https://github.com/Strikeout101/small-business-tech-security
+      Vercel - https://vercel.com/eddiealba2003-9416s-projects/small-business-tech-security-u9aq
+      Registrar - Cloudflare
 - [ ] **P1** Register website repos as ATLAS projects with absolute paths and the correct GitHub account.
 - [ ] **P2 YOU** Create a Vercel access token for each Vercel account (Primrose and Small Business Tech) and enter them in Settings once the integration exists.
 - [ ] **P1** Add a Vercel integration (token per Vercel account or team): list projects, deployments, build logs, environment variable names (not values) and domains.
@@ -190,7 +191,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 6. Selling pages and storefronts
 
-- [X] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites. Answer From strike: All the ones mentioned exept Gumroad
+- [x] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites. Answer From strike: All the ones mentioned exept Gumroad
 - [~] **P1** (2026-11-18: built in section E, verify live once the app is approved) Etsy API publishing (needs an Etsy-approved developer app; owner step in section E). Include listing create and update, inventory, prices within limits, and reading orders.
 - [ ] **P2** itch.io uploads with the butler tool.
 - [ ] **P2** Orders flow: new order, record it, fulfil it (digital delivery or a task), send the customer a message, and mark the deal paid only from verified payment evidence.
@@ -219,7 +220,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ### Primrose Events (rentals)
 
-- [X] **P1 YOU** Provide the rental inventory, pricing rules, delivery and service area rules, and an example quote format. Answer From strike: Has been answered in SETUP-INFO-NEEDED
+- [x] **P1 YOU** Provide the rental inventory, pricing rules, delivery and service area rules, and an example quote format. Answer From strike: Has been answered in SETUP-INFO-NEEDED
 - [ ] **P2** Inventory and availability by date, so a quote cannot double-book an item.
 - [ ] **P2** Pre-event and post-event message schedule: confirmation, delivery reminder, check-out, check-in, review request.
 - [ ] **P2** Quote documents (PDF) and acceptance tracking. Today "shared" sends nothing.
@@ -238,7 +239,7 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 
 ## 9. Homelab
 
-- [X] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now. Answer From strike: Has been answered in SETUP-INFO-NEEDED
+- [x] **P1 YOU** List all hosts (name, address, purpose, OS) and how ATLAS reaches each. Only "Media" is connected now. Answer From strike: Has been answered in SETUP-INFO-NEEDED
 - [ ] **P2 YOU** On each homelab host, create a dedicated agent login with only the sudo it needs (Claude can give you the exact commands).
 - [ ] **P2** Switch from password to SSH key auth, using a dedicated agent login per host with only the sudo it needs.
 - [ ] **P2** Turn on `restrict_agents` and grant hosts to the homelab department only.
@@ -309,9 +310,9 @@ See docs/operations.md for running, updating, backing up and restoring ATLAS.
 - [x] **P3** (2026-11-18: 230 items, 185 MB, sent to the Recycle Bin. Kept: the 3D `.glb` work files and `backup/`, the e2e and vitest runtimes, and the evidence folders cited in `docs/models-workers-verification-2026-11-18.md`. `ollama-real-worker/` is too big for the Recycle Bin and is reused by its script.) Clear `.tmp/` dev leftovers and `test-results/`.
 - [x] **P3** (2026-11-18: `public/atlas.svg` favicon; ATLAS in the loading screen, default company name, API docs title, folder picker, log prefix `[ATLAS]`, health `app` field and agent worktree commit identity. Kept on purpose: browser storage keys and file markers named `climpire`, so saved preferences and generated files keep working, and the classroom mascot image in the parked 3D work.) Replace the claw-empire favicon and branding with ATLAS.
 
-## 14. Answers only the owner can give (YOU) 
+## 14. Answers only the owner can give (YOU)
 
-**Please review I have updated `SETUP-INFO-NEEDED.txt`
+\*\*Please review I have updated `SETUP-INFO-NEEDED.txt`
 
 Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the business profiles and `knowledge/systems.md` on 2026-11-17. Still open below.
 
@@ -321,7 +322,7 @@ Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the
 - [~] Monthly spending budget per business and per provider (AI subscriptions, listing fees, ads). Answer From strike: If refering to the AI providers the usage should just be up to the subscription for now, as of now we have 0 budgets for ads, listing etc. Once we have a plan and a product/service/etc I might be willing to invest in ads agents shouldbe able to ask for approval on this
 - [~] Posting frequency and the platforms for each business. (Partly answered: agents give ideas and drafts; the owner and partner post videos. Frequency still open.) Answer From strike: I am thinking a minimum of 3 per week but honestly should be more for the venture, and I have been thinking and I do want agent to make videos for veanture but this needs to be discused and applied
 - [x] (2026-11-17: reputable public sources) Acceptable sources for lead research.
-- [~] Where customers, jobs and quotes live today (the source of truth to import from). (Partly answered: Google Sheets for leads, Square for quotes; ATLAS is the source of truth from now on.) Answer From strike: Like meantioned there is nothing besides the excel if the agents want to make their own or use/suggest a free tool I can connect for them or maybe even one they can make themself in my homelab that would be fine with me but i have nothing 
+- [~] Where customers, jobs and quotes live today (the source of truth to import from). (Partly answered: Google Sheets for leads, Square for quotes; ATLAS is the source of truth from now on.) Answer From strike: Like meantioned there is nothing besides the excel if the agents want to make their own or use/suggest a free tool I can connect for them or maybe even one they can make themself in my homelab that would be fine with me but i have nothing
 - [x] (2026-11-17: yes, director-approved) Whether routine model upgrades may be approved by the director without you.
 - [x] (2026-11-17, in `knowledge/systems.md`) Hardware available to run workers (main PC, homelab, Precision laptop) and when.
 
@@ -338,5 +339,5 @@ Answers in `SETUP-INFO-NEEDED.txt` (now private, out of git) were moved into the
 - 2026-11-18: Section 12 reliability: ATLAS service with crash restarts and safe updates, automatic restore-tested backups, upstream updater locked, server log rotation.
 - 2026-11-18: Section 10 approvals: client importance, deal-size limit, structured routing facts, policy-driven VP prompt, trust-ramp suggestions, spending budgets.
 - 2026-11-17: Agent knowledge and memory (section 2): systems registry, filled business profiles, knowledge block in task prompts, persistent memory with owner review, `knowledge.get` / `memory.*` tools, Team > Knowledge page, docs index. `SETUP-INFO-NEEDED.txt` moved out of git.
-- [X] **P1 YOU** Open ATLAS on the phone over the home VPN and confirm the login page loads at the PC's LAN address on port 8800. ## 11/17 Cofirmed 
-- [x] **P1 YOU** Square: press Test in Settings > Businesses > Square, map a real location to each business, then turn sync on. The token is already saved. - 11/17 Thsi si done functionality still needs to be tested through the agents 
+- [x] **P1 YOU** Open ATLAS on the phone over the home VPN and confirm the login page loads at the PC's LAN address on port 8800. ## 11/17 Cofirmed
+- [x] **P1 YOU** Square: press Test in Settings > Businesses > Square, map a real location to each business, then turn sync on. The token is already saved. - 11/17 Thsi si done functionality still needs to be tested through the agents

@@ -61,6 +61,10 @@ Rules of thumb:
 | `experiments.ts`                | Opportunity budgets, variants, metrics and the owner's stop rules                                |
 | `playbooks.ts`                  | Editable playbooks (default: Etsy digital products), step advance, `opportunity.propose`         |
 | `profit.ts`                     | Monthly costs and profit per business and opportunity                                            |
+| `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                           |
+| `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner             |
+| `streams.ts`                    | One income stream's page data (`GET /api/streams`)                                               |
+| `content-guard.ts`              | Flags web content that tries to instruct agents; flagged tasks' approvals go to the owner        |
 | `businesses.ts`                 | The business registry (`tech`, `rental`, `ventures`)                                             |
 
 **Approvals and safety**
@@ -155,8 +159,8 @@ Rules of thumb:
 | `i18n.ts`                                                                    | Text helper (`t({ en })`); English only                                                            |
 | `types/`                                                                     | Shared web types                                                                                   |
 | `components/today/`                                                          | Today page: approvals waiting, digest                                                              |
-| `components/autonomy/`                                                       | Goals, opportunities, schedules                                                                    |
-| `components/revenue/`, `components/listings/`                                | Revenue and ledger; listing packages                                                               |
+| `components/autonomy/`                                                       | Goals (with milestones), opportunities, schedules                                                  |
+| `components/revenue/`, `components/listings/`                                | Revenue, ledger, income streams; listings                                                          |
 | `components/work/`, `components/taskboard/`                                  | Work views and the task board (task drawer, create modal)                                          |
 | `components/team/`                                                           | Team area: knowledge, VP decisions, model director                                                 |
 | `components/settings/`                                                       | Settings tabs: general (service, backups), businesses, accounts, approvals, API providers, gateway |

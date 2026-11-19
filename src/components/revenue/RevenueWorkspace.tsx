@@ -27,6 +27,7 @@ import { useI18n } from "../../i18n";
 import { formatMoney, moneyInput, parseMoney } from "./money";
 import "./revenue.css";
 import ProfitPanel from "./ProfitPanel";
+import StreamsPanel from "./StreamsPanel";
 
 const currencyOptions = ["USD", "CAD", "EUR", "GBP", "AUD", "JPY", "KWD"];
 const stages = ["lead", "qualified", "proposal", "won", "paid", "lost"] as const;
@@ -295,6 +296,7 @@ export default function RevenueWorkspace() {
           >
             {[
               ["overview", "Overview"],
+              ["streams", "Income streams"],
               ["pipeline", "Pipeline"],
               ["ledger", "Records"],
               ["spending", "Spending requests"],
@@ -464,7 +466,8 @@ export default function RevenueWorkspace() {
                 </section>
               </>
             )}
-            {tab !== "overview" && (
+            {tab === "streams" && <StreamsPanel locale={locale} initialBusiness={business || "ventures"} />}
+            {tab !== "overview" && tab !== "streams" && (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">
                   {tab === "pipeline"

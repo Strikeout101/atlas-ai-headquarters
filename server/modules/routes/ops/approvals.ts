@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret } from "../../../oauth/helpers.ts";
 import { isBusinessKey, type BusinessKey } from "../../businesses.ts";
 import { getApprovalVpState, isOwnerApproval } from "../../approval-review-state.ts";
+import { taskReadFlaggedContent } from "../../content-guard.ts";
 import { feeNeedsOwner, getListing } from "../../listings.ts";
 import { describeRecordChange, getRecordChange } from "../../record-changes.ts";
 import { contactFacts, recordChangeFacts } from "../../approval-facts.ts";
@@ -173,6 +174,8 @@ export type PendingApproval = (
   changes_client_tier?: boolean;
   /** Spend requests: true when the request fits the owner's spending budget for its business and category. */
   within_spend_budget?: boolean;
+  /** The task behind this request read outside content that tried to give instructions; the owner decides. */
+  untrusted_content?: boolean;
   vp_review?: {
     status: string;
     reason: string;
@@ -511,6 +514,7 @@ export function listPendingApprovals(
     }
   }
   return items
+    .map((item) => (taskReadFlaggedContent(db, item.task_id) ? { ...item, untrusted_content: true } : item))
     .sort((a, b) => b.created_at - a.created_at)
     .filter((item) => audience === "all" || isOwnerApproval(db, item))
     .slice(0, limit)

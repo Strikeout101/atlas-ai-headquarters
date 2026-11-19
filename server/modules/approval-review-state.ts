@@ -62,6 +62,9 @@ export function itemFacts(item: ReviewableApproval): ApprovalFacts {
 }
 
 export function approvalRoute(item: ReviewableApproval): "owner" | "vp" {
+  // A task that read outside text trying to give it instructions (content-guard.ts) never gets VP-only approvals:
+  // whatever it asks to send, publish or spend goes to the owner.
+  if (item.untrusted_content === true) return "owner";
   // Routing uses structured facts only. Words like "pay" or "buy" in a customer email or in product copy describe the
   // customer's side, not a spend by ATLAS; spending is its own request kind, and VPs escalate anything that commits
   // ATLAS to money or terms.

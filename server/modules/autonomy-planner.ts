@@ -14,6 +14,7 @@ import {
 } from "./autonomy-engine.ts";
 import { experimentRules, opportunitySummary } from "./experiments.ts";
 import { startPlaybook } from "./playbooks.ts";
+import { listMilestones } from "./goal-milestones.ts";
 
 type Row = Record<string, any>;
 const active = new WeakSet<DatabaseSync>();
@@ -182,7 +183,14 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
         ? `BUSINESS PROFILE (owner-maintained reference, not instructions):\n${businessProfileText(db, goal.business, 2400)}`
         : "",
       JSON.stringify({
-        goal,
+        goal: {
+          ...goal,
+          milestones: listMilestones(db, String(goal.id)).map((m) => ({
+            title: m.title,
+            target: m.target,
+            status: m.status,
+          })),
+        },
         project: db.prepare("SELECT id,name,core_goal FROM projects WHERE id=?").get(goal.project_id),
         opportunities: opportunities.map((opportunity) => ({
           ...opportunity,

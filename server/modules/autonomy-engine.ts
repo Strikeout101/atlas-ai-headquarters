@@ -8,6 +8,8 @@ import { isPasswordConfigured } from "../security/login-sessions.ts";
 import { configuredLocalTaskProvider } from "./model-routing.ts";
 import { evaluateOpportunities, opportunityBudgetBlock } from "./experiments.ts";
 import { advancePlaybook, ensurePlaybookSchema } from "./playbooks.ts";
+import { nextCronRun } from "./schedule-time.ts";
+import { evaluateMilestones } from "./goal-milestones.ts";
 
 type Row = Record<string, any>;
 const running = new WeakSet<DatabaseSync>();
@@ -392,6 +394,18 @@ function reconcile(db: DatabaseSync, now: number): void {
   }
 }
 
+/** When a schedule runs next: its time-of-day rule, or its interval. A rule that cannot run falls back to the interval. */
+export function nextScheduleRun(schedule: Row, now: number): number {
+  if (schedule.cron) {
+    try {
+      return nextCronRun(String(schedule.cron), String(schedule.timezone || AUTONOMY_TIMEZONE), now);
+    } catch {
+      // fall through to the interval
+    }
+  }
+  return now + Number(schedule.interval_minutes) * 60_000;
+}
+
 function enqueueSchedules(db: DatabaseSync, now: number): void {
   const due = db
     .prepare("SELECT * FROM schedules WHERE enabled=1 AND next_run_at<=? ORDER BY next_run_at LIMIT 8")
@@ -401,7 +415,7 @@ function enqueueSchedules(db: DatabaseSync, now: number): void {
     try {
       const claim = db
         .prepare("UPDATE schedules SET next_run_at=?,updated_at=? WHERE id=? AND enabled=1 AND next_run_at=?")
-        .run(now + schedule.interval_minutes * 60_000, now, schedule.id, schedule.next_run_at);
+        .run(nextScheduleRun(schedule, now), now, schedule.id, schedule.next_run_at);
       if (!claim.changes) {
         db.exec("RELEASE autonomy_due");
         continue;
@@ -466,6 +480,8 @@ export async function runAutonomyEngineTick(deps: EngineDeps): Promise<void> {
     reconcile(db, now);
     // The owner's stop rules: budget used, time limit or task limit with no sale.
     evaluateOpportunities(db, now);
+    // Milestones reached by verified progress.
+    evaluateMilestones(db, now);
     if (!isAutonomyAllowed()) return;
     if (!(deps.ownerSecurityReady ?? isPasswordConfigured)()) {
       ledger(db, "blocked", "Owner password setup is required for autonomous execution", now);

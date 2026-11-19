@@ -74,3 +74,18 @@ test("a monthly cost shows in profit, and stop rules and playbooks are owner set
   await page.locator("summary").filter({ hasText: "Playbooks" }).click();
   await expect(page.getByRole("region", { name: "Playbook Etsy digital products" })).toBeVisible();
 });
+
+test("the income stream page shows a business on one screen and fits a phone", async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/revenue");
+  await page.getByRole("tab", { name: "Income streams" }).click();
+  const stream = page.getByRole("region", { name: "Income stream" });
+  await expect(stream.getByRole("button", { name: "Ventures" })).toHaveAttribute("aria-pressed", "true");
+  await expect(stream.getByRole("heading", { name: "What the engine does next" })).toBeVisible();
+  await stream.getByRole("button", { name: "Tech Services" }).click();
+  await expect(stream.getByRole("button", { name: "Tech Services" })).toHaveAttribute("aria-pressed", "true");
+  await expect(stream.getByRole("heading", { name: "Goals" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});

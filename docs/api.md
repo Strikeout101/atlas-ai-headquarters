@@ -324,4 +324,13 @@ All owner-only (password session, plus CSRF for changes); agent task tokens are 
 | PUT        | `/api/autonomy/playbooks/:key`                                                         | Edit a playbook's steps                                                  |
 | POST       | `/api/autonomy/playbooks/:key/reset`, `/api/autonomy/playbooks/:key/research-schedule` | Default steps back / add its research schedule (off)                     |
 
-`GET /api/finance` now also returns `profit` (lines per business, monthly costs, `costs_complete`) and each opportunity's `spent_minor` and `earned_minor`. `GET /api/autonomy` also returns `experiment_rules` and `playbooks`.
+`GET /api/finance` now also returns `profit` (lines per business, monthly costs, `costs_complete`) and each opportunity's `spent_minor` and `earned_minor`. `GET /api/autonomy` also returns `experiment_rules`, `playbooks` and `milestones`.
+
+| Method | Path                                  | What it does                                                                                                                               |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/streams?business=`              | One income stream: goals with milestones, ideas with money and stage, queued work, listings, schedules, this month's profit, recent events |
+| POST   | `/api/autonomy/goals/:id/milestones`  | Add a milestone: `{title, kind: "progress", target}` (completes from measured progress) or `{title, kind: "manual"}` (owner confirms)      |
+| POST   | `/api/autonomy/milestones/:id/done`   | `{done}`: owner confirms a manual milestone (refused for progress milestones)                                                              |
+| POST   | `/api/autonomy/milestones/:id/delete` | Remove a milestone                                                                                                                         |
+
+Schedules accept optional `cron` (5 fields: minute hour day month weekday; numbers, `*`, lists, ranges and steps) and `timezone` (IANA, default `America/New_York`). With a rule, `next_run_at` is computed from it and the interval is ignored; a time skipped by daylight saving runs at the next real minute, a doubled time runs once. Approvals listed by `GET /api/approvals` carry `untrusted_content: true` when the task (or the task it came from) read web content that tried to instruct it; those always go to the owner.

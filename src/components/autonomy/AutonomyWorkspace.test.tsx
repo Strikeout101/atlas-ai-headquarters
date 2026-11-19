@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAutonomy, saveAutonomy, type AutonomyOverview } from "../../api/autonomy";
@@ -91,6 +91,29 @@ describe("autonomy planning", () => {
         undefined,
       ),
     );
+  });
+  it("turns a days-and-time choice into a time-of-day rule in the chosen zone", async () => {
+    const user = userEvent.setup();
+    render(<AutonomyWorkspace departments={[]} />);
+    await user.click(await screen.findByRole("tab", { name: /Schedules/ }));
+    await user.click(screen.getByRole("button", { name: "Lead research preset" }));
+    const form = screen.getByRole("form", { name: "Add schedules" });
+    await user.selectOptions(within(form).getByLabelText("Project"), "project-1");
+    await user.selectOptions(within(form).getByLabelText("Days"), "1-5");
+    fireEvent.change(within(form).getByLabelText("Time"), { target: { value: "07:30" } });
+    await user.clear(within(form).getByLabelText("Time zone"));
+    await user.type(within(form).getByLabelText("Time zone"), "Europe/London");
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(saveAutonomy).toHaveBeenCalledWith(
+        "schedules",
+        expect.objectContaining({ cron: "30 7 * * 1-5", timezone: "Europe/London" }),
+        undefined,
+      ),
+    );
+    const saved = vi.mocked(saveAutonomy).mock.calls[0][1] as Record<string, unknown>;
+    expect(saved).not.toHaveProperty("tod_days");
+    expect(saved).not.toHaveProperty("cron_advanced");
   });
   it("keeps a rejected owner mutation editable and tells the owner where to sign in", async () => {
     vi.mocked(saveAutonomy).mockRejectedValue(

@@ -32694,6 +32694,658 @@
           }
         ]
       }
+    },
+    "/api/streams": {
+      "get": {
+        "tags": ["autonomy"],
+        "summary": "One income stream",
+        "description": "Goals with milestones, ideas with money and stage, queued and running work, listings, schedules, this month's profit and recent events for one business; query business. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/autonomy/goals/{id}/milestones": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Add a goal milestone",
+        "description": "kind progress needs a target and completes only from the goal's measured progress; kind manual completes only when the owner confirms it. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "title": "First two products",
+                "kind": "progress",
+                "target": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autonomy/milestones/{id}/done": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Confirm a manual milestone",
+        "description": "Sets a manual milestone done or open; refused for progress milestones. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "done": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autonomy/milestones/{id}/delete": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Remove a milestone",
+        "description": "Deletes one milestone. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   }
 }

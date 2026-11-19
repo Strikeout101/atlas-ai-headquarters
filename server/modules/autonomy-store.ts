@@ -71,6 +71,12 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     )
   )
     db.exec("ALTER TABLE business_goals ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'");
+  // Time-of-day schedules (schedule-time.ts): a cron rule in a time zone; interval_minutes is used when cron is empty.
+  const scheduleColumns = new Set(
+    (db.prepare("PRAGMA table_info(schedules)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!scheduleColumns.has("cron")) db.exec("ALTER TABLE schedules ADD COLUMN cron TEXT");
+  if (!scheduleColumns.has("timezone")) db.exec("ALTER TABLE schedules ADD COLUMN timezone TEXT");
 }
 
 export function autonomyConfig(db: DatabaseSync): AutonomyConfig {

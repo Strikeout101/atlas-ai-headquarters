@@ -11,6 +11,8 @@ interface PendingApprovalBase {
   deal_amount_minor?: number | null;
   deal_currency?: string | null;
   changes_client_tier?: boolean;
+  /** The task behind it read outside content that tried to give instructions; the owner decides. */
+  untrusted_content?: boolean;
   within_spend_budget?: boolean;
   vp_review?: {
     status: string;

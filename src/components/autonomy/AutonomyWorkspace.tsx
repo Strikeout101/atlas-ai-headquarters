@@ -26,6 +26,7 @@ import type { Department, Project } from "../../types";
 import { useI18n } from "../../i18n";
 import { currencyDigits, parseMoney } from "../revenue/money";
 import PlaybooksPanel from "./PlaybooksPanel";
+import GoalMilestones from "./GoalMilestones";
 
 const inputClass = "mt-1 min-h-[40px] w-full min-w-0 rounded-lg border px-3 py-2 text-sm";
 const inputStyle = {
@@ -159,6 +160,19 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
     if (resource === "schedules") {
       row.interval_minutes = Number(row.interval_minutes);
       row.next_run_at = new Date(String(row.next_run_at)).getTime();
+      // Time of day: an advanced cron rule wins; otherwise days + time build one; otherwise the interval is used.
+      const advanced = String(row.cron_advanced ?? "").trim();
+      const days = String(row.tod_days ?? "");
+      const time = String(row.tod_time ?? "");
+      if (advanced) row.cron = advanced;
+      else if (days && /^\d{2}:\d{2}$/.test(time)) {
+        const [hour, minute] = time.split(":").map(Number);
+        row.cron = `${minute} ${hour} * * ${days}`;
+      } else row.cron = "";
+      row.timezone = String(row.timezone ?? "").trim() || "America/New_York";
+      delete row.cron_advanced;
+      delete row.tod_days;
+      delete row.tod_time;
       row.enabled = form.get("enabled") === "on";
       row.department_id = row.department_id || null;
     }
@@ -495,6 +509,75 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                         "datetime-local",
                         { defaultValue: localDate(editing?.next_run_at ?? Date.now() + 86400000) },
                       )}
+                      {(() => {
+                        const cron = typeof editing?.cron === "string" ? editing.cron : "";
+                        const simple = cron.match(/^(\d{1,2}) (\d{1,2}) \* \* (\*|1-5|0,6|[0-6])$/);
+                        return (
+                          <fieldset
+                            className="grid gap-3 rounded-lg border p-3 sm:col-span-2 sm:grid-cols-3"
+                            style={{ borderColor: "var(--th-border)" }}
+                          >
+                            <legend className="px-1 text-xs font-semibold">
+                              {t({ en: "Time of day (optional; replaces the interval)" })}
+                            </legend>
+                            <Field label={t({ en: "Days" })}>
+                              <select
+                                name="tod_days"
+                                defaultValue={simple ? simple[3] : ""}
+                                className={inputClass}
+                                style={inputStyle}
+                              >
+                                <option value="">Use the interval</option>
+                                <option value="*">Every day</option>
+                                <option value="1-5">Weekdays</option>
+                                <option value="0,6">Weekends</option>
+                                <option value="1">Mondays</option>
+                                <option value="2">Tuesdays</option>
+                                <option value="3">Wednesdays</option>
+                                <option value="4">Thursdays</option>
+                                <option value="5">Fridays</option>
+                                <option value="6">Saturdays</option>
+                                <option value="0">Sundays</option>
+                              </select>
+                            </Field>
+                            <Field label={t({ en: "Time" })}>
+                              <input
+                                name="tod_time"
+                                type="time"
+                                defaultValue={
+                                  simple ? `${simple[2].padStart(2, "0")}:${simple[1].padStart(2, "0")}` : "09:00"
+                                }
+                                className={inputClass}
+                                style={inputStyle}
+                              />
+                            </Field>
+                            <Field label={t({ en: "Time zone" })}>
+                              <input
+                                name="timezone"
+                                defaultValue={
+                                  typeof editing?.timezone === "string" && editing.timezone
+                                    ? editing.timezone
+                                    : "America/New_York"
+                                }
+                                className={inputClass}
+                                style={inputStyle}
+                              />
+                            </Field>
+                            <div className="sm:col-span-3">
+                              <Field
+                                label={t({ en: "Or a cron rule (minute hour day month weekday), e.g. 0 9 1 * *" })}
+                              >
+                                <input
+                                  name="cron_advanced"
+                                  defaultValue={cron && !simple ? cron : ""}
+                                  className={inputClass}
+                                  style={inputStyle}
+                                />
+                              </Field>
+                            </div>
+                          </fieldset>
+                        );
+                      })()}
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" name="enabled" defaultChecked={Boolean(editing?.enabled)} />
                         {t({ en: "Enable schedule" })}
@@ -544,7 +627,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                         · {projects.find((project) => project.id === row.project_id)?.name ?? row.project_id}
                         {"status" in row && row.status ? ` · ${row.status}` : ""}
                         {"enabled" in row
-                          ? ` · ${row.enabled ? "Enabled" : "Paused"} · ${row.consecutive_failures} failures · ${new Date(row.next_run_at).toLocaleString(locale)}`
+                          ? ` · ${row.enabled ? "Enabled" : "Paused"} · ${row.cron ? `${row.cron} (${row.timezone ?? "America/New_York"})` : `every ${row.interval_minutes} min`} · ${row.consecutive_failures} failures · next ${new Date(row.next_run_at).toLocaleString(locale)}`
                           : ""}
                       </p>
                       {"metric" in row && (
@@ -553,6 +636,14 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           {new Date(row.period_end).toLocaleDateString(locale)}
                           {row.progress_scope === "business" ? ` · ${t({ en: "Business-wide records" })}` : ""}
                         </p>
+                      )}
+                      {"metric" in row && (
+                        <GoalMilestones
+                          goalId={row.id}
+                          milestones={(data.milestones ?? []).filter((m) => m.goal_id === row.id)}
+                          busy={busy}
+                          mutate={mutate}
+                        />
                       )}
                       {"demand_score" in row && (row.playbook_stage || row.stop_reason) && (
                         <p className="mt-2 break-words text-xs">
