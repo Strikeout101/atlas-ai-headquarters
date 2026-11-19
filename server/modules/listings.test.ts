@@ -48,6 +48,7 @@ const pack = {
   files: ["products/budget-planner/planner.pdf"],
   mockups: ["products/budget-planner/mockup-1.png"],
   notes: "Original work made in this task.",
+  taxonomy_id: 2078,
 };
 
 function harness() {
@@ -84,6 +85,9 @@ describe("listing packages", () => {
       NOW,
     );
     expect(complete.title).toBe("Planner");
+    // Etsy needs a category before it can be submitted.
+    expect(() => submitListing(db, draft.id, NOW)).toThrow("listing_taxonomy_required");
+    updateListing(db, draft.id, { taxonomy_id: 2078 }, NOW);
     expect(submitListing(db, draft.id, NOW)).toMatchObject({ status: "ready", submitted_at: NOW });
     expect(createListing(db, { ...pack, platform: "itch" }, {}, NOW).fee_minor).toBe(0);
   });

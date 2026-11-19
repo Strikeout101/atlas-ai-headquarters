@@ -1,11 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
+import { listRecurringCosts, opportunityMoney, profitLines, profitSettings, recurringShareMinor } from "./profit.ts";
 
 type Row = Record<string, unknown>;
 /** Spending categories for agent spend requests and the owner's budgets (spend-budgets.ts). */
 export const SPEND_CATEGORIES = ["ai_tools", "ads", "hosting", "software", "supplies", "other"] as const;
 export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "paid", "lost"] as const;
+/** Where a ledger row came from. Provider sources (Square, Etsy) are verified evidence; the rest are recorded by ATLAS. */
+export const LEDGER_SOURCES = [
+  "manual",
+  "square_payment",
+  "square_fee",
+  "etsy_receipt",
+  "etsy_fee",
+  "etsy_refund",
+  "tool_usage",
+  "subscription",
+] as const;
+const LEDGER_SOURCE_SQL = LEDGER_SOURCES.map((source) => `'${source}'`).join(",");
 export function ensureFinanceSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS deals (
     id TEXT PRIMARY KEY,business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
@@ -18,7 +31,7 @@ export function ensureFinanceSchema(db: DatabaseSync): void {
   CREATE TABLE IF NOT EXISTS ledger_entries (
     id TEXT PRIMARY KEY,business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),kind TEXT NOT NULL CHECK(kind IN ('revenue','expense')),
     amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor)='integer' AND amount_minor BETWEEN 0 AND 9007199254740991),currency TEXT NOT NULL,
-    source TEXT NOT NULL CHECK(source IN ('manual','square_payment','square_fee')),external_id TEXT,verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN (0,1)),
+    source TEXT NOT NULL CHECK(source IN (${LEDGER_SOURCE_SQL})),external_id TEXT,verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN (0,1)),
     deal_id TEXT REFERENCES deals(id),opportunity_id TEXT REFERENCES opportunities(id),description TEXT NOT NULL DEFAULT '',occurred_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(source,external_id)
   );
@@ -33,6 +46,7 @@ export function ensureFinanceSchema(db: DatabaseSync): void {
   CREATE INDEX IF NOT EXISTS idx_ledger_opportunity ON ledger_entries(opportunity_id);
   CREATE INDEX IF NOT EXISTS idx_spend_pending ON spend_requests(status,created_at);`);
   migrateNullableFinancialReferences(db);
+  migrateLedgerSources(db);
   if (!(db.prepare("PRAGMA table_info(spend_requests)").all() as { name: string }[]).some((c) => c.name === "category"))
     db.exec("ALTER TABLE spend_requests ADD COLUMN category TEXT NOT NULL DEFAULT 'other'");
   if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='business_goals'").get()) {
@@ -50,6 +64,29 @@ function migrateNullableFinancialReferences(db: DatabaseSync): void {
       "$1 ON DELETE SET NULL",
     );
     if (sql === row.sql) continue;
+    rebuildFinanceTable(db, table, sql);
+  }
+}
+
+/** Older databases only allowed manual and Square ledger rows; widen the CHECK to every current source. */
+function migrateLedgerSources(db: DatabaseSync): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get() as
+    | { sql: string }
+    | undefined;
+  if (!row) return;
+  const match = row.sql.match(/source\s+TEXT\s+NOT\s+NULL\s+CHECK\s*\(\s*source\s+IN\s*\(([^)]*)\)\s*\)/i);
+  if (!match) throw new Error("finance_migration_unexpected_schema");
+  if (LEDGER_SOURCES.every((source) => match[1].includes(`'${source}'`))) return;
+  rebuildFinanceTable(
+    db,
+    "ledger_entries",
+    row.sql.replace(match[0], `source TEXT NOT NULL CHECK(source IN (${LEDGER_SOURCE_SQL}))`),
+  );
+}
+
+/** Rebuilds a finance table from new SQL, keeping every row, index and trigger. Runs at startup, outside other work. */
+function rebuildFinanceTable(db: DatabaseSync, table: string, sql: string): void {
+  {
     if ((db as DatabaseSync & { isTransaction?: boolean }).isTransaction)
       throw new Error("finance_migration_requires_startup");
     const indexes = db
@@ -441,14 +478,31 @@ export function getFinancialGoalProgress(db: DatabaseSync, goal: Row) {
   const revenue = total?.revenue_minor ?? 0,
     cost = total?.cost_minor ?? 0;
   const revenueMetric = ["revenue", "verified_revenue"].includes(String(goal.metric));
+  // Profit is only measured once the owner has confirmed their recurring costs are complete: until then a missing
+  // cost could make a profit goal look met. All recorded expenses count, verified or not.
+  const costsComplete = profitSettings(db).costs_complete;
+  const allExpenses = safeTotal(
+    (rows as Row[]).filter((row) => row.kind === "expense").map((row) => Number(row.amount_minor)),
+  );
+  const recurring = recurringShareMinor(
+    db,
+    String(goal.business),
+    code,
+    Number(goal.period_start),
+    Number(goal.period_end),
+  );
+  const profit = revenue - allExpenses - recurring;
+  const profitMetric = ["profit", "verified_profit"].includes(String(goal.metric));
   return {
     currency: code,
     verified_revenue_minor: revenue,
     cost_minor: cost,
     reported_surplus_minor: revenue - cost,
-    progress: revenueMetric ? revenue / 10 ** digits : null,
+    profit_minor: costsComplete ? profit : null,
+    recurring_minor: recurring,
+    progress: revenueMetric ? revenue / 10 ** digits : profitMetric && costsComplete ? profit / 10 ** digits : null,
     progress_scope: "business",
-    costs_complete: false,
+    costs_complete: costsComplete,
     profit_verified: false,
   };
 }
@@ -490,5 +544,79 @@ export function financeOverview(db: DatabaseSync, filters: { business?: string; 
       ...opportunity,
       currencies: totalsFor(rows.filter((row) => row.opportunity_id === opportunity.id)),
     }));
-  return { deals, ledger: rows, spend_requests: spendRequests, totals: totalsFor(rows), goals, opportunities };
+  const now = Date.now();
+  const from = filters.from ?? Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
+  const to = filters.to ?? now;
+  const periodRows =
+    filters.from === undefined ? (rows as Row[]).filter((row) => Number(row.occurred_at) >= from) : (rows as Row[]);
+  return {
+    deals,
+    ledger: rows,
+    spend_requests: spendRequests,
+    totals: totalsFor(rows),
+    goals,
+    opportunities: opportunities.map((opportunity): Row & { currencies: Totals[]; spent_minor: number } => ({
+      ...opportunity,
+      ...opportunityMoney(db, String(opportunity.id)),
+    })),
+    profit: {
+      from,
+      to,
+      costs_complete: profitSettings(db).costs_complete,
+      lines: profitLines(db, periodRows, from, to, filters.business),
+      recurring_costs: listRecurringCosts(db),
+    },
+  };
+}
+
+export interface ProviderLedgerRow {
+  business: BusinessKey;
+  kind: "revenue" | "expense";
+  amount_minor: number;
+  currency: string;
+  source: (typeof LEDGER_SOURCES)[number];
+  external_id: string;
+  verified: boolean;
+  description: string;
+  occurred_at: number;
+  opportunity_id?: string | null;
+}
+
+/**
+ * Insert or update one ledger row that comes from a provider or a tool (Etsy, image studio), keyed by its source and
+ * external id so a repeated sync never counts it twice. An existing link to an opportunity is kept.
+ */
+export function upsertProviderLedgerEntry(db: DatabaseSync, row: ProviderLedgerRow, now = Date.now()): void {
+  ensureFinanceSchema(db);
+  if (!isBusinessKey(row.business)) fail("invalid_business");
+  if (!Number.isSafeInteger(row.amount_minor) || row.amount_minor < 0) fail("invalid_amount_minor");
+  const existing = db
+    .prepare("SELECT id, opportunity_id FROM ledger_entries WHERE source=? AND external_id=?")
+    .get(row.source, row.external_id) as Row | undefined;
+  const opportunityId =
+    (existing?.opportunity_id as string | null | undefined) ??
+    (row.opportunity_id &&
+    db.prepare("SELECT 1 FROM opportunities WHERE id=? AND business=?").get(row.opportunity_id, row.business)
+      ? row.opportunity_id
+      : null);
+  db.prepare(
+    `INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,opportunity_id,description,occurred_at,created_at,updated_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source,external_id) DO UPDATE SET amount_minor=excluded.amount_minor,
+     verified=excluded.verified,opportunity_id=COALESCE(ledger_entries.opportunity_id, excluded.opportunity_id),
+     description=excluded.description,occurred_at=excluded.occurred_at,updated_at=excluded.updated_at`,
+  ).run(
+    (existing?.id as string | undefined) ?? randomUUID(),
+    row.business,
+    row.kind,
+    row.amount_minor,
+    row.currency,
+    row.source,
+    row.external_id,
+    row.verified ? 1 : 0,
+    opportunityId,
+    row.description.slice(0, 500),
+    row.occurred_at,
+    now,
+    now,
+  );
 }

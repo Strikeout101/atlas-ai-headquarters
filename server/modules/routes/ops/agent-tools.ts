@@ -30,6 +30,11 @@ import {
   updateListing,
 } from "../../listings.ts";
 import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
+import { generateImage, renderMockup, type StudioContext } from "../../studio.ts";
+import { searchMedia } from "../../media-library.ts";
+import { startVariant } from "../../experiments.ts";
+import { searchEtsyTaxonomy } from "../../etsy.ts";
+import { proposeOpportunity } from "../../playbooks.ts";
 import {
   createDeal,
   updateDeal,
@@ -194,6 +199,77 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           return res.status(operation === "finance.deals.create" ? 201 : 200).json({ ok: true, item });
         }
         return res.status(403).json({ error: "finance_operation_forbidden" });
+      }
+      // Image studio, media library, experiments and Etsy categories (section E).
+      if (
+        operation === "studio.mockup" ||
+        operation === "studio.generate" ||
+        operation === "media.search" ||
+        operation === "experiment.start" ||
+        operation === "etsy.taxonomy" ||
+        operation === "opportunity.propose"
+      ) {
+        const context = resolveTaskContext(db, claims.taskId);
+        const work = db
+          .prepare("SELECT opportunity_id FROM autonomy_work WHERE task_id=? AND opportunity_id IS NOT NULL LIMIT 1")
+          .get(claims.taskId) as { opportunity_id: string } | undefined;
+        const opportunityId =
+          typeof body.opportunity_id === "string" && body.opportunity_id
+            ? body.opportunity_id
+            : (work?.opportunity_id ?? null);
+        const studioContext: StudioContext = {
+          business: context?.business ?? null,
+          projectId: context?.projectId ?? null,
+          projectPath: context?.projectPath ?? null,
+          opportunityId,
+          listingId: typeof body.listing_id === "string" ? body.listing_id : null,
+          agentId: claims.agentId,
+          taskId: claims.taskId,
+        };
+        try {
+          if (operation === "studio.mockup")
+            return res.status(201).json({ ok: true, item: await renderMockup(db, body, studioContext) });
+          if (operation === "studio.generate")
+            return res.status(201).json({ ok: true, item: await generateImage(db, body, studioContext) });
+          if (operation === "media.search")
+            return res.json({
+              ok: true,
+              items: searchMedia(db, {
+                query: body.query,
+                business: body.business ?? context?.business,
+                project_id: body.project_id,
+                opportunity_id: body.opportunity_id,
+                limit: typeof body.limit === "number" ? body.limit : 20,
+              }),
+            });
+          if (operation === "experiment.start") {
+            const item = startVariant(
+              db,
+              { ...body, opportunity_id: opportunityId },
+              { agentId: claims.agentId, taskId: claims.taskId },
+            );
+            return res.status(201).json({ ok: true, item });
+          }
+          if (operation === "opportunity.propose") {
+            // Research tasks from a playbook schedule record niches as ideas tied to that playbook.
+            const schedule = db
+              .prepare(
+                "SELECT s.playbook FROM autonomy_work w JOIN schedules s ON s.id=w.schedule_id WHERE w.task_id=? LIMIT 1",
+              )
+              .get(claims.taskId) as { playbook: string | null } | undefined;
+            const item = proposeOpportunity(db, body, {
+              business: context?.business ?? null,
+              projectId: context?.projectId ?? null,
+              taskId: claims.taskId,
+              playbook: schedule?.playbook ?? null,
+            });
+            return res.status(201).json({ ok: true, item });
+          }
+          return res.json({ ok: true, items: await searchEtsyTaxonomy(db, body.query) });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "studio_request_failed";
+          return res.status(message.endsWith("_not_found") ? 404 : 400).json({ error: message });
+        }
       }
       if (typeof operation === "string" && operation.startsWith("listings.")) {
         ensureListingSchema(db);

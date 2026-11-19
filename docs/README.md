@@ -20,6 +20,7 @@ Which documents describe ATLAS as it is now, and which are dated history. Pendin
 | [phase3-vp-approvals.md](phase3-vp-approvals.md)         | The two VPs and who approves what.                                                                                                                |
 | [phase4-autonomy.md](phase4-autonomy.md)                 | Goals, opportunities, routines and the autonomy engine.                                                                                           |
 | [phase5-finance.md](phase5-finance.md)                   | Deals, ledger, spending requests and read-only Square.                                                                                            |
+| [etsy.md](etsy.md)                                       | Ventures Etsy money loop: owner setup, playbook, what counts as money.                                                                            |
 | [phase6-listings.md](phase6-listings.md)                 | Etsy and itch.io listing packages and the fee budget.                                                                                             |
 | [DESIGN.md](DESIGN.md)                                   | UI and visual style.                                                                                                                              |
 

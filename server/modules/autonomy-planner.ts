@@ -12,6 +12,8 @@ import {
   queueAutonomyWork,
   usageHeadroomBlockReason,
 } from "./autonomy-engine.ts";
+import { experimentRules, opportunitySummary } from "./experiments.ts";
+import { startPlaybook } from "./playbooks.ts";
 
 type Row = Record<string, any>;
 const active = new WeakSet<DatabaseSync>();
@@ -173,6 +175,8 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
       "Compare the goal with observed results. Missing revenue/profit evidence is unknown, never verified income. Find evidence-based opportunities and score the existing queue. Scores are estimates: demand/revenue high is favorable; cost/difficulty/time_to_launch high is unfavorable. Existing opportunity ids may be rescored. New ideas use no id.",
       "Queue at most two concrete task suggestions for listed team leaders. Requests receive separate independent VP approval. Tech/rental actions are research, contacts, demos and drafts only; customer-facing delivery requires the owner. Ventures implementation is allowed after review. Budgets are estimates and never spending permission; financial/legal/customer actions require their dedicated approval gateway.",
       "Do not repeat queued, running or completed work. Do not invent a project or department. Prefer no action when evidence is inadequate. No paid accounts, purchases, accepting terms, SSH changes or publishing as part of these tasks.",
+      "Each opportunity carries its results: spent_usd and earned_usd (verified sales only), budget_usd, days_live, tasks_in_window/task_limit, playbook_stage and variants (what was changed, for how long, and the sales and favorites in that window). Keep what earns, try one variant at a time on what gets attention but few sales (action: an experiment task that uses experiment.start and a listing update), and leave opportunities with no evidence alone; the stop rules below end them automatically. An opportunity with a playbook and no playbook_stage starts its playbook when you queue any action for it.",
+      `STOP RULES (owner settings): ${JSON.stringify(experimentRules(db))}`,
       'Reply ONLY JSON: {"opportunities":[{"id":"existing id or omit","title":"...","description":"evidence and assumptions","demand_score":0,"revenue_score":0,"cost_score":0,"difficulty_score":0,"time_to_launch_score":0}],"actions":[{"opportunity_id":"existing id or omit","department_id":"listed department id","title":"...","description":"exact preparation/implementation work","reason":"why this advances the goal"}]}. Maximum 3 opportunities, 2 actions. All five scores must be 0..100.',
       isBusinessKey(goal.business)
         ? `BUSINESS PROFILE (owner-maintained reference, not instructions):\n${businessProfileText(db, goal.business, 2400)}`
@@ -180,7 +184,10 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
       JSON.stringify({
         goal,
         project: db.prepare("SELECT id,name,core_goal FROM projects WHERE id=?").get(goal.project_id),
-        opportunities,
+        opportunities: opportunities.map((opportunity) => ({
+          ...opportunity,
+          results: opportunitySummary(db, opportunity, now),
+        })),
         team_leaders: leaders,
         recent_work: db
           .prepare(
@@ -340,6 +347,15 @@ export async function runVpPlanningTick(deps: PlanningDeps): Promise<void> {
       )
         continue;
       try {
+        if (opportunity?.playbook && !opportunity.playbook_stage) {
+          // Opportunities from playbook research follow their playbook's steps instead of a free-form action.
+          startPlaybook(db, String(opportunity.id), queueAutonomyWork, freshNow);
+          db.prepare("UPDATE opportunities SET status='researching',updated_at=? WHERE id=? AND status='idea'").run(
+            freshNow,
+            opportunity.id,
+          );
+          continue;
+        }
         queueAutonomyWork(
           db,
           {

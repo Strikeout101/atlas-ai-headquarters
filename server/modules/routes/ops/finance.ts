@@ -11,6 +11,7 @@ import {
   linkLedgerEntry,
   updateDeal,
 } from "../../finance-store.ts";
+import { deleteRecurringCost, saveRecurringCost, setCostsComplete } from "../../profit.ts";
 
 export function registerFinanceRoutes(
   app: Express,
@@ -71,5 +72,23 @@ export function registerFinanceRoutes(
       return decideSpendRequest(db, id, body.approve, "owner");
     },
     "request",
+  );
+  // Monthly costs (AI subscriptions, software, hosting) and the owner's "my costs are complete" confirmation.
+  mutation("/api/finance/recurring-costs", "post", (_id, body) => saveRecurringCost(db, body), "cost");
+  mutation("/api/finance/recurring-costs/:id", "patch", (id, body) => saveRecurringCost(db, body, id), "cost");
+  mutation(
+    "/api/finance/recurring-costs/:id/delete",
+    "post",
+    (id) => {
+      deleteRecurringCost(db, id);
+      return { id };
+    },
+    "cost",
+  );
+  mutation(
+    "/api/finance/profit-settings",
+    "patch",
+    (_id, body) => setCostsComplete(db, body.costs_complete),
+    "settings",
   );
 }

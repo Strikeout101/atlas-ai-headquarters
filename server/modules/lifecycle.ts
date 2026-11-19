@@ -16,6 +16,7 @@ import { isPasswordConfigured } from "../security/login-sessions.ts";
 import { ensureAutonomyEngineSchema, runAutonomyEngineTick } from "./autonomy-engine.ts";
 import { runVpPlanningTick } from "./autonomy-planner.ts";
 import { runSquareSyncTick, SQUARE_SYNC_INTERVAL_MS } from "./square-sync.ts";
+import { ETSY_SYNC_INTERVAL_MS, runEtsyTick } from "./etsy.ts";
 import {
   getContextRollover,
   releaseStaleContextRolloverClaims,
@@ -578,6 +579,26 @@ export function startLifecycle(ctx: RuntimeContext): void {
   };
   setTimeout(squareTick, 45_000);
   setInterval(squareTick, SQUARE_SYNC_INTERVAL_MS);
+  // Etsy: push approved packages as drafts (and publish them if the owner turned that on), then read orders and fees.
+  let etsyTickRunning = false;
+  const etsyTick = async () => {
+    if (
+      etsyTickRunning ||
+      !isAutonomyAllowed() ||
+      db.prepare("SELECT 1 FROM settings WHERE key='__e2eRuntimeId'").get()
+    )
+      return;
+    etsyTickRunning = true;
+    try {
+      await runEtsyTick(db);
+    } catch {
+      console.error("[etsy-sync] Sync failed; see the Etsy card in Settings > Businesses.");
+    } finally {
+      etsyTickRunning = false;
+    }
+  };
+  setTimeout(etsyTick, 90_000);
+  setInterval(etsyTick, ETSY_SYNC_INTERVAL_MS);
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 

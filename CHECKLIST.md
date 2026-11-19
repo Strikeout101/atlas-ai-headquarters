@@ -52,21 +52,21 @@ Last full review: 2026-11-18 (added section E after checking the checklist again
 | # | Feature | Status | What is missing |
 |---|---|---|---|
 | 1 | Goal engine (work toward targets like $X a month) | Built, not running | No goals set yet (owner waits for the engine to be complete). Money goals count only verified ledger income. Goals have no milestones. |
-| 2 | Opportunity discovery (research, score, queue) | Built | Scored queue, planner and research schedules exist. No Etsy niche-research routine yet. |
-| 3 | Business tools (do real work in real systems) | Partial | Web search and reading, approved email, GitHub, read-only Square, SSH, listing packages. **Missing: image studio, Etsy API.** |
+| 2 | Opportunity discovery (research, score, queue) | Built | Scored queue, VP planner, research schedules, and `opportunity.propose` for research agents (2026-11-18). |
+| 3 | Business tools (do real work in real systems) | Partial | Web, email, GitHub, Square, SSH, listing packages, image studio (free mockups; AI images off until set up), Etsy API (built, not yet tested live). Missing: video. |
 | 4 | Persistent work and schedules | Built | Interval schedules, auto-pause after repeated failures, daily start cap, usage gate. Missing: time-of-day schedules. |
 | 5 | Business project manager (one view per income stream) | Partial | Projects belong to businesses; deals and ledger link to opportunities. Missing: one page per stream with goal, products, spend and results. |
-| 6 | Product creation pipeline | Partial | Etsy and itch.io listing packages. **Missing: the end-to-end Etsy playbook.** |
+| 6 | Product creation pipeline | Built, not running | Etsy playbook (research → build → mockups → listing → approval → Etsy draft/publish), editable in Autonomy > Playbooks (2026-11-18). Starts once a research schedule and goal are switched on. |
 | 7 | Customer acquisition | Partial | Contacts, drafts, lead research schedules. For Etsy, traffic comes from search and social; social posting is not possible yet (section 5). |
 | 8 | Sales and fulfillment | Partial | Quotes and approved email. For Etsy: orders and customer messages are not read; Etsy delivers digital files itself. |
-| 9 | Revenue and profit | Partial | Ledger with verified Square payments. **Missing: Etsy orders, fees and payouts in the ledger; AI and tool costs as expenses; profit.** |
-| 10 | Experiments and optimization | Missing | Opportunity budgets are stored but not enforced; nothing tests variants or stops what does not sell. |
+| 9 | Revenue and profit | Built | Ledger with verified Square and Etsy money, fees and refunds; monthly costs; profit per business and opportunity (2026-11-18). Etsy mapping verified once live. |
+| 10 | Experiments and optimization | Built | Budgets, task and time limits enforced; variants measured from sales and favorites; owner stop rules; planner keeps, changes or stops (2026-11-18). |
 
 Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP approvals (ATLAS's version of Starnet's consent rules), daily start cap, a ledger that records skips, the "while you were away" digest on Today, schedules that auto-pause, the trust ramp and the usage gate. Not yet: soft money budgets per run and per day with a one-click resume (see section 11), time-of-day schedules, protection against instructions hidden in content agents read, and goal milestones the owner confirms.
 
 ### Build: Etsy first
 
-- [ ] **P1** **Etsy playbook.** One routine for Ventures:
+- [x] **P1** (2026-11-18, `server/modules/playbooks.ts`; Autonomy > Playbooks; steps run as ordinary autonomy work through every gate) **Etsy playbook.** One routine for Ventures:
   - Research niches.
   - Score each idea as an opportunity, with a budget and time limit.
   - Make the product files, then mockups and preview images (studio).
@@ -74,20 +74,23 @@ Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP appr
   - Publish through the API, or hand it to the owner while the API is not approved.
   - Track views and sales.
   - Build it on the existing opportunities, schedules, listing packages and approvals. Each step's result is recorded, so a generated product, a published listing, an order and a payout stay separate states.
-- [ ] **P1** **Image studio.** An agent tool that makes images (mockups, previews, social images, later game assets and video):
+- [x] **P1** (2026-11-18, `server/modules/studio.ts` and `media-library.ts`; Settings > Businesses > Image studio; Team > Knowledge > Media. Free mockups work now; AI images off until the owner sets a service and cap) **Image studio.** An agent tool that makes images (mockups, previews, social images, later game assets and video):
   - The provider is a setting: a paid service or a model on the homelab or Precision.
   - Each use is recorded as a cost and counted against a monthly cap set by the owner.
   - Outputs go to the media library (section 5) with what made them and their license terms.
-- [ ] **P1** **Etsy API** (details in section 6): create and update listings as drafts, read orders, payments and fees into the ledger as verified income and costs.
-- [ ] **P1** **Experiments and auto-stop:**
+- [x] **P1** (2026-11-18, built: `server/modules/etsy.ts`, Settings > Businesses > Etsy, `docs/etsy.md`. Tested against Etsy's spec and fakes; **verify live once the developer app is approved**) **Etsy API** (details in section 6): create and update listings as drafts, read orders, payments and fees into the ledger as verified income and costs.
+- [x] **P1** (2026-11-18, `server/modules/experiments.ts`; stop rules in Autonomy) **Experiments and auto-stop:**
   - Enforce each opportunity's money and agent-time budget.
   - Let agents try variants (titles, prices, images) and record the results.
   - Have the planner keep, change or stop an opportunity by rules the owner can edit.
   - Record every stop in the ledger with its reason.
-- [ ] **P1** **Costs and profit:**
+- [x] **P1** (2026-11-18, `server/modules/profit.ts`; Revenue > Profit. Owner enters monthly costs and confirms they are complete) **Costs and profit:**
   - Count AI subscriptions as monthly costs, and per-use costs (studio, listing fees, ads) as expenses.
   - Show profit per opportunity, per stream and per business.
   - Profit goals (section 10) depend on this.
+- [ ] **P1** Verify the Etsy connection live once the developer app is approved: connect, push one real draft, check its images and file, publish, then confirm one order and its fees land in Revenue. Adjust `classifyLedgerEntry` in `server/modules/etsy.ts` to Etsy's real fee labels.
+- [ ] **P2** Run the real-model playbook check when a subscription is under the 80% usage limit: `pnpm exec tsx scripts/qa/etsy-playbook-planner.ts --run` (blocked on 2026-11-18: Claude 7-day at 94%, Codex also over the limit).
+- [ ] **P2** Owner create and edit of listing packages from the Listings panel (agents create them today; the owner can only approve, publish and withdraw).
 - [ ] **P2** **Income stream page:** per stream, the goal against verified revenue, the products and opportunities with their status, spend, results and what the engine plans next.
 - [ ] **P2** **Time-of-day schedules** ("weekdays at 9", with a time zone). Refuse schedules that cannot be read exactly instead of guessing.
 - [ ] **P2** **Content guard:**
@@ -183,12 +186,12 @@ Today Instagram can be read, and drafts exist as records only. No platform can b
 - [ ] **P2** OAuth login flow for social accounts, so tokens are not pasted by hand.
 - [ ] **P3** TikTok (deferred), then others as needed.
 - [ ] **P3** Post performance (reach, likes, follows) feeding goals and the next content plan.
-- [ ] **P1** (engine: the image studio saves here) Media library: brand assets, logos, photos of rentals and work, generated images with their source and license, with tags agents can search.
+- [~] **P1** (2026-11-18: built for studio images, `server/modules/media-library.ts`, Team > Knowledge > Media; owner uploads of brand assets and photos still to do) Media library: brand assets, logos, photos of rentals and work, generated images with their source and license, with tags agents can search.
 
 ## 6. Selling pages and storefronts
 
 - [X] **P1 YOU** Decide which storefronts are in use: Etsy, itch.io, Square Online, Shopify, Gumroad or the businesses' own sites. Answer From strike: All the ones mentioned exept Gumroad
-- [ ] **P1** (engine, section E) Etsy API publishing (needs an Etsy-approved developer app; owner step in section E). Include listing create and update, inventory, prices within limits, and reading orders.
+- [~] **P1** (2026-11-18: built in section E, verify live once the app is approved) Etsy API publishing (needs an Etsy-approved developer app; owner step in section E). Include listing create and update, inventory, prices within limits, and reading orders.
 - [ ] **P2** itch.io uploads with the butler tool.
 - [ ] **P2** Orders flow: new order, record it, fulfil it (digital delivery or a task), send the customer a message, and mark the deal paid only from verified payment evidence.
 - [ ] **P1 YOU** Raise the listing fee budget from $0 if you want VPs to approve normal Etsy listings. Today every $0.20 listing goes to the owner (also in section E).

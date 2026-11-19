@@ -6,6 +6,8 @@ import { ensureAgentProposalSchema } from "./agent-proposals.ts";
 import { ensureAutonomySchema, autonomyConfig, appendAutonomyLedger } from "./autonomy-store.ts";
 import { isPasswordConfigured } from "../security/login-sessions.ts";
 import { configuredLocalTaskProvider } from "./model-routing.ts";
+import { evaluateOpportunities, opportunityBudgetBlock } from "./experiments.ts";
+import { advancePlaybook, ensurePlaybookSchema } from "./playbooks.ts";
 
 type Row = Record<string, any>;
 const running = new WeakSet<DatabaseSync>();
@@ -15,6 +17,7 @@ export const USAGE_MAX_AGE_MS = 10 * 60_000;
 export function ensureAutonomyEngineSchema(db: DatabaseSync): void {
   ensureAutonomySchema(db);
   ensureAgentProposalSchema(db);
+  ensurePlaybookSchema(db);
   db.exec(`CREATE TABLE IF NOT EXISTS autonomy_engine_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS autonomy_start_reservations(work_id TEXT PRIMARY KEY,day TEXT NOT NULL,created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS autonomy_work_snapshots(work_id TEXT PRIMARY KEY,proposal_hash TEXT NOT NULL,source_hash TEXT);`);
@@ -115,6 +118,8 @@ export interface QueueAutonomyWork {
   reason: string;
   opportunity_id?: string | null;
   schedule_id?: string | null;
+  /** Set when this work is one step of an opportunity's playbook. */
+  playbook_step?: string | null;
 }
 
 /** Queue a bounded, reviewable request. This never starts a task or approves its own proposal. */
@@ -140,6 +145,11 @@ export function queueAutonomyWork(db: DatabaseSync, input: QueueAutonomyWork, no
     (db.prepare("SELECT COUNT(*) AS n FROM agent_task_proposals WHERE status='pending'").get() as Row).n,
   );
   if (pending >= 12) throw new Error("autonomy_review_queue_full");
+  // An opportunity that used its money or task budget without a sale takes no new work (experiments.ts).
+  if (input.opportunity_id) {
+    const blocked = opportunityBudgetBlock(db, input.opportunity_id);
+    if (blocked) throw new Error(`opportunity_budget_reached: ${blocked}`);
+  }
   const id = randomUUID(),
     proposalId = randomUUID();
   const description = [
@@ -178,6 +188,10 @@ export function queueAutonomyWork(db: DatabaseSync, input: QueueAutonomyWork, no
       now,
       now,
     );
+    if (input.playbook_step) {
+      ensurePlaybookSchema(db);
+      db.prepare("UPDATE autonomy_work SET playbook_step=? WHERE id=?").run(input.playbook_step, id);
+    }
     const proposal = db.prepare("SELECT * FROM agent_task_proposals WHERE id=?").get(proposalId) as Row;
     const schedule = input.schedule_id
       ? (db.prepare("SELECT * FROM schedules WHERE id=?").get(input.schedule_id) as Row)
@@ -366,6 +380,8 @@ function reconcile(db: DatabaseSync, now: number): void {
             "UPDATE opportunities SET status='building',updated_at=? WHERE id=? AND status IN ('idea','researching','approved')",
           ).run(now, work.opportunity_id);
         ledger(db, "completed", "Autonomous task completed; delivery and income are not inferred", now, work);
+        // Next playbook step (queued through every gate), if this work was one.
+        advancePlaybook(db, work, queueAutonomyWork, now);
       } else if (!task || task.status === "cancelled") {
         db.prepare("UPDATE autonomy_work SET status='skipped',updated_at=? WHERE id=?").run(now, work.id);
         ledger(db, "skipped", "Task was removed or cancelled; it will not restart automatically", now, work);
@@ -448,6 +464,8 @@ export async function runAutonomyEngineTick(deps: EngineDeps): Promise<void> {
     ensureAutonomyEngineSchema(db);
     const now = deps.now?.() ?? Date.now();
     reconcile(db, now);
+    // The owner's stop rules: budget used, time limit or task limit with no sale.
+    evaluateOpportunities(db, now);
     if (!isAutonomyAllowed()) return;
     if (!(deps.ownerSecurityReady ?? isPasswordConfigured)()) {
       ledger(db, "blocked", "Owner password setup is required for autonomous execution", now);
@@ -458,6 +476,12 @@ export async function runAutonomyEngineTick(deps: EngineDeps): Promise<void> {
       .prepare("SELECT * FROM autonomy_work WHERE status='planned' ORDER BY created_at LIMIT 20")
       .all() as Row[];
     for (const work of works) {
+      const budgetBlock = work.opportunity_id ? opportunityBudgetBlock(db, String(work.opportunity_id)) : null;
+      if (budgetBlock) {
+        db.prepare("UPDATE autonomy_work SET status='skipped',updated_at=? WHERE id=?").run(now, work.id);
+        ledger(db, "skipped", `Not started: ${budgetBlock}`, now, work);
+        continue;
+      }
       const reason = sourceBlockReason(db, work);
       if (reason) {
         ledger(db, "waiting", reason, now, work);

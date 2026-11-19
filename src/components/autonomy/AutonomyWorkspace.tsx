@@ -13,6 +13,8 @@ import {
   getAutonomy,
   saveAutonomy,
   saveAutonomyConfig,
+  restartOpportunity,
+  saveExperimentRules,
   type AutonomyOverview,
   type AutonomyResource,
   type AutonomyConfig,
@@ -23,6 +25,7 @@ import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/bus
 import type { Department, Project } from "../../types";
 import { useI18n } from "../../i18n";
 import { currencyDigits, parseMoney } from "../revenue/money";
+import PlaybooksPanel from "./PlaybooksPanel";
 
 const inputClass = "mt-1 min-h-[40px] w-full min-w-0 rounded-lg border px-3 py-2 text-sm";
 const inputStyle = {
@@ -150,7 +153,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
       row.period_end = new Date(String(row.period_end)).getTime();
     }
     if (resource === "opportunities") {
-      for (const key of [...scoreFields, "budget"]) row[key] = Number(row[key]);
+      for (const key of [...scoreFields, "budget", "task_limit", "time_limit_days"]) row[key] = Number(row[key]);
       row.goal_id = row.goal_id || null;
     }
     if (resource === "schedules") {
@@ -439,7 +442,17 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                       {scoreFields.map((key) => (
                         <div key={key}>{textField(key, pretty(key), 0, "number", { min: 0, max: 100, step: 1 })}</div>
                       ))}
-                      {textField("budget", t({ en: "Budget estimate" }), 0, "number", { min: 0, step: "any" })}
+                      {textField("budget", t({ en: "Budget (USD)" }), 0, "number", { min: 0, step: "any" })}
+                      {textField("task_limit", t({ en: "Task limit without a sale" }), 10, "number", {
+                        min: 1,
+                        max: 200,
+                        step: 1,
+                      })}
+                      {textField("time_limit_days", t({ en: "Days live without a sale" }), 30, "number", {
+                        min: 1,
+                        max: 365,
+                        step: 1,
+                      })}
                     </>
                   )}
                   {resource === "schedules" && (
@@ -492,7 +505,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 {resource === "opportunities" && (
                   <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
                     {t({
-                      en: "Scores run from 0–100. A budget is a planning estimate; spending still requires your approval.",
+                      en: "Scores run from 0–100. An opportunity that uses its budget, its task limit or its days live without a sale is stopped by the stop rules (below). Spending still needs approval.",
                     })}
                   </p>
                 )}
@@ -541,6 +554,13 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           {row.progress_scope === "business" ? ` · ${t({ en: "Business-wide records" })}` : ""}
                         </p>
                       )}
+                      {"demand_score" in row && (row.playbook_stage || row.stop_reason) && (
+                        <p className="mt-2 break-words text-xs">
+                          {row.playbook_stage ? `Playbook step: ${pretty(row.playbook_stage)}` : ""}
+                          {row.playbook_stage && row.stop_reason ? " · " : ""}
+                          {row.stop_reason ? <span className="text-amber-600">Stopped: {row.stop_reason}</span> : null}
+                        </p>
+                      )}
                       {"demand_score" in row && (
                         <p className="mt-2 break-words text-xs" style={{ color: "var(--th-text-muted)" }}>
                           {scoreFields.map((key) => `${pretty(key)}: ${row[key]}`).join(" · ")}
@@ -566,6 +586,16 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           }
                         >
                           {row.enabled ? t({ en: "Pause" }) : t({ en: "Enable" })}
+                        </button>
+                      )}
+                      {"demand_score" in row && row.status === "stopped" && (
+                        <button
+                          type="button"
+                          className="ax-btn-secondary"
+                          disabled={busy}
+                          onClick={() => void mutate(() => restartOpportunity(row.id))}
+                        >
+                          {t({ en: "Restart" })}
                         </button>
                       )}
                       <button type="button" className="ax-btn-secondary" onClick={() => edit(row)}>
@@ -625,6 +655,87 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
               </button>
             </form>
           </details>
+          {data.experiment_rules && (
+            <details className="border-t pt-5" style={{ borderColor: "var(--th-border)" }}>
+              <summary className="cursor-pointer text-sm font-semibold">{t({ en: "Stop rules" })}</summary>
+              <form
+                aria-label="Stop rules"
+                className="mt-4 space-y-4"
+                key={JSON.stringify(data.experiment_rules)}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const values = new FormData(event.currentTarget);
+                  void mutate(() =>
+                    saveExperimentRules({
+                      enabled: values.get("enabled") === "on",
+                      stop_when_budget_spent_without_revenue: values.get("budget_rule") === "on",
+                      no_sale_days_after_launch: Number(values.get("no_sale_days_after_launch")),
+                      max_tasks_without_revenue: Number(values.get("max_tasks_without_revenue")),
+                    }),
+                  );
+                }}
+              >
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="enabled" defaultChecked={data.experiment_rules.enabled} />
+                  {t({ en: "Stop opportunities automatically" })}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="budget_rule"
+                    defaultChecked={data.experiment_rules.stop_when_budget_spent_without_revenue}
+                  />
+                  {t({ en: "Stop when the budget is used with no sale" })}
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label={t({ en: "Stop after this many days live with no sale" })}>
+                    <input
+                      name="no_sale_days_after_launch"
+                      type="number"
+                      min={1}
+                      max={365}
+                      required
+                      defaultValue={data.experiment_rules.no_sale_days_after_launch}
+                      className={inputClass}
+                      style={inputStyle}
+                    />
+                  </Field>
+                  <Field label={t({ en: "Stop after this many tasks with no sale" })}>
+                    <input
+                      name="max_tasks_without_revenue"
+                      type="number"
+                      min={1}
+                      max={200}
+                      required
+                      defaultValue={data.experiment_rules.max_tasks_without_revenue}
+                      className={inputClass}
+                      style={inputStyle}
+                    />
+                  </Field>
+                </div>
+                <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
+                  {t({
+                    en: "An opportunity that has sold anything is never stopped by these rules. Each opportunity's own limits apply too (the lower one wins). Stopped opportunities can be restarted with a fresh window.",
+                  })}
+                </p>
+                <button type="submit" className="ax-btn-secondary" disabled={busy}>
+                  {t({ en: "Save stop rules" })}
+                </button>
+              </form>
+            </details>
+          )}
+          {data.playbooks && data.playbooks.length > 0 && (
+            <details className="border-t pt-5" style={{ borderColor: "var(--th-border)" }}>
+              <summary className="cursor-pointer text-sm font-semibold">{t({ en: "Playbooks" })}</summary>
+              <PlaybooksPanel
+                playbooks={data.playbooks}
+                departments={departments}
+                projects={projects}
+                busy={busy}
+                mutate={mutate}
+              />
+            </details>
+          )}
           <details className="border-t pt-5" style={{ borderColor: "var(--th-border)" }}>
             <summary className="cursor-pointer text-sm font-semibold">{t({ en: "Activity log" })}</summary>
             {!data.ledger.length ? (

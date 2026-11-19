@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { etsyApi } from "../../api/etsy";
 import { isApiRequestError } from "../../api/core";
 import {
   LISTING_PLATFORM_NAMES,
@@ -72,15 +73,21 @@ function CopyField({ label, value }: { label: string; value: string }) {
 function PackageCard({
   item,
   busy,
+  etsyConnected,
   onDecide,
   onPublished,
   onWithdraw,
+  onEtsyDraft,
+  onEtsyPublish,
 }: {
   item: ListingPackage;
   busy: boolean;
+  etsyConnected: boolean;
   onDecide: (approve: boolean) => void;
   onPublished: (url: string) => void;
   onWithdraw: () => void;
+  onEtsyDraft: () => void;
+  onEtsyPublish: () => void;
 }) {
   const [url, setUrl] = useState("");
   const platform = LISTING_PLATFORM_NAMES[item.platform];
@@ -113,7 +120,30 @@ function PackageCard({
           <CopyField label="Files to upload" value={item.files.join("\n")} />
           <CopyField label="Mockup images" value={item.mockups.join("\n")} />
           <CopyField label="Agent notes" value={item.notes} />
+          {item.platform === "etsy" && item.taxonomy_id ? (
+            <CopyField label="Etsy category id" value={String(item.taxonomy_id)} />
+          ) : null}
         </dl>
+      )}
+
+      {item.status === "approved" && item.platform === "etsy" && etsyConnected && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--th-bg-surface)] p-3">
+          <p className="text-xs text-[var(--th-text-secondary)]">
+            {item.etsy_listing_id
+              ? `Etsy draft created (listing ${item.etsy_listing_id}). Publishing makes it public and Etsy charges its fee.`
+              : "Not on Etsy yet. Create the draft (private), check it on Etsy, then publish."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {!item.etsy_listing_id && (
+              <button type="button" className={buttonClass} disabled={busy} onClick={onEtsyDraft}>
+                Create Etsy draft
+              </button>
+            )}
+            <button type="button" className={primaryClass} disabled={busy} onClick={onEtsyPublish}>
+              Publish on Etsy
+            </button>
+          </div>
+        </div>
       )}
 
       {item.status === "ready" && (
@@ -170,6 +200,13 @@ export default function ListingsPanel({ business }: { business: BusinessKind }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [budgetText, setBudgetText] = useState("");
+  const [etsyConnected, setEtsyConnected] = useState(false);
+  useEffect(() => {
+    etsyApi
+      .get()
+      .then((settings) => setEtsyConnected(settings.connected))
+      .catch(() => setEtsyConnected(false));
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -208,8 +245,10 @@ export default function ListingsPanel({ business }: { business: BusinessKind }) 
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight">Listings</h2>
           <p className="mt-1 max-w-[65ch] text-sm text-[var(--th-text-secondary)]">
-            Agents prepare complete listing packages for Etsy and itch.io. Nothing is published from here: once a
-            package is approved, publish it yourself from the checklist and record its address.
+            Agents prepare complete listing packages for Etsy and itch.io.{" "}
+            {etsyConnected
+              ? "Approved Etsy packages become Etsy drafts here and you publish them (or turn on auto-publish in Settings). For other platforms, publish by hand and record the address."
+              : "Once a package is approved, publish it yourself and record its address. Connect Etsy in Settings > Businesses to draft and publish from here."}
           </p>
         </div>
         {budget && (
@@ -274,6 +313,16 @@ export default function ListingsPanel({ business }: { business: BusinessKind }) 
                         key={item.id}
                         item={item}
                         busy={busy}
+                        etsyConnected={etsyConnected}
+                        onEtsyDraft={() => void run(() => etsyApi.pushDraft(item.id))}
+                        onEtsyPublish={() => {
+                          if (
+                            window.confirm(
+                              `Publish "${item.title}" on Etsy now? It becomes public and Etsy charges its listing fee.`,
+                            )
+                          )
+                            void run(() => etsyApi.publish(item.id));
+                        }}
                         onDecide={(approve) => void run(() => listingsApi.decide(item.id, approve))}
                         onPublished={(url) => void run(() => listingsApi.markPublished(item.id, url))}
                         onWithdraw={() => {

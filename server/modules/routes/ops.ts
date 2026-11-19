@@ -1,6 +1,8 @@
 import { registerSquareRoutes } from "./ops/square.ts";
 import { registerFinanceRoutes } from "./ops/finance.ts";
 import { registerListingRoutes } from "./ops/listings.ts";
+import { registerEtsyRoutes } from "./ops/etsy.ts";
+import { registerStudioRoutes } from "./ops/studio.ts";
 import { registerKnowledgeRoutes } from "./ops/knowledge.ts";
 import { registerApprovalSettingsRoutes } from "./ops/approval-settings.ts";
 import { registerSystemRoutes } from "./ops/system.ts";
@@ -250,6 +252,8 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   registerAutonomyRoutes(app, db, broadcast);
   registerFinanceRoutes(app, db, broadcast);
   registerListingRoutes(app, db, broadcast);
+  registerEtsyRoutes(app, db, broadcast);
+  registerStudioRoutes(app, db);
   registerKnowledgeRoutes(app, db, broadcast);
   registerApprovalSettingsRoutes(app, db, broadcast);
   registerSystemRoutes(app, db, dbPath);

@@ -29,6 +29,32 @@ export interface Opportunity {
   time_to_launch_score: number;
   budget: number;
   status: "idea" | "researching" | "approved" | "building" | "launched" | "stopped";
+  task_limit?: number;
+  time_limit_days?: number;
+  launched_at?: number | null;
+  stop_reason?: string | null;
+  playbook?: string | null;
+  playbook_stage?: string | null;
+}
+export interface ExperimentRules {
+  enabled: boolean;
+  stop_when_budget_spent_without_revenue: boolean;
+  no_sale_days_after_launch: number;
+  max_tasks_without_revenue: number;
+}
+export interface PlaybookStep {
+  key: string;
+  title: string;
+  department_id: string;
+  instructions: string;
+}
+export interface Playbook {
+  key: string;
+  title: string;
+  business: BusinessKind;
+  research: PlaybookStep;
+  steps: PlaybookStep[];
+  updated_at: number;
 }
 export interface AutonomySchedule {
   id: string;
@@ -43,6 +69,7 @@ export interface AutonomySchedule {
   enabled: number | boolean;
   consecutive_failures: number;
   last_task_id: string | null;
+  playbook?: string | null;
 }
 export interface AutonomyConfig {
   daily_start_cap: number;
@@ -65,6 +92,8 @@ export interface AutonomyOverview {
   schedules: AutonomySchedule[];
   config: AutonomyConfig;
   ledger: LedgerEvent[];
+  experiment_rules?: ExperimentRules;
+  playbooks?: Playbook[];
 }
 export interface AutonomyDigest {
   events: LedgerEvent[];
@@ -88,4 +117,20 @@ export const saveAutonomyConfig = (config: AutonomyConfig) =>
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
+  });
+
+const sendJson = (url: string, method: string, data: unknown) =>
+  request(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+export const saveExperimentRules = (rules: Partial<ExperimentRules>) =>
+  sendJson("/api/autonomy/experiment-rules", "PATCH", rules);
+export const restartOpportunity = (id: string) =>
+  sendJson(`/api/autonomy/opportunities/${encodeURIComponent(id)}/restart`, "POST", {});
+export const savePlaybook = (key: string, data: Partial<Pick<Playbook, "title" | "research" | "steps">>) =>
+  sendJson(`/api/autonomy/playbooks/${encodeURIComponent(key)}`, "PUT", data);
+export const resetPlaybook = (key: string) =>
+  sendJson(`/api/autonomy/playbooks/${encodeURIComponent(key)}/reset`, "POST", {});
+export const addPlaybookResearchSchedule = (key: string, projectId: string, intervalMinutes = 10080) =>
+  sendJson(`/api/autonomy/playbooks/${encodeURIComponent(key)}/research-schedule`, "POST", {
+    project_id: projectId,
+    interval_minutes: intervalMinutes,
   });

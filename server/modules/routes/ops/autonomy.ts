@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Express } from "express";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import { requireOwnerSession } from "../../../security/auth.ts";
+import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../security/auth.ts";
 import { appendAutonomyLedger, autonomyConfig, autonomyOverview, ensureAutonomySchema } from "../../autonomy-store.ts";
 import { isBusinessKey } from "../../businesses.ts";
 import { currencyMinorDigits } from "../../finance-store.ts";
+import { experimentRules, restartOpportunity, saveExperimentRules } from "../../experiments.ts";
+import { ensurePlaybookSchema, getPlaybook, listPlaybooks, resetPlaybook, savePlaybook } from "../../playbooks.ts";
 
 type Body = Record<string, unknown>;
 const SCORE_FIELDS = ["demand_score", "revenue_score", "cost_score", "difficulty_score", "time_to_launch_score"];
@@ -18,7 +20,18 @@ const RESOURCES = {
   opportunities: {
     table: "opportunities",
     singular: "opportunity",
-    fields: ["business", "project_id", "goal_id", "title", "description", ...SCORE_FIELDS, "budget", "status"],
+    fields: [
+      "business",
+      "project_id",
+      "goal_id",
+      "title",
+      "description",
+      ...SCORE_FIELDS,
+      "budget",
+      "status",
+      "task_limit",
+      "time_limit_days",
+    ],
   },
   schedules: {
     table: "schedules",
@@ -33,6 +46,7 @@ const RESOURCES = {
       "interval_minutes",
       "next_run_at",
       "enabled",
+      "playbook",
     ],
   },
 } as const;
@@ -90,6 +104,8 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
   if (resource === "opportunities") {
     for (const field of SCORE_FIELDS) numeric(row[field], field, 0, 100);
     numeric(row.budget, "budget", 0, 1e12);
+    numeric(row.task_limit, "task_limit", 1, 200, true);
+    numeric(row.time_limit_days, "time_limit_days", 1, 365, true);
     if (!["idea", "researching", "approved", "building", "launched", "stopped"].includes(String(row.status)))
       fail("invalid_status");
     if (row.goal_id !== null) {
@@ -102,6 +118,9 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
     return;
   }
   if (!["research", "lead_research"].includes(String(row.kind))) fail("invalid_schedule_kind");
+  if (row.playbook !== null && row.playbook !== undefined && row.playbook !== "") {
+    if (typeof row.playbook !== "string" || !getPlaybook(db, row.playbook)) fail("playbook_not_found");
+  } else row.playbook = null;
   numeric(row.interval_minutes, "interval_minutes", 1, 525600, true);
   numeric(row.next_run_at, "next_run_at", 0, Number.MAX_SAFE_INTEGER, true);
   if (row.enabled === true) row.enabled = 1;
@@ -127,6 +146,8 @@ function defaults(resource: Resource, now: number): Body {
       time_to_launch_score: 0,
       budget: 0,
       status: "idea",
+      task_limit: 10,
+      time_limit_days: 30,
     };
   return {
     department_id: null,
@@ -135,6 +156,7 @@ function defaults(resource: Resource, now: number): Body {
     interval_minutes: 1440,
     next_run_at: now + 86400000,
     enabled: 0,
+    playbook: null,
   };
 }
 
@@ -144,7 +166,90 @@ export function registerAutonomyRoutes(
   broadcast: (event: string, value: unknown) => void = () => {},
 ): void {
   ensureAutonomySchema(db);
-  app.get("/api/autonomy", (_req, res) => res.json({ ok: true, ...autonomyOverview(db) }));
+  ensurePlaybookSchema(db);
+  app.get("/api/autonomy", (_req, res) =>
+    res.json({
+      ok: true,
+      ...autonomyOverview(db),
+      experiment_rules: experimentRules(db),
+      playbooks: listPlaybooks(db),
+    }),
+  );
+  const ownerJson =
+    (handler: (req: import("express").Request) => unknown) =>
+    (req: import("express").Request, res: import("express").Response) => {
+      if (!requireOwnerSession(req, res)) return;
+      if (shouldRequireCsrf(req) && !hasValidCsrfToken(req))
+        return res.status(403).json({ error: "csrf_token_required" });
+      try {
+        const result = handler(req);
+        broadcast("autonomy_changed", { resource: "experiments" });
+        res.json({ ok: true, ...(result as object) });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "autonomy_request_failed";
+        res.status(message.endsWith("_not_found") ? 404 : 400).json({ error: message });
+      }
+    };
+  const bodyOf = (req: import("express").Request): Body =>
+    req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Body) : {};
+  // Experiments: the owner's stop rules, and bringing a stopped opportunity back.
+  app.patch(
+    "/api/autonomy/experiment-rules",
+    ownerJson((req) => ({ rules: saveExperimentRules(db, bodyOf(req)) })),
+  );
+  app.post(
+    "/api/autonomy/opportunities/:id/restart",
+    ownerJson((req) => ({ item: restartOpportunity(db, String(req.params.id)) })),
+  );
+  // Playbooks: view, edit, reset to the default, and add the research schedule (created switched off).
+  app.put(
+    "/api/autonomy/playbooks/:key",
+    ownerJson((req) => ({ playbook: savePlaybook(db, String(req.params.key), bodyOf(req)) })),
+  );
+  app.post(
+    "/api/autonomy/playbooks/:key/reset",
+    ownerJson((req) => ({ playbook: resetPlaybook(db, String(req.params.key)) })),
+  );
+  app.post(
+    "/api/autonomy/playbooks/:key/research-schedule",
+    ownerJson((req) => {
+      const playbook = getPlaybook(db, String(req.params.key));
+      if (!playbook) throw new Error("playbook_not_found");
+      const body = bodyOf(req);
+      const now = Date.now();
+      const interval =
+        typeof body.interval_minutes === "number" && Number.isSafeInteger(body.interval_minutes)
+          ? body.interval_minutes
+          : 10080;
+      const row: Body = {
+        business: playbook.business,
+        project_id: body.project_id,
+        department_id: playbook.research.department_id,
+        title: playbook.research.title,
+        description: playbook.research.instructions,
+        kind: "research",
+        interval_minutes: interval,
+        next_run_at: now + interval * 60000,
+        enabled: 0,
+        playbook: playbook.key,
+      };
+      validate(db, "schedules", row);
+      const id = randomUUID();
+      const fields = RESOURCES.schedules.fields;
+      db.prepare(
+        `INSERT INTO schedules(id,${fields.join(",")},created_at,updated_at) VALUES (${Array(fields.length + 3)
+          .fill("?")
+          .join(",")})`,
+      ).run(id, ...fields.map((field) => (row[field] ?? null) as SQLInputValue), now, now);
+      appendAutonomyLedger(db, {
+        event: "schedule_created",
+        business: playbook.business,
+        sourceId: id,
+        message: `Owner added the "${playbook.title}" research schedule (off until switched on).`,
+      });
+      return { item: db.prepare("SELECT * FROM schedules WHERE id=?").get(id) };
+    }),
+  );
   app.get("/api/autonomy/digest", (req, res) => {
     const raw = req.query.after;
     const after = raw === undefined ? 0 : typeof raw === "string" ? Number(raw) : NaN;

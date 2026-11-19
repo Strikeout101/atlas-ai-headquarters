@@ -78,6 +78,36 @@ export interface RevenueOpportunity {
   business: BusinessKind;
   status: string;
   currencies: CurrencyTotals[];
+  /** All recorded costs linked to it (verified or not) and its verified sales, in minor units. */
+  spent_minor?: number;
+  earned_minor?: number;
+  budget?: number;
+  stop_reason?: string | null;
+  playbook_stage?: string | null;
+}
+export interface RecurringCost {
+  id: string;
+  label: string;
+  business: BusinessKind | null;
+  category: "ai_tools" | "software" | "hosting" | "ads" | "other";
+  amount_minor: number;
+  currency: string;
+  active: number;
+}
+export interface ProfitLine {
+  business: string;
+  currency: string;
+  revenue_minor: number;
+  expense_minor: number;
+  recurring_minor: number;
+  profit_minor: number;
+}
+export interface ProfitOverview {
+  from: number;
+  to: number;
+  costs_complete: boolean;
+  lines: ProfitLine[];
+  recurring_costs: RecurringCost[];
 }
 export interface FinanceOverview {
   deals: Deal[];
@@ -86,6 +116,7 @@ export interface FinanceOverview {
   totals: CurrencyTotals[];
   goals: RevenueGoal[];
   opportunities: RevenueOpportunity[];
+  profit?: ProfitOverview;
 }
 export function getFinance(filters: { business?: BusinessKind; from?: number; to?: number } = {}) {
   const params = new URLSearchParams(
@@ -118,6 +149,24 @@ export const createSpendRequest = (data: Record<string, unknown>) =>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
+  });
+export const saveRecurringCost = (data: Record<string, unknown>, id?: string) =>
+  request(`/api/finance/recurring-costs${id ? `/${encodeURIComponent(id)}` : ""}`, {
+    method: id ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+export const deleteRecurringCost = (id: string) =>
+  request(`/api/finance/recurring-costs/${encodeURIComponent(id)}/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+export const setCostsComplete = (costs_complete: boolean) =>
+  request("/api/finance/profit-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ costs_complete }),
   });
 export const decideSpendRequest = (id: string, approve: boolean) =>
   request(`/api/finance/spend-requests/${encodeURIComponent(id)}/decide`, {

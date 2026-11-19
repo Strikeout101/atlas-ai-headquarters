@@ -26,6 +26,7 @@ import { isApiRequestError } from "../../api/core";
 import { useI18n } from "../../i18n";
 import { formatMoney, moneyInput, parseMoney } from "./money";
 import "./revenue.css";
+import ProfitPanel from "./ProfitPanel";
 
 const currencyOptions = ["USD", "CAD", "EUR", "GBP", "AUD", "JPY", "KWD"];
 const stages = ["lead", "qualified", "proposal", "won", "paid", "lost"] as const;
@@ -318,6 +319,15 @@ export default function RevenueWorkspace() {
           <div role="tabpanel" id="revenue-panel" aria-labelledby={`revenue-tab-${tab}`} className="space-y-5">
             {tab === "overview" && (
               <>
+                {data.profit && (
+                  <ProfitPanel
+                    profit={data.profit}
+                    locale={locale}
+                    busy={busy || loading}
+                    onChanged={() => refresh()}
+                    onError={(message) => setError(message)}
+                  />
+                )}
                 {!data.totals.length ? (
                   <p className="py-6 text-sm">
                     {t({
@@ -391,7 +401,9 @@ export default function RevenueWorkspace() {
                           <p className="mt-1 text-sm tabular-nums">
                             {goal.currency
                               ? goal.metric.includes("profit")
-                                ? `${new Intl.NumberFormat(locale, { style: "currency", currency: goal.currency }).format(goal.target)} target · Profit not measured`
+                                ? goal.progress === null
+                                  ? `${new Intl.NumberFormat(locale, { style: "currency", currency: goal.currency }).format(goal.target)} target · Profit not measured`
+                                  : `${new Intl.NumberFormat(locale, { style: "currency", currency: goal.currency }).format(goal.progress)} profit / ${new Intl.NumberFormat(locale, { style: "currency", currency: goal.currency }).format(goal.target)} target`
                                 : `${money(goal.verified_revenue_minor, goal.currency)} verified net receipts / ${new Intl.NumberFormat(locale, { style: "currency", currency: goal.currency }).format(goal.target)} target`
                               : "No currency assigned; progress unavailable"}
                           </p>
@@ -399,7 +411,9 @@ export default function RevenueWorkspace() {
                             {new Date(goal.period_start).toLocaleDateString(locale)} –{" "}
                             {new Date(goal.period_end).toLocaleDateString(locale)} ·{" "}
                             {goal.metric.includes("profit")
-                              ? "Profit progress unavailable: costs are incomplete."
+                              ? goal.progress === null
+                                ? "Profit is measured once you confirm your monthly costs are complete (Profit, above)."
+                                : "Verified revenue minus all recorded and monthly costs."
                               : "Verified receipts only; unverified revenue is excluded."}
                           </p>
                         </li>
@@ -420,7 +434,18 @@ export default function RevenueWorkspace() {
                           <p className="break-words text-sm font-medium">{item.title}</p>
                           <p className="mt-1 text-xs" style={{ color: "var(--th-text-muted)" }}>
                             {BUSINESS_NAMES[item.business]} · {item.status}
+                            {item.playbook_stage ? ` · playbook: ${item.playbook_stage.replaceAll("_", " ")}` : ""}
                           </p>
+                          {item.spent_minor !== undefined && (
+                            <p className="mt-1 text-sm tabular-nums">
+                              Spent {money(item.spent_minor, "USD")}
+                              {item.budget ? ` of ${money(Math.round(item.budget * 100), "USD")} budget` : ""} · earned{" "}
+                              {money(item.earned_minor ?? 0, "USD")}
+                            </p>
+                          )}
+                          {item.stop_reason && (
+                            <p className="mt-1 text-xs text-amber-600">Stopped: {item.stop_reason}</p>
+                          )}
                           {!item.currencies.length ? (
                             <p className="mt-2 text-sm">No attributed receipts or costs.</p>
                           ) : (

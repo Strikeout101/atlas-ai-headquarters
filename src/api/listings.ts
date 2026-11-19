@@ -34,6 +34,11 @@ export interface ListingPackage {
   published_at: number | null;
   created_at: number;
   updated_at: number;
+  taxonomy_id?: number | null;
+  who_made?: string;
+  when_made?: string;
+  /** Set once the package has been pushed to Etsy as a draft. */
+  etsy_listing_id?: string | null;
   /** Who can approve it right now: the VPs, or the owner (always, for fees outside the budget). */
   approver: "owner" | "vp";
 }

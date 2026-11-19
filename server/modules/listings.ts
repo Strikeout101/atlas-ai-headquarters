@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
 import { recordApprovalDecision } from "./trust-ramp.ts";
+import { markOpportunityLaunched } from "./experiments.ts";
 
 /**
  * Listing packages: everything needed to publish one product on a storefront, prepared by agents.
@@ -51,6 +52,10 @@ export interface ListingPackage {
   task_id: string | null;
   decided_by: string | null;
   decision_reason: string | null;
+  taxonomy_id: number | null;
+  who_made: string;
+  when_made: string;
+  etsy_listing_id: string | null;
   submitted_at: number | null;
   decided_at: number | null;
   published_at: number | null;
@@ -81,7 +86,27 @@ export function ensureListingSchema(db: DatabaseSync): void {
     updated_at INTEGER NOT NULL DEFAULT 0
   );
   INSERT OR IGNORE INTO listing_fee_budget(id) VALUES (1);`);
+  // Fields Etsy needs to create a listing, and the Etsy listing id once a draft is pushed.
+  const have = new Set(
+    (db.prepare("PRAGMA table_info(listing_packages)").all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  if (!have.has("taxonomy_id")) db.exec("ALTER TABLE listing_packages ADD COLUMN taxonomy_id INTEGER");
+  if (!have.has("who_made")) db.exec("ALTER TABLE listing_packages ADD COLUMN who_made TEXT NOT NULL DEFAULT 'i_did'");
+  if (!have.has("when_made"))
+    db.exec("ALTER TABLE listing_packages ADD COLUMN when_made TEXT NOT NULL DEFAULT 'made_to_order'");
+  if (!have.has("etsy_listing_id")) db.exec("ALTER TABLE listing_packages ADD COLUMN etsy_listing_id TEXT");
 }
+
+/** Etsy's allowed values (from its OpenAPI spec). Digital goods made by the shop: `i_did` and `made_to_order`. */
+export const ETSY_WHO_MADE = ["i_did", "someone_else", "collective"] as const;
+export const ETSY_WHEN_MADE = [
+  "made_to_order",
+  "2020_2026",
+  "2010_2019",
+  "2007_2009",
+  "before_2007",
+  "2000_2006",
+] as const;
 
 function fail(message: string): never {
   throw new Error(message);
@@ -140,6 +165,9 @@ const EDITABLE = [
   "notes",
   "project_id",
   "opportunity_id",
+  "taxonomy_id",
+  "who_made",
+  "when_made",
 ] as const;
 const CREATE_FIELDS = ["business", "platform", ...EDITABLE] as const;
 
@@ -161,6 +189,22 @@ function contentValues(input: Row, current?: ListingPackage) {
     notes: text(merged.notes, "notes", 4000),
     project_id: text(merged.project_id, "project_id", 128) || null,
     opportunity_id: text(merged.opportunity_id, "opportunity_id", 128) || null,
+    taxonomy_id: (() => {
+      const value = merged.taxonomy_id;
+      if (value === undefined || value === null || value === "") return null;
+      if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) return fail("invalid_taxonomy_id");
+      return value;
+    })(),
+    who_made: (() => {
+      const value = merged.who_made ?? "i_did";
+      if (!(ETSY_WHO_MADE as readonly unknown[]).includes(value)) return fail("invalid_who_made");
+      return value as string;
+    })(),
+    when_made: (() => {
+      const value = merged.when_made ?? "made_to_order";
+      if (!(ETSY_WHEN_MADE as readonly unknown[]).includes(value)) return fail("invalid_when_made");
+      return value as string;
+    })(),
   };
 }
 
@@ -180,8 +224,8 @@ export function createListing(
   const id = randomUUID();
   db.prepare(
     `INSERT INTO listing_packages (id,business,platform,project_id,opportunity_id,title,description,tags,price_minor,currency,
-      files,mockups,notes,fee_minor,fee_currency,status,agent_id,task_id,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?)`,
+      files,mockups,notes,fee_minor,fee_currency,status,agent_id,task_id,created_at,updated_at,taxonomy_id,who_made,when_made)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?)`,
   ).run(
     id,
     input.business as string,
@@ -202,6 +246,9 @@ export function createListing(
     author.taskId ?? null,
     now,
     now,
+    values.taxonomy_id,
+    values.who_made,
+    values.when_made,
   );
   return getListing(db, id)!;
 }
@@ -216,7 +263,7 @@ export function updateListing(db: DatabaseSync, id: string, input: Row, now = Da
   const values = contentValues(input, current);
   db.prepare(
     `UPDATE listing_packages SET project_id=?,opportunity_id=?,title=?,description=?,tags=?,price_minor=?,currency=?,
-      files=?,mockups=?,notes=?,updated_at=? WHERE id=? AND status='draft'`,
+      files=?,mockups=?,notes=?,taxonomy_id=?,who_made=?,when_made=?,updated_at=? WHERE id=? AND status='draft'`,
   ).run(
     values.project_id,
     values.opportunity_id,
@@ -228,6 +275,9 @@ export function updateListing(db: DatabaseSync, id: string, input: Row, now = Da
     JSON.stringify(values.files),
     JSON.stringify(values.mockups),
     values.notes,
+    values.taxonomy_id,
+    values.who_made,
+    values.when_made,
     now,
     id,
   );
@@ -240,6 +290,8 @@ export function submitListing(db: DatabaseSync, id: string, now = Date.now()): L
   const current = getListing(db, id) ?? fail("listing_not_found");
   if (current.status !== "draft") fail("listing_not_editable");
   if (!current.description || !current.files.length || current.price_minor <= 0) fail("listing_incomplete");
+  // Etsy will not create a listing without a category (taxonomy). Agents look one up with etsy.taxonomy.
+  if (current.platform === "etsy" && !current.taxonomy_id) fail("listing_taxonomy_required");
   db.prepare(
     "UPDATE listing_packages SET status='ready',submitted_at=?,updated_at=? WHERE id=? AND status='draft'",
   ).run(now, now, id);
@@ -323,6 +375,7 @@ export function listingContentHash(listing: ListingPackage): string {
         listing.mockups,
         listing.fee_minor,
         listing.fee_currency,
+        ...(listing.platform === "etsy" ? [listing.taxonomy_id, listing.who_made, listing.when_made] : []),
       ]),
     )
     .digest("hex");
@@ -369,7 +422,13 @@ export function decideListing(
 }
 
 /** Owner only: the listing is live. Records where, and the platform fee as an unverified cost. */
-export function markListingPublished(db: DatabaseSync, id: string, url: unknown, now = Date.now()): ListingPackage {
+export function markListingPublished(
+  db: DatabaseSync,
+  id: string,
+  url: unknown,
+  now = Date.now(),
+  opts: { recordFee?: boolean } = {},
+): ListingPackage {
   ensureListingSchema(db);
   const address = text(url, "listing_url", 500, true);
   let parsed: URL;
@@ -387,7 +446,8 @@ export function markListingPublished(db: DatabaseSync, id: string, url: unknown,
       "UPDATE listing_packages SET status='published',listing_url=?,published_at=?,updated_at=? WHERE id=? AND status='approved'",
     ).run(parsed.toString(), now, now, id);
     const hasLedger = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get();
-    if (current.fee_minor > 0 && hasLedger) {
+    // Published through the Etsy API, the fee arrives with Etsy's own payment records, so it is not recorded twice.
+    if (current.fee_minor > 0 && hasLedger && opts.recordFee !== false) {
       // Recorded by hand, so it is never "verified": only imported payment evidence is.
       db.prepare(
         `INSERT INTO ledger_entries (id,business,kind,amount_minor,currency,source,external_id,verified,opportunity_id,
@@ -406,6 +466,8 @@ export function markListingPublished(db: DatabaseSync, id: string, url: unknown,
         now,
       );
     }
+    // The opportunity is live now: its "no sales in N days" clock starts.
+    if (current.opportunity_id) markOpportunityLaunched(db, current.opportunity_id, now);
     db.exec("RELEASE listing_published");
     return getListing(db, id)!;
   } catch (error) {

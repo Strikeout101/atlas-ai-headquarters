@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import MediaPanel from "./MediaPanel";
 import { isApiRequestError } from "../../api/core";
 import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/business";
 import {
@@ -11,7 +12,7 @@ import {
 import { useI18n } from "../../i18n";
 import MarkdownView from "./MarkdownView";
 
-type Section = "memory" | "systems" | "checklist";
+type Section = "memory" | "systems" | "checklist" | "media";
 
 const ERROR_TEXT: Record<string, string> = {
   owner_session_required: "Sign in with your password in Settings > Security to change memories.",
@@ -436,6 +437,7 @@ export default function KnowledgeTab() {
     { key: "memory", label: t({ en: "Memory" }) },
     { key: "systems", label: t({ en: "Systems" }) },
     { key: "checklist", label: t({ en: "Checklist" }) },
+    { key: "media", label: t({ en: "Media" }) },
   ];
   return (
     <section className="mx-auto w-full max-w-7xl pb-8" aria-label={t({ en: "Knowledge" })}>
@@ -464,6 +466,7 @@ export default function KnowledgeTab() {
       {section === "memory" && <MemoryPanel />}
       {section === "systems" && <DocumentPanel topic="systems" />}
       {section === "checklist" && <DocumentPanel topic="checklist" />}
+      {section === "media" && <MediaPanel />}
     </section>
   );
 }
