@@ -10,6 +10,7 @@ import { createAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { PORT } from "../../../config/runtime.ts";
 import { autonomyTaskUsageBlockReason } from "../../autonomy-engine.ts";
 import { assertRunsAllowed, automaticStartBlockReason } from "../../control-state.ts";
+import { cliPath } from "../core/gemini-command.ts";
 
 type CliRuntimeDeps = {
   db: any;
@@ -259,7 +260,9 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     }
     delete cleanEnv.CLAUDECODE;
     delete cleanEnv.CLAUDE_CODE;
-    cleanEnv.PATH = withCliPathFallback(String(cleanEnv.PATH ?? process.env.PATH ?? ""));
+    cleanEnv.PATH = withCliPathFallback(
+      `${String(cleanEnv.PATH ?? process.env.PATH ?? "")}${path.delimiter}${cliPath()}`,
+    );
     cleanEnv.NO_COLOR = "1";
     cleanEnv.FORCE_COLOR = "0";
     cleanEnv.CI = "1";
@@ -361,7 +364,9 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     });
 
     // Deliver prompt via stdin (cross-platform safe)
-    child.stdin?.write(prompt);
+    child.stdin?.write(
+      args[0] === "agy" ? `${JSON.stringify({ event: "user", message: { content: prompt } })}\n` : prompt,
+    );
     child.stdin?.end();
 
     // Pipe agent output to log file AND broadcast via WebSocket

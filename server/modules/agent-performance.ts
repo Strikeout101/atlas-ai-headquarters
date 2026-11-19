@@ -116,6 +116,10 @@ export function createWorkerUsageCollector() {
       input = add(input, count(tokens?.input ?? tokens?.input_tokens));
       output = add(output, count(tokens?.output ?? tokens?.output_tokens));
       cost = add(cost, count(source.cost));
+    } else if (event.event === "result") {
+      const usage = object(object(event.result)?.usage);
+      input = count(usage?.input_tokens);
+      output = count(usage?.output_tokens);
     } else if (event.type === "result") {
       // Claude's final result is cumulative for this invocation.
       const usage = object(event.usage);

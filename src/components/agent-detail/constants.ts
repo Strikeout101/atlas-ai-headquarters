@@ -45,11 +45,11 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: s
 export const CLI_LABELS: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex CLI",
-  gemini: "Gemini CLI",
+  gemini: "Antigravity CLI / Gemini CLI",
   opencode: "OpenCode",
   kimi: "Kimi Code",
   copilot: "GitHub Copilot",
-  antigravity: "Antigravity",
+  antigravity: "Antigravity OAuth",
   api: "API Provider",
 };
 

@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import type { AgentRow, OneShotRunOptions, OneShotRunResult } from "./conversation-types.ts";
 import { areRunsAllowed, registerOneShotAbort, RUNS_HALTED_ERROR } from "../../control-state.ts";
 import { createCodexCompletionDrain } from "../agents/providers/codex-completion-drain.ts";
+import { cliPath } from "./gemini-command.ts";
 
 type CreateOneShotRunnerDeps = {
   logsDir: string;
@@ -42,7 +43,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
   } = deps;
   const NO_TOOLS_POLICY_ERROR = "tool_use_blocked_by_no_tools_policy";
   const CLI_TOOL_SIGNAL_REGEX =
-    /"type"\s*:\s*"(?:tool_use|tool_result|command_execution|function_call|tool_call|mcp_tool_call)"|"tool_use_id"\s*:|"toolName"\s*:/i;
+    /"type"\s*:\s*"(?:tool_use|tool_result|command_execution|function_call|tool_call|mcp_tool_call)"|"step_type"\s*:\s*"tool"|"tool_use_id"\s*:|"toolName"\s*:/i;
 
   function hasCliToolSignal(text: string): boolean {
     return CLI_TOOL_SIGNAL_REGEX.test(text);
@@ -219,7 +220,9 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
           const cleanEnv = agentEnvironment();
           delete cleanEnv.CLAUDECODE;
           delete cleanEnv.CLAUDE_CODE;
-          cleanEnv.PATH = withCliPathFallback(String(cleanEnv.PATH ?? process.env.PATH ?? ""));
+          cleanEnv.PATH = withCliPathFallback(
+            `${String(cleanEnv.PATH ?? process.env.PATH ?? "")}${path.delimiter}${cliPath()}`,
+          );
           cleanEnv.NO_COLOR = "1";
           cleanEnv.FORCE_COLOR = "0";
           cleanEnv.CI = "1";
@@ -276,7 +279,9 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
               settle(() => resolve());
             });
 
-          child.stdin?.write(prompt);
+          child.stdin?.write(
+            args[0] === "agy" ? `${JSON.stringify({ event: "user", message: { content: prompt } })}\n` : prompt,
+          );
           child.stdin?.end();
         });
       }

@@ -269,6 +269,9 @@ Approval rules are settings per business (Settings > Businesses > Approvals and 
 
 Section 11 work by Codex on 2026-11-18, reviewed and committed by Claude the same day. Details: docs/models-and-workers.md and docs/models-workers-verification-2026-11-18.md.
 
+- [x] **P2** (2026-11-19, `server/modules/workflow/core/gemini-command.ts`, CLI runtime, Settings) Gemini agent slot now detects and launches Antigravity CLI (`agy`) with its headless stream protocol, lists its models, and retains the legacy Gemini CLI fallback. `agy.exe` was found at the official Windows install location and detection reports installed/authenticated (v1.5.12); a real headless stream run returned `ATLAS_OK`. Focused tests, typecheck, and scoped lint pass.
+- [ ] **P2** Update the running ATLAS service after the Antigravity CLI integration is committed. The service on port 8800 runs a stable build of the latest commit, so the source change is not live yet.
+
 - [x] **P1** (2026-11-18, `scripts/qa/autonomy-real-cycle.ts`, `docs/models-workers-verification-2026-11-18.md`) Real isolated goal → planner → independent Codex/Claude VP approval → Claude worker → result → engine goal progress passed. Final task consensus uses an exact-result oracle; production routines remain disabled.
 - [ ] **P2** Investigate an intermittent Codex worker shutdown timeout: one real diagnostic emitted the correct result and `turn.completed` but did not close within 60 seconds. The verified cycle used Claude as worker and both providers as VPs. Evidence and reproduction: `docs/models-workers-verification-2026-11-18.md`.
 - [x] **P2** (2026-11-18, `server/modules/workflow/orchestration/review-finalize-tools.ts`; regression tests in the adjacent test file) Failed merges now keep tasks in Review, preserve worktrees/callbacks, and report the actual failure for retry; completion side effects run only after success.

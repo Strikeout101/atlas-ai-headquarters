@@ -49,4 +49,18 @@ describe("Claude stream result normalization", () => {
     );
     expect(prettyStreamJson("plain text")).toBe("plain text");
   });
+
+  it("joins Antigravity response deltas without repeating its result", () => {
+    expect(
+      prettyStreamJson(
+        lines(
+          { event: "init", init: {} },
+          { event: "step_update", step_update: { step_type: "agent_response", text_delta: "Task " } },
+          { event: "step_update", step_update: { step_type: "agent_response", text_delta: "done" } },
+          { event: "result", result: { status: "SUCCESS", response: "Task done" } },
+        ),
+      ),
+    ).toBe("Task done");
+    expect(prettyStreamJson(lines({ event: "result", result: { status: "SUCCESS", response: "Done" } }))).toBe("Done");
+  });
 });

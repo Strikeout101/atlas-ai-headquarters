@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
 import { discoverCodexCliModels } from "../../codex-cli-models.ts";
+import { cliPath, resolveGeminiCommand } from "../../workflow/core/gemini-command.ts";
 
 interface CliModelInfoServer {
   slug: string;
@@ -117,6 +118,23 @@ export function registerModelRoutes(ctx: RuntimeContext): void {
   }
 
   function fetchGeminiModels(): CliModelInfoServer[] {
+    if (resolveGeminiCommand() === "agy") {
+      try {
+        const output = execFileSync("agy", ["models"], {
+          stdio: "pipe",
+          timeout: 8000,
+          encoding: "utf8",
+          env: { ...process.env, PATH: cliPath() },
+        });
+        return output
+          .split(/\r?\n/)
+          .map((line) => line.trim().match(/^([a-z][a-z0-9._-]*-[a-z0-9._-]+)\s+(.+)$/))
+          .filter((match): match is RegExpMatchArray => match !== null)
+          .map((match) => ({ slug: match[1], displayName: match[2] }));
+      } catch {
+        return [];
+      }
+    }
     const FALLBACK: CliModelInfoServer[] = [
       { slug: "gemini-3-pro-preview", displayName: "Gemini 3 Pro Preview" },
       { slug: "gemini-3-flash-preview", displayName: "Gemini 3 Flash Preview" },

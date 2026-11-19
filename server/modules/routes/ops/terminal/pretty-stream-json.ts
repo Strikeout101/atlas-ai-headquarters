@@ -3,6 +3,7 @@ export function prettyStreamJson(raw: string, opts: { includeReasoning?: boolean
   let sawJson = false;
   let sawClaudeTextDelta = false;
   let sawClaudeAssistantText = false;
+  let sawAntigravityText = false;
   const includeReasoning = opts.includeReasoning === true;
   const pushReasoningChunk = (text: string): void => {
     if (!text) return;
@@ -27,6 +28,19 @@ export function prettyStreamJson(raw: string, opts: { includeReasoning?: boolean
     try {
       const j: any = JSON.parse(t);
       sawJson = true;
+
+      if (j.event === "step_update" && j.step_update?.step_type === "agent_response") {
+        if (typeof j.step_update.text_delta === "string") {
+          chunks.push(j.step_update.text_delta);
+          sawAntigravityText = true;
+        }
+        continue;
+      }
+      if (j.event === "result" && j.result) {
+        if (!sawAntigravityText && typeof j.result.response === "string") pushMessageChunk(j.result.response);
+        sawAntigravityText = false;
+        continue;
+      }
 
       if (j.type === "stream_event") {
         const ev = j.event;

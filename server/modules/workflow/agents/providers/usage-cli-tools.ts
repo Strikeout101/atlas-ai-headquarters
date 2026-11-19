@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile, execFileSync } from "node:child_process";
 import type { CliStatusResult, CliToolDef, CliToolStatus, CliUsageEntry, CliUsageWindow } from "./types.ts";
+import { cliPath, resolveGeminiCommand } from "../../core/gemini-command.ts";
 
 type CreateUsageCliToolsDeps = {
   jsonHasKey: (filePath: string, key: string) => boolean;
@@ -163,7 +164,7 @@ export function createUsageCliTools(deps: CreateUsageCliToolsDeps) {
     },
     {
       name: "gemini",
-      authHint: "Run: gemini auth login",
+      authHint: "Run: agy (sign in interactively)",
       getVersion: () => {
         try {
           const whichCmd = process.platform === "win32" ? "where" : "which";
@@ -189,6 +190,19 @@ export function createUsageCliTools(deps: CreateUsageCliToolsDeps) {
         return null;
       },
       checkAuth: () => {
+        if (resolveGeminiCommand() === "agy") {
+          try {
+            execFileSync("agy", ["-p", "/usage", "--output-format", "json"], {
+              encoding: "utf8",
+              timeout: 8000,
+              env: { ...process.env, PATH: cliPath() },
+              stdio: "pipe",
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        }
         if (readGeminiCredsFromKeychain()) return true;
         if (jsonHasKey(path.join(os.homedir(), ".gemini", "oauth_creds.json"), "access_token")) return true;
         const appData = process.env.APPDATA;
@@ -242,18 +256,33 @@ export function createUsageCliTools(deps: CreateUsageCliToolsDeps) {
 
   async function detectCliTool(tool: CliToolDef): Promise<CliToolStatus> {
     const whichCmd = process.platform === "win32" ? "where" : "which";
+    const command = tool.name === "gemini" ? resolveGeminiCommand() : tool.name;
     try {
-      await execWithTimeout(whichCmd, [tool.name], 3000);
+      if (!command) throw new Error("CLI not found");
+      if (tool.name !== "gemini") await execWithTimeout(whichCmd, [command], 3000);
     } catch {
       return { installed: false, version: null, authenticated: false, authHint: tool.authHint };
     }
 
     let version: string | null = null;
-    if (tool.getVersion) {
+    if (command === "agy") {
+      try {
+        version = execFileSync("agy", ["--version"], {
+          encoding: "utf8",
+          timeout: 3000,
+          env: { ...process.env, PATH: cliPath() },
+          stdio: "pipe",
+        })
+          .trim()
+          .split(/\r?\n/)[0];
+      } catch {
+        /* version is optional */
+      }
+    } else if (tool.getVersion) {
       version = tool.getVersion();
     } else {
       try {
-        version = await execWithTimeout(tool.name, tool.versionArgs ?? ["--version"], 3000);
+        version = await execWithTimeout(command, tool.versionArgs ?? ["--version"], 3000);
         if (version.includes("\n")) version = version.split("\n")[0].trim();
       } catch {
         /* binary found but --version failed */
@@ -261,7 +290,13 @@ export function createUsageCliTools(deps: CreateUsageCliToolsDeps) {
     }
 
     const authenticated = tool.checkAuth();
-    return { installed: true, version, authenticated, authHint: tool.authHint };
+    return {
+      installed: true,
+      version,
+      authenticated,
+      authHint: command === "gemini" ? "Run: gemini auth login" : tool.authHint,
+      command,
+    };
   }
 
   async function detectAllCli(): Promise<CliStatusResult> {

@@ -313,7 +313,7 @@ export default function AgentFormModal({
                         !active ? { borderColor: "var(--th-input-border)", color: "var(--th-text-muted)" } : undefined
                       }
                     >
-                      {p}
+                      {p === "gemini" ? "Antigravity CLI / Gemini" : p === "antigravity" ? "Antigravity OAuth" : p}
                     </button>
                   );
                 })}

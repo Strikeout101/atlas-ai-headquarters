@@ -139,6 +139,7 @@ Rules of thumb:
 | `core/project-context-tools.ts`                                | Builds the task prompt (project context, knowledge block, policies)           |
 | `core/meeting-prompt-tools.ts`, `core/reply-core-tools.ts`     | Meeting and 1:1 chat prompts; reply cleanup                                   |
 | `core/one-shot-runner.ts`                                      | Single no-tools model calls (VPs, think loop, meetings)                       |
+| `core/gemini-command.ts`                                       | Resolves Antigravity CLI (`agy`) or legacy Gemini CLI on the worker PATH      |
 | `core/worktree/`                                               | Git worktrees per task: create, merge, clean up                               |
 | `agents/cli-runtime.ts`                                        | Spawns CLI workers (Claude, Codex, Gemini, OpenCode, Kimi)                    |
 | `agents/providers/`                                            | Provider adapters: HTTP and API workers, OAuth, usage readers, stream parsing |

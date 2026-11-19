@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { resolveGeminiCommand } from "./gemini-command.ts";
 
 export type CliOutputStream = "stdout" | "stderr";
 
@@ -80,6 +81,15 @@ export function createCliTools(deps: CreateCliToolsDeps) {
         return args;
       }
       case "gemini": {
+        const command = resolveGeminiCommand() ?? "agy";
+        if (command === "agy") {
+          const args = ["agy", "--input-format", "stream-json", "--output-format", "stream-json"];
+          // Existing installs seed a Gemini CLI-only model that agy does not recognize.
+          if (model && model !== "gemini-3-pro-preview") args.push("--model", model);
+          if (noTools) args.push("--mode", "plan");
+          else args.push("--dangerously-skip-permissions");
+          return args;
+        }
         const args = ["gemini"];
         if (model) args.push("-m", model);
         if (noTools) {

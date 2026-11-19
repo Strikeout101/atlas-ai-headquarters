@@ -24,6 +24,11 @@ function setup() {
 }
 
 describe("worker performance", () => {
+  it("records Antigravity's terminal usage envelope", () => {
+    const usage = createWorkerUsageCollector();
+    usage.ingest('{"event":"result","result":{"status":"SUCCESS","usage":{"input_tokens":42,"output_tokens":9}}}\n');
+    expect(usage.finish()).toEqual({ input_tokens: 42, output_tokens: 9, cost_usd: null });
+  });
   it("snapshots actual routed provider/model and counts success, failures and retries once", () => {
     const db = setup();
     const first = createRunPerformanceTracker(db, "task", { provider: "opencode", model: "wrapper/qwen" });
