@@ -54,6 +54,7 @@ import { ensureRecordChangeSchema } from "./modules/record-changes.ts";
 import { ensureTrustRampSchema } from "./modules/trust-ramp.ts";
 import { ensureSpendBudgetSchema } from "./modules/spend-budgets.ts";
 import { ensureBackupSchema, startBackupScheduler } from "./modules/db-backups.ts";
+import { startSystemsRegistrySync } from "./modules/systems-registry-sync.ts";
 import { ensureContextRolloverSchema } from "./modules/workflow/agents/context-rollover-store.ts";
 
 export type { TaskCreationAuditInput } from "./modules/bootstrap/security-audit.ts";
@@ -85,6 +86,7 @@ ensureSpendBudgetSchema(db);
 ensureBackupSchema(db);
 // Daily database backups with a restore test (Settings > General > Backups).
 startBackupScheduler(db, dbPath);
+if (!process.env.KNOWLEDGE_SYNC_DISABLED) startSystemsRegistrySync(db);
 ensureContextRolloverSchema(db);
 applyDefaultSeeds(db);
 ensureVpAgents(db);

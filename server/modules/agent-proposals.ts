@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ensureControlStateSchema, isAutonomyAllowed } from "./control-state.ts";
 import { BUSINESSES, isBusinessKey } from "./businesses.ts";
 import type { DatabaseSync } from "node:sqlite";
+import { buildReferenceBlock } from "./agent-knowledge.ts";
 
 /**
  * Agent autonomy, level 1: eligible agents periodically think about their area and suggest tasks.
@@ -59,6 +60,8 @@ interface ThinkingContext {
   pastProposals: Array<{ title: string; status: string }>;
   /** Short summaries of the owner's filled-in business profiles (Tech Services, Events and Rentals). */
   businesses: string[];
+  /** Memories and the systems summary that match this agent's area (reference only). */
+  knowledge?: string;
 }
 
 function readBusinessSummaries(db: DatabaseSync): string[] {
@@ -206,6 +209,19 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
     openDepartmentTasks,
     pastProposals,
     businesses: readBusinessSummaries(db),
+    knowledge: (() => {
+      try {
+        return buildReferenceBlock(db, {
+          query: [department?.name, department?.description, ...recentTasks.map((task) => task.title)]
+            .filter(Boolean)
+            .join("\n"),
+          omitBusinessList: true,
+          maxBytes: 1800,
+        });
+      } catch {
+        return "";
+      }
+    })(),
   };
 }
 
@@ -239,6 +255,7 @@ export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, 
     "Your earlier suggestions (dismissed ones were not wanted; do not suggest them again):",
     list(ctx.pastProposals),
     "",
+    ...(ctx.knowledge ? [ctx.knowledge, ""] : []),
     `Write titles and text in ${LANGUAGE_NAMES[language] ?? "English"}.`,
     "Reply with ONLY this JSON, no other text:",
     '{"proposals":[{"title":"short imperative title","description":"what you would do and what the result is","reason":"why this matters now","project_id":"one of the project ids above, or null"}]}',

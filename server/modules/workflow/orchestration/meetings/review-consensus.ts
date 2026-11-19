@@ -241,6 +241,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
         notifyCeo(pickL(resumeMeeting ? resumeNotice : startNotice, lang), taskId);
 
         const openingPrompt = buildMeetingPrompt(planningLeader, {
+          taskId,
           meetingType: "review",
           round,
           taskTitle,
@@ -268,6 +269,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
         for (const leader of otherLeaders) {
           if (abortIfInactive()) return;
           const feedbackPrompt = buildMeetingPrompt(leader, {
+            taskId,
             meetingType: "review",
             round,
             taskTitle,
@@ -300,6 +302,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
         if (otherLeaders.length === 0) {
           if (abortIfInactive()) return;
           const soloPrompt = buildMeetingPrompt(planningLeader, {
+            taskId,
             meetingType: "review",
             round,
             taskTitle,
@@ -324,6 +327,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
         }
 
         const summaryPrompt = buildMeetingPrompt(planningLeader, {
+          taskId,
           meetingType: "review",
           round,
           taskTitle,
@@ -356,6 +360,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
           if (abortIfInactive()) return;
           const isReviseOwner = reviseOwner?.id === leader.id;
           const approvalPrompt = buildMeetingPrompt(leader, {
+            taskId,
             meetingType: "review",
             round,
             taskTitle,

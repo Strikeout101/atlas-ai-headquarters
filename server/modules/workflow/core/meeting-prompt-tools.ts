@@ -12,6 +12,8 @@ type CreateMeetingPromptToolsDeps = {
   normalizeMeetingLang: (value: unknown) => Lang;
   localeInstruction: (lang: string) => string;
   resolveLang: (text: string) => string;
+  /** Project goal, business, memories and systems for a prompt that must not call tools. */
+  knowledgeBlock?: (input: { taskId?: string | null; query: string }) => string;
 };
 
 export function createMeetingPromptTools(deps: CreateMeetingPromptToolsDeps) {
@@ -26,7 +28,15 @@ export function createMeetingPromptTools(deps: CreateMeetingPromptToolsDeps) {
     normalizeMeetingLang,
     localeInstruction,
     resolveLang,
+    knowledgeBlock,
   } = deps;
+  const knowledge = (input: { taskId?: string | null; query: string }) => {
+    try {
+      return knowledgeBlock?.(input) ?? "";
+    } catch {
+      return ""; // knowledge is a help, never a reason for a turn to fail
+    }
+  };
 
   function buildMeetingPrompt(agent: AgentRow, opts: MeetingPromptOptions): string {
     const lang = normalizeMeetingLang(opts.lang);
@@ -55,6 +65,11 @@ export function createMeetingPromptTools(deps: CreateMeetingPromptToolsDeps) {
       "[Meeting transcript so far]",
       formatMeetingTranscript(opts.transcript, lang),
       recentCtx,
+      knowledge({
+        taskId: opts.taskId,
+        query: `${opts.taskTitle}
+${opts.turnObjective}`,
+      }),
     ]
       .filter(Boolean)
       .join("\n");
@@ -101,6 +116,7 @@ export function createMeetingPromptTools(deps: CreateMeetingPromptToolsDeps) {
       "",
       `CEO message: ${ceoMessage}`,
       recentCtx,
+      knowledge({ taskId: agent.current_task_id, query: ceoMessage }),
     ]
       .filter(Boolean)
       .join("\n");

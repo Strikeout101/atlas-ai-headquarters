@@ -1,4 +1,5 @@
 import type { RuntimeContext, WorkflowCoreExports } from "../../types/runtime-context.ts";
+import { buildReferenceBlock } from "../agent-knowledge.ts";
 import fs from "node:fs";
 import type { ChildProcess } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
@@ -295,6 +296,7 @@ export function initializeWorkflowPartA(ctx: RuntimeContext): WorkflowCoreExport
     normalizeMeetingLang,
     localeInstruction,
     resolveLang,
+    knowledgeBlock: ({ taskId, query }) => buildReferenceBlock(db as any, { taskId, query }),
   });
 
   const { runAgentOneShot } = createOneShotRunner({

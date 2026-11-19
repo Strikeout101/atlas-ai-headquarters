@@ -64,9 +64,9 @@ Built 2026-11-17: agents now get a knowledge block (project goal, business profi
 - [x] **P2** (2026-11-17) Add `docs/README.md` as an index, and mark which docs are current reference and which are dated history (phase docs, `operations-setup-2026-11-12`, `agent-access-review-2026-11-14`).
 - [x] **P2** (2026-11-17, filled from `SETUP-INFO-NEEDED.txt`; Ventures named Eduardo Capital; owner review pending in section 1) Fill business profiles (services, prices or pricing rules, hours, service area, brand voice, do and don't) so agents stop guessing. Needs answers from section 14.
 - [x] **P3** (2026-11-17, Team > Knowledge > Systems / Checklist) Show this checklist and the systems registry inside ATLAS (read-only page or a Settings tab), so they can be read from the phone.
-- [ ] **P2** Not yet covered by the knowledge block: chat replies, meetings and the think loop (one-shot prompts). Only the planner and VP review got business profiles.
-- [ ] **P2** Ask agents for lessons automatically at task end (today they are told to call `memory.add`; nothing checks that they do).
-- [ ] **P3** Keep `knowledge/systems.md` current: update it when hosts, accounts or projects change (agents can read it but not write it).
+- [x] **P2** (2026-11-18, `buildReferenceBlock` in `server/modules/agent-knowledge.ts`: project goal, business, matching memories and systems summary, no tools line) Not yet covered by the knowledge block: chat replies, meetings and the think loop (one-shot prompts). Only the planner and VP review got business profiles.
+- [x] **P2** (2026-11-18, `server/modules/task-lessons.ts`: each finished task is checked; `LESSON:`/`FACT:` lines in the final output are saved as unreviewed memories when the agent did not call `memory.add`; results in Team > Knowledge) Ask agents for lessons automatically at task end (today they are told to call `memory.add`; nothing checks that they do).
+- [x] **P3** (2026-11-18, `server/modules/systems-registry-sync.ts`: ATLAS rewrites a marked "Current setup" section at the end of the file every 10 minutes from its own records (projects, GitHub, Square, mailboxes, social, SSH and model hosts, sign-ins), names and locations only; the owner's text is untouched; off in the browser-test runtime) Keep `knowledge/systems.md` current: update it when hosts, accounts or projects change (agents can read it but not write it).
 
 ## 3. Accounts, identities and credentials
 

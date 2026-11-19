@@ -48,6 +48,8 @@ export interface MeetingPromptOptions {
   turnObjective: string;
   stanceHint?: string;
   lang: string;
+  /** The task the meeting is about, for its knowledge (project goal, business, memories). */
+  taskId?: string;
 }
 
 export type ReplyKind = "opening" | "feedback" | "summary" | "approval" | "direct";

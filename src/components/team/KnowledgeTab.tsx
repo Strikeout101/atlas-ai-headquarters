@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { isApiRequestError } from "../../api/core";
 import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/business";
-import { knowledgeApi, type AgentMemory, type MemoryFilter, type MemoryList } from "../../api/knowledge";
+import {
+  knowledgeApi,
+  type AgentMemory,
+  type LessonCoverage,
+  type MemoryFilter,
+  type MemoryList,
+} from "../../api/knowledge";
 import { useI18n } from "../../i18n";
 import MarkdownView from "./MarkdownView";
 
@@ -150,6 +156,33 @@ function MemoryCard({
   );
 }
 
+/** Whether finished tasks are leaving lessons, so a quiet memory list is not mistaken for "nothing learned". */
+function LessonCoverageLine() {
+  const [coverage, setCoverage] = useState<LessonCoverage | null>(null);
+  useEffect(() => {
+    knowledgeApi
+      .lessonChecks()
+      .then(setCoverage)
+      .catch(() => setCoverage(null));
+  }, []);
+  if (!coverage) return null;
+  const { agent_added, captured, none_declared, missing } = coverage.counts;
+  if (agent_added + captured + none_declared + missing === 0) return null;
+  return (
+    <div className="mt-2 text-xs" style={{ color: "var(--th-text-secondary)" }} aria-label="Lessons after tasks">
+      <p>
+        Finished tasks, last {coverage.days} days: {agent_added} saved lessons themselves · {captured} had lessons taken
+        from their final message · {none_declared} said there was nothing to learn · {missing} left nothing
+      </p>
+      {coverage.recentMissing.length > 0 && (
+        <p className="mt-1 break-words">
+          Recent tasks with no lessons: {coverage.recentMissing.map((item) => item.title).join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MemoryPanel() {
   const { locale } = useI18n();
   const [filter, setFilter] = useState<MemoryFilter>({ status: "active" });
@@ -198,6 +231,7 @@ function MemoryPanel() {
           {data.counts.active} in use · {data.counts.unreviewed} need review · {data.counts.archived} archived
         </p>
       )}
+      <LessonCoverageLine />
       <form
         className="mt-4 flex flex-wrap items-end gap-2"
         role="search"

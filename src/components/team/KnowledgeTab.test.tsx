@@ -14,6 +14,7 @@ vi.mock("../../api/knowledge", async (importOriginal) => ({
     setStatus: vi.fn(),
     update: vi.fn(),
     create: vi.fn(),
+    lessonChecks: vi.fn(),
   },
 }));
 
@@ -61,9 +62,29 @@ beforeEach(() => {
   });
   for (const fn of [knowledgeApi.review, knowledgeApi.setStatus, knowledgeApi.update, knowledgeApi.create])
     vi.mocked(fn).mockResolvedValue(memory());
+  vi.mocked(knowledgeApi.lessonChecks).mockResolvedValue({
+    ok: true,
+    days: 30,
+    counts: { agent_added: 0, captured: 0, none_declared: 0, missing: 0 },
+    recentMissing: [],
+  });
 });
 
 describe("Knowledge tab", () => {
+  it("shows whether finished tasks left lessons", async () => {
+    vi.mocked(knowledgeApi.lessonChecks).mockResolvedValue({
+      ok: true,
+      days: 30,
+      counts: { agent_added: 3, captured: 2, none_declared: 1, missing: 1 },
+      recentMissing: [{ task_id: "t9", title: "Fix the booking form", agent_name: "Iris", checked_at: 1 }],
+    });
+    render(<KnowledgeTab />);
+    const line = await screen.findByLabelText("Lessons after tasks");
+    expect(line).toHaveTextContent("3 saved lessons themselves · 2 had lessons taken from their final message");
+    expect(line).toHaveTextContent("1 left nothing");
+    expect(line).toHaveTextContent("Recent tasks with no lessons: Fix the booking form");
+  });
+
   it("lists memories with where they came from and which need review", async () => {
     render(<KnowledgeTab />);
     const card = await screen.findByRole("listitem", { name: "Flower wall photos" });

@@ -11,6 +11,7 @@ import {
   updateMemory,
 } from "../../agent-memory.ts";
 import { readKnowledgeFile } from "../../agent-knowledge.ts";
+import { lessonCoverage } from "../../task-lessons.ts";
 
 function owner(req: Request, res: Response): boolean {
   if (!requireOwnerSession(req, res)) return false;
@@ -49,6 +50,9 @@ export function registerKnowledgeRoutes(
     const text = readKnowledgeFile(topic);
     return res.json({ ok: true, topic, available: text !== null, text: text ?? "" });
   });
+
+  // How often finished tasks left lessons (saved by the agent, taken from its final output, none, or missing).
+  app.get("/api/knowledge/lesson-checks", (_req, res) => res.json({ ok: true, ...lessonCoverage(db) }));
 
   app.get("/api/knowledge/memories", (req, res) => {
     try {

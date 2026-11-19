@@ -40,11 +40,19 @@ export interface MemoryFilter {
   q?: string;
 }
 
+/** How often finished tasks left lessons over the last `days`. */
+export interface LessonCoverage {
+  days: number;
+  counts: { agent_added: number; captured: number; none_declared: number; missing: number };
+  recentMissing: Array<{ task_id: string; title: string; agent_name: string | null; checked_at: number }>;
+}
+
 async function owner() {
   await bootstrapSession({ promptOnUnauthorized: false });
 }
 
 export const knowledgeApi = {
+  lessonChecks: () => request<LessonCoverage & { ok: true }>("/api/knowledge/lesson-checks"),
   document: (topic: "systems" | "checklist") =>
     request<{ ok: true; topic: string; available: boolean; text: string }>(`/api/knowledge/documents/${topic}`),
   memories: (filter: MemoryFilter = {}) => {

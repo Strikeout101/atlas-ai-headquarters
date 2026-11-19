@@ -281,6 +281,7 @@ All changes need the owner password session and CSRF. Paid accounts, accepting t
 | GET/PATCH | `/api/knowledge/memories/:id`        | Read or edit a memory (editing marks it reviewed)                                                                                                                                               |
 | POST      | `/api/knowledge/memories/:id/review` | Mark reviewed                                                                                                                                                                                   |
 | POST      | `/api/knowledge/memories/:id/status` | `active` or `archived`                                                                                                                                                                          |
+| GET       | `/api/knowledge/lesson-checks`       | Whether finished tasks left lessons over the last 30 days (saved by the agent, taken from the final output, none, missing)                                                                      |
 
 Memory changes need the owner password session and CSRF. Agent task tokens are refused on `/api/knowledge/*`; agents use `knowledge.get`, `memory.search` and `memory.add` through the gateway.
 

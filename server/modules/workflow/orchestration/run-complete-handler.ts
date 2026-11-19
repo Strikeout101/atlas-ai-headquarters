@@ -9,6 +9,7 @@ import {
 } from "../agents/context-rollover-store.ts";
 import { summarizeTaskRunFailure } from "../agents/run-failure-summary.ts";
 import { recordAutonomyTaskFailure } from "../../autonomy-engine.ts";
+import { captureTaskLessons } from "../../task-lessons.ts";
 
 type CreateRunCompleteHandlerDeps = Record<string, any>;
 
@@ -372,6 +373,24 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       }
       // Trigger delegation for foreign-department subtasks
       processSubtaskDelegations(taskId);
+
+      // Did the agent leave lessons? Saves LESSON:/FACT: lines from the output when it did not call memory.add.
+      try {
+        const runLog = path.join(logsDir, `${taskId}.log`);
+        const output = fs.existsSync(runLog) ? prettyStreamJson(fs.readFileSync(runLog, "utf8").slice(-200_000)) : "";
+        const lessons = captureTaskLessons(db as any, { taskId, agentId: task?.assigned_agent_id ?? null, output });
+        const note =
+          lessons.outcome === "agent_added"
+            ? `Lessons: ${lessons.saved} saved by the agent`
+            : lessons.outcome === "captured"
+              ? `Lessons: ${lessons.saved} saved from the final output (unreviewed)`
+              : lessons.outcome === "none_declared"
+                ? "Lessons: the agent reported none"
+                : "Lessons: none left by the agent";
+        appendTaskLog(taskId, "system", note);
+      } catch {
+        /* lessons never block completion */
+      }
     }
 
     // Update agent status back to idle

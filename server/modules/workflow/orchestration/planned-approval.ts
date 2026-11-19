@@ -197,6 +197,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         );
 
         const openingPrompt = buildMeetingPrompt(planningLeader, {
+          taskId,
           meetingType: "planned",
           round,
           taskTitle,
@@ -217,6 +218,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         for (const leader of otherLeaders) {
           if (abortIfInactive()) return;
           const feedbackPrompt = buildMeetingPrompt(leader, {
+            taskId,
             meetingType: "planned",
             round,
             taskTitle,
@@ -238,6 +240,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         }
 
         const summaryPrompt = buildMeetingPrompt(planningLeader, {
+          taskId,
           meetingType: "planned",
           round,
           taskTitle,
@@ -258,6 +261,7 @@ export function createPlannedApprovalTools(deps: CreatePlannedApprovalToolsDeps)
         for (const leader of leaders) {
           if (abortIfInactive()) return;
           const actionPrompt = buildMeetingPrompt(leader, {
+            taskId,
             meetingType: "planned",
             round,
             taskTitle,
