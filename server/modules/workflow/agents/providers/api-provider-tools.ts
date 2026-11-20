@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { createRunPerformanceTracker } from "../../../agent-performance.ts";
 import path from "node:path";
 import type { ChildProcess } from "node:child_process";
@@ -14,6 +15,11 @@ import { createOpenCodeContextMonitor } from "./opencode-context-monitor.ts";
 import { setContextRolloverProcessPid } from "../context-rollover-store.ts";
 import { autonomyTaskUsageBlockReason } from "../../../autonomy-engine.ts";
 import { assertRunsAllowed, automaticStartBlockReason } from "../../../control-state.ts";
+import {
+  AutonomousProviderBudgetError,
+  reserveAutonomyProviderInvocation,
+} from "../../../autonomous-provider-budget.ts";
+import { localWorkerAgentConfig, readLocalWorkerProjectInstructions } from "./local-worker-config.ts";
 
 class ProviderUnavailableError extends Error {
   constructor(message: string) {
@@ -237,6 +243,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     apiModel?: string | null,
     safeWriteOverride?: (text: string) => boolean,
     onUsage?: ProviderUsageCallback,
+    budgetTaskId?: string,
   ): Promise<void> {
     const safeWrite = safeWriteOverride ?? createSafeLogStreamOps(logStream).safeWrite;
 
@@ -250,6 +257,14 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     }
     if (!provider.enabled) {
       throw new Error(`API provider '${provider.name}' is disabled.`);
+    }
+    const invocationTaskId = budgetTaskId ?? taskId;
+    if (invocationTaskId) {
+      const budgetBlock = reserveAutonomyProviderInvocation(db as any, invocationTaskId, {
+        provider: "api",
+        apiProviderId: provider.id,
+      });
+      if (budgetBlock) throw new AutonomousProviderBudgetError(budgetBlock);
     }
 
     const model = resolveApiProviderModel(provider, apiModel ?? null);
@@ -309,9 +324,23 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
     onComplete?: (exitCode: number) => void,
   ): void {
     assertRunsAllowed();
+    const failPolicy = (reason: string) => {
+      const message = `[policy] ${reason}\n`;
+      try {
+        fs.appendFileSync(logPath, message);
+      } catch {
+        // Preserve the state transition even when the task log is unavailable.
+      }
+      broadcast("cli_output", { task_id: taskId, stream: "stderr", data: message });
+      if (onComplete) onComplete(1);
+      else handleTaskRunComplete(taskId, 1);
+    };
     const autonomyBlock =
       automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
-    if (autonomyBlock) throw new Error(autonomyBlock);
+    if (autonomyBlock) {
+      failPolicy(autonomyBlock);
+      return;
+    }
     const taskRoute = getCurrentTaskModelRoute(db as any, taskId);
     if (taskRoute?.provider === "api") {
       apiProviderId = taskRoute.api_provider_id ?? apiProviderId;
@@ -331,6 +360,30 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         return;
       }
       const providerKey = `climpire-${provider.id.replace(/[^a-zA-Z0-9-]/g, "-")}`;
+      const agentConfig = db
+        .prepare(
+          "SELECT a.context_window_tokens FROM tasks t JOIN agents a ON a.id = t.assigned_agent_id WHERE t.id = ?",
+        )
+        .get(taskId) as { context_window_tokens?: number | null } | undefined;
+      const configuredWindow = taskRoute?.context_window_tokens ?? agentConfig?.context_window_tokens;
+      const contextWindow =
+        Number.isSafeInteger(configuredWindow) && Number(configuredWindow) >= 2048 ? Number(configuredWindow) : 8192;
+      const compactAgent = localWorkerAgentConfig(contextWindow);
+      let workerPrompt = prompt;
+      try {
+        if (!prompt.includes("[Project instructions]")) {
+          const instructions = readLocalWorkerProjectInstructions(projectPath);
+          if (instructions) workerPrompt += `\n\n[Project instructions]\n${instructions}`;
+        }
+        if (Buffer.byteLength(workerPrompt, "utf8") > Math.floor(contextWindow * 0.65 * 0.85)) {
+          throw new Error(
+            "Local task and project instructions exceed the context budget; use the configured stronger worker",
+          );
+        }
+      } catch (error) {
+        failPolicy(error instanceof Error ? error.message : "Local project instructions unavailable");
+        return;
+      }
       const settings: Record<string, string> = { baseURL: normalizeApiBaseUrl(provider.base_url) };
       if (provider.api_key_enc) settings.apiKey = decryptSecret(provider.api_key_enc);
       const config = {
@@ -338,12 +391,20 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         // ATLAS preserves the isolated worktree itself. Avoid a second snapshot
         // scan of the project before every small local-model run.
         snapshots: false,
+        default_agent: compactAgent.default_agent,
+        agents: compactAgent.agents,
         providers: {
           [providerKey]: {
             name: provider.name,
             package: "@opencode/ai/providers/openai-compatible",
             settings,
-            models: { [model]: { name: model } },
+            models: {
+              [model]: {
+                name: model,
+                limit: compactAgent.limit,
+                compatibility: { reasoningField: "reasoning_content" },
+              },
+            },
           },
         },
         permissions: [
@@ -353,11 +414,6 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         ],
       };
       let child: ChildProcess;
-      const agentConfig = db
-        .prepare(
-          "SELECT a.context_window_tokens FROM tasks t JOIN agents a ON a.id = t.assigned_agent_id WHERE t.id = ?",
-        )
-        .get(taskId) as { context_window_tokens?: number | null } | undefined;
       const monitor = createOpenCodeContextMonitor({
         contextWindowTokens: taskRoute?.context_window_tokens ?? agentConfig?.context_window_tokens,
         onNearLimit: () => {
@@ -369,15 +425,29 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         child = spawnCliAgent(
           taskId,
           "opencode",
-          prompt,
+          workerPrompt,
           projectPath,
           logPath,
           `${providerKey}/${model}`,
           undefined,
-          { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) },
+          {
+            OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+            // Mandatory target-project rules are already in the bounded ATLAS task prompt.
+            OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+            OPENCODE_DISABLE_CLAUDE_CODE: "1",
+            XDG_CONFIG_HOME: path.resolve(logsDir, "opencode-config"),
+            OPENCODE_DB: path.resolve(
+              logsDir,
+              `${createHash("sha256").update(taskId).digest("hex").slice(0, 24)}.opencode.sqlite`,
+            ),
+          },
           (chunk, stream) => monitor.ingest(chunk, stream),
         );
-      } catch {
+      } catch (error) {
+        if (error instanceof AutonomousProviderBudgetError) {
+          failPolicy(error.message);
+          return;
+        }
         if (onComplete) onComplete(1);
         else handleTaskRunComplete(taskId, 1, "provider_unavailable");
         return;

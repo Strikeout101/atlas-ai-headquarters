@@ -36,6 +36,14 @@ This proves the goal → planner → dual-VP approval → admitted real model wo
 
 An earlier Codex worker returned the correct JSON and emitted `turn.completed`, but its CLI process did not close before the 60-second transport timeout. That run was recorded as failed rather than treating partial output as success. This was one observed timeout, not an established root cause. The successful cycle used a Claude worker; Codex still performed a genuine independent VP review.
 
+### Codex shutdown follow-up — verified 2026-11-19
+
+The completion drain already present in the one-shot and CLI runtimes requires two independent signals: a structured stdout `turn.completed` event and an actual successful OS process exit. It releases only this child's readable pipe handles after both signals, so inherited handles cannot hold up completion. A terminal marker alone, an unsuccessful exit, cancellation or timeout does not become success. Nonzero one-shot exits keep their captured output and return an error.
+
+The resumed review added 14 lifecycle regressions covering both signal orders, unsuccessful/null exit codes, marker text in other events or stderr, split JSON, disposal, normal close, timeout and owner stop. It also fixed one remaining edge: a complete final JSON event without a trailing newline can now be recognized after OS exit; an incomplete event remains insufficient. Focused tests and scoped lint pass.
+
+At 14:30 America/New_York on 2026-11-19, one actual no-tools Codex invocation (`gpt-6.1-sol`, low reasoning) through the production one-shot runner returned exactly `ATLAS_SHUTDOWN_OK` without an error in 5,314 ms. A fresh authenticated usage reading before the call showed 22% of the five-hour window and 3% of the seven-day window, below the existing 80% threshold. Local evidence: `.tmp/codex-shutdown-verification/287340c7-d911-4f50-9aff-28d65dfff8ff/evidence.json` and its worker log. No live routing, director assignment or service state changed. This is a bounded reproduction/regression check, not a long unattended workload test.
+
 ## Real local tool worker
 
 The configured Precision host answered its OpenAI-compatible `/models` endpoint and advertised cached model `5690-flint`. Its Ollama `/api/tags` endpoint returned 404; discovery and execution must use the configured compatible endpoint.

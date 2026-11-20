@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureAgentPerformanceSchema, getAgentPerformanceSummary } from "../../../agent-performance.ts";
 import { createApiProviderTools } from "./api-provider-tools.ts";
 import { createStreamTools } from "./stream-tools.ts";
+import { AutonomousProviderBudgetError } from "../../../autonomous-provider-budget.ts";
 
 const resources: Array<{ db: DatabaseSync; dir: string }> = [];
 afterEach(() => {
@@ -20,8 +21,10 @@ function setup(type: string) {
   const db = new DatabaseSync(":memory:");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-api-performance-"));
   resources.push({ db, dir });
-  db.exec(`CREATE TABLE tasks(id TEXT PRIMARY KEY, assigned_agent_id TEXT);
-    INSERT INTO tasks VALUES ('task','worker');
+  db.exec(`CREATE TABLE tasks(id TEXT PRIMARY KEY, assigned_agent_id TEXT, origin TEXT DEFAULT 'owner');
+    INSERT INTO tasks(id,assigned_agent_id) VALUES ('task','worker');
+    CREATE TABLE agents(id TEXT PRIMARY KEY, context_window_tokens INTEGER);
+    INSERT INTO agents VALUES ('worker',4096);
     CREATE TABLE api_providers(id TEXT PRIMARY KEY, name TEXT, type TEXT, base_url TEXT,
       api_key_enc TEXT, enabled INTEGER, models_cache TEXT, models_cached_at INTEGER);`);
   db.prepare("INSERT INTO api_providers VALUES ('provider','Provider',?,'https://provider.example',NULL,1,?,0)").run(
@@ -37,22 +40,72 @@ function setup(type: string) {
     completeSubtaskFromCli: vi.fn(),
   });
   const complete = vi.fn();
+  const spawn = vi.fn();
+  const broadcast = vi.fn();
   const tools = createApiProviderTools({
     db,
     logsDir: dir,
     activeProcesses: new Map(),
-    broadcast: vi.fn(),
+    broadcast,
     normalizeStreamChunk: String,
     handleTaskRunComplete: complete,
-    spawnCliAgent: vi.fn(),
+    spawnCliAgent: spawn,
     createSafeLogStreamOps: streams.createSafeLogStreamOps,
     parseSSEStream: streams.parseSSEStream,
     parseGeminiSSEStream: streams.parseGeminiSSEStream,
   });
-  return { db, dir, tools, complete };
+  return { db, dir, tools, complete, spawn, broadcast };
 }
 
 describe("API provider structured usage tracking", () => {
+  it("blocks autonomous API requests without an enforceable budget before network access", async () => {
+    const h = setup("openrouter");
+    h.db.prepare("UPDATE tasks SET origin='autonomy'").run();
+    const network = vi.fn();
+    vi.stubGlobal("fetch", network);
+    const log = {} as fs.WriteStream;
+    await expect(
+      h.tools.executeApiProviderAgent(
+        "Do work",
+        h.dir,
+        log,
+        new AbortController().signal,
+        "task",
+        "provider",
+        "cached-model",
+        () => true,
+      ),
+    ).rejects.toBeInstanceOf(AutonomousProviderBudgetError);
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it("reports a late local budget refusal as policy failure without calling the host unhealthy", () => {
+    const h = setup("ollama");
+    h.spawn.mockImplementation(() => {
+      throw new AutonomousProviderBudgetError("Local daily invocation cap reached");
+    });
+    const network = vi.fn();
+    vi.stubGlobal("fetch", network);
+    const logPath = path.join(h.dir, "blocked.log");
+    h.tools.launchApiProviderAgent(
+      "task",
+      "provider",
+      "cached-model",
+      "Do work",
+      h.dir,
+      logPath,
+      new AbortController(),
+      1,
+    );
+    expect(h.complete).toHaveBeenCalledWith("task", 1);
+    expect(h.complete).not.toHaveBeenCalledWith("task", 1, "provider_unavailable");
+    expect(fs.readFileSync(logPath, "utf8")).toContain("[policy] Local daily invocation cap reached");
+    expect(h.broadcast).toHaveBeenCalledWith(
+      "cli_output",
+      expect.objectContaining({ data: expect.stringContaining("Local daily invocation cap reached") }),
+    );
+    expect(network).not.toHaveBeenCalled();
+  });
   it.each([
     {
       type: "openrouter",

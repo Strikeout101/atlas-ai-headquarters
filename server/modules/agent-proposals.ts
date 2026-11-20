@@ -355,6 +355,14 @@ export async function runAutonomyTick(
      ON CONFLICT(agent_id) DO UPDATE SET last_thought_at = excluded.last_thought_at, last_error = NULL`,
   ).run(agent.id, now);
 
+  if (agent.cli_provider === "api") {
+    const reason =
+      "Unattributed API thinking is disabled; use task-scoped local work with an invocation budget or a subscription provider";
+    db.prepare("UPDATE agent_autonomy_state SET last_error=? WHERE agent_id=?").run(reason, agent.id);
+    deps.log?.(`[autonomy] ${agent.name} could not think: ${reason}`);
+    return { agentId: agent.id, created: 0, error: reason };
+  }
+
   const ctx = gatherThinkingContext(db, agent);
   const prompt = buildProposalPrompt(agent, ctx, deps.getPreferredLanguage?.() ?? "en");
   let text = "";

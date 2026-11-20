@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAutonomy, saveAutonomy, type AutonomyOverview } from "../../api/autonomy";
+import { getAutonomy, saveAutonomy, saveAutonomyConfig, type AutonomyOverview } from "../../api/autonomy";
 import { getProjects } from "../../api/organization-projects";
 import { ApiRequestError } from "../../api/core";
 import AutonomyWorkspace from "./AutonomyWorkspace";
@@ -40,6 +40,20 @@ beforeEach(() => {
 });
 
 describe("autonomy planning", () => {
+  it("shows the per-host invocation limit and persists the owner's cap including zero", async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveAutonomyConfig).mockResolvedValue({ ok: true });
+    render(<AutonomyWorkspace departments={[]} />);
+    await user.click(await screen.findByText("Operating limits"));
+    const cap = screen.getByLabelText("Daily local provider invocations (per host)");
+    expect(cap).toHaveValue(20);
+    fireEvent.change(cap, { target: { value: "0" } });
+    await user.click(screen.getByRole("button", { name: "Save limits" }));
+    await waitFor(() =>
+      expect(saveAutonomyConfig).toHaveBeenCalledWith(expect.objectContaining({ local_provider_daily_run_cap: 0 })),
+    );
+    expect(screen.getByText(/Autonomous paid API calls remain blocked/)).toBeVisible();
+  });
   it("requires financial targets to respect their currency's minor-unit precision", async () => {
     const user = userEvent.setup();
     render(<AutonomyWorkspace departments={[]} />);

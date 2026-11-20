@@ -419,6 +419,7 @@ Whenever you complete a subtask, report it in this format:
     if (!compactRollover && localRoute?.provider === "api" && localRoute.context_window_tokens) {
       initialLocalPrompt = tryBuildCompactInitialTaskPrompt(
         {
+          projectPath: agentCwd,
           taskId: id,
           title: task.title,
           description: task.description,
@@ -450,6 +451,7 @@ Whenever you complete a subtask, report it in this format:
       (compactRollover
         ? buildCompactContextRolloverPrompt(
             {
+              projectPath: provider === "api" ? agentCwd : undefined,
               taskId: id,
               title: task.title,
               checkpointText: rollover!.checkpointText,
@@ -523,17 +525,6 @@ Whenever you complete a subtask, report it in this format:
       const updatedAgent = db.prepare("SELECT * FROM agents WHERE id = ?").get(agentId);
       broadcast("task_update", updatedTask);
       broadcast("agent_status", updatedAgent);
-      notifyTaskStatus(id, task.title, "in_progress", taskLang);
-
-      const assigneeName = getAgentDisplayName(agent as unknown as AgentRow, taskLang);
-      const worktreeNote = pickL(l([` (isolated branch: climpire/${id.slice(0, 8)})`]), taskLang);
-      notifyCeo(pickL(l([`${assigneeName} started work on '${task.title}'.${worktreeNote}`]), taskLang), id);
-
-      const taskRow = db.prepare("SELECT department_id FROM tasks WHERE id = ?").get(id) as
-        | { department_id: string | null }
-        | undefined;
-      startProgressTimer(id, task.title, taskRow?.department_id ?? null);
-
       launchApiProviderAgent(
         id,
         agent.api_provider_id ?? null,
@@ -544,6 +535,19 @@ Whenever you complete a subtask, report it in this format:
         controller,
         fakePid,
       );
+      const launchedTask = db.prepare("SELECT status, department_id FROM tasks WHERE id = ?").get(id) as
+        | { status: string; department_id: string | null }
+        | undefined;
+      if (launchedTask?.status !== "in_progress")
+        return res.status(409).json({
+          error: "worker_start_blocked",
+          message: "Worker did not start; see the task log for the policy or transport failure.",
+        });
+      notifyTaskStatus(id, task.title, "in_progress", taskLang);
+      const assigneeName = getAgentDisplayName(agent as unknown as AgentRow, taskLang);
+      const worktreeNote = pickL(l([` (isolated branch: climpire/${id.slice(0, 8)})`]), taskLang);
+      notifyCeo(pickL(l([`${assigneeName} started work on '${task.title}'.${worktreeNote}`]), taskLang), id);
+      startProgressTimer(id, task.title, launchedTask.department_id);
       return res.json({ ok: true, pid: fakePid, logPath, cwd: agentCwd, worktree: !!worktreePath });
     }
 

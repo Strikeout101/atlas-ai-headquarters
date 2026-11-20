@@ -17,6 +17,15 @@ export function createCodexCompletionDrain(child: ChildProcess, onTerminal?: () 
     child.off("exit", onExit);
   };
   const drain = () => {
+    // A valid final JSON event need not include a trailing newline. Only consider
+    // that buffered tail after OS exit; incomplete chunks are never completion.
+    if (exited && !terminal && buffer) {
+      try {
+        terminal = JSON.parse(buffer)?.type === "turn.completed";
+      } catch {
+        // A later stdout chunk may finish the event.
+      }
+    }
     if (disposed || !exited || exitCode !== 0 || !terminal) return;
     detach();
     onTerminal?.();

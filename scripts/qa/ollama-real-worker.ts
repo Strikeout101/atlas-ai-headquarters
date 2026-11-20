@@ -76,8 +76,8 @@ try {
     ...cli,
     broadcast: () => {},
     killPidTree,
-    TASK_RUN_IDLE_TIMEOUT_MS: 80000,
-    TASK_RUN_HARD_TIMEOUT_MS: 85000,
+    TASK_RUN_IDLE_TIMEOUT_MS: 120000,
+    TASK_RUN_HARD_TIMEOUT_MS: 175000,
     appendTaskLog: () => {},
     createSubtaskFromCli: () => {},
     completeSubtaskFromCli: () => {},
@@ -86,8 +86,8 @@ try {
   const completion = new Promise<number>((resolve, reject) => {
     const timeout = setTimeout(() => {
       if (child?.pid) killPidTree(child.pid);
-      reject(new Error("Local worker timed out after 90s"));
-    }, 90000);
+      reject(new Error("Local worker timed out after 180s"));
+    }, 180000);
     const finish = (code: number) => {
       clearTimeout(timeout);
       resolve(code);
@@ -122,7 +122,7 @@ try {
       "local-task",
       null,
       null,
-      "Use a file writing tool to create proof.txt in the current directory containing exactly LOCAL_WORKER_OK followed by a newline. Then reply done. Do not read other directories or use network. Do not commit or push.",
+      "Use the shell tool to create proof.txt in the current directory containing exactly LOCAL_WORKER_OK followed by a newline. Then reply done. Do not read other directories or use network. Do not commit or push.",
       runDir,
       logPath,
       new AbortController(),

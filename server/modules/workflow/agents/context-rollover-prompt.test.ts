@@ -1,5 +1,23 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildCompactContextRolloverPrompt, tryBuildCompactInitialTaskPrompt } from "./context-rollover-prompt.ts";
+
+const fixtureRoot = path.resolve(".tmp");
+const fixtures: string[] = [];
+afterEach(() => {
+  for (const directory of fixtures.splice(0)) {
+    if (!directory.startsWith(fixtureRoot + path.sep)) throw new Error("Unexpected fixture path");
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+function projectWithInstructions(contents: string): string {
+  fs.mkdirSync(fixtureRoot, { recursive: true });
+  const directory = fs.mkdtempSync(path.join(fixtureRoot, "local-instructions-"));
+  fixtures.push(directory);
+  fs.writeFileSync(path.join(directory, "AGENTS.md"), contents);
+  return directory;
+}
 
 describe("context rollover prompt", () => {
   it("keeps goal and recent state while bounding a small model's prompt", () => {
@@ -40,6 +58,43 @@ describe("context rollover prompt", () => {
 });
 
 describe("initial local prompt", () => {
+  it("preserves own-project rules in both initial and rollover prompts", () => {
+    const rules = "Keep generated examples offline. Verify documentation links before reporting completion.";
+    const input = {
+      taskId: "local-task",
+      title: "Document usage",
+      description: "Write the usage guide.",
+      checkpointText: "Continue the guide.",
+      worktreeBranch: "climpire/local-task",
+      contextWindowTokens: 4096,
+      projectPath: projectWithInstructions(rules),
+    };
+    const initial = tryBuildCompactInitialTaskPrompt(input, (parts) => parts.join("\n"));
+    const resumed = buildCompactContextRolloverPrompt(input, (parts) => parts.join("\n"));
+    expect(initial).toContain(rules);
+    expect(resumed).toContain(rules);
+    expect(initial).toContain("[Project instructions]");
+  });
+  it("falls back when project instructions cannot fit instead of omitting them", () => {
+    const base = {
+      taskId: "local-task",
+      title: "Document usage",
+      description: "Write the usage guide.",
+      worktreeBranch: "climpire/local-task",
+      contextWindowTokens: 4096,
+    };
+    expect(
+      tryBuildCompactInitialTaskPrompt(
+        { ...base, projectPath: projectWithInstructions("Mandatory project rule. ".repeat(1000)) },
+        (parts) => parts.join("\n"),
+      ),
+    ).toBeNull();
+    expect(
+      tryBuildCompactInitialTaskPrompt({ ...base, projectPath: projectWithInstructions("a".repeat(65537)) }, (parts) =>
+        parts.join("\n"),
+      ),
+    ).toBeNull();
+  });
   it("preserves the full task and department requirements with context headroom", () => {
     const description = `Beginning requirement. ${"Keep every detail. ".repeat(40)} Final requirement.`;
     const prompt = tryBuildCompactInitialTaskPrompt(

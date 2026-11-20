@@ -1,3 +1,5 @@
+import { readLocalWorkerProjectInstructions } from "./providers/local-worker-config.ts";
+
 type CompactPromptInput = {
   taskId: string;
   title: string;
@@ -9,6 +11,7 @@ type CompactPromptInput = {
   interruptPrompt?: string | null;
   taskToolsPath?: string | null;
   worktreeBranch: string;
+  projectPath?: string;
   /**
    * Compact project goal and memories for this task, sized to the bytes still free (see buildCompactKnowledgeBlock).
    * Called once the mandatory parts fit; returns "" when there is no room.
@@ -36,9 +39,11 @@ export function buildCompactContextRolloverPrompt(
   const hardLimit = Number.isSafeInteger(window) && window > 0 ? Math.floor(window * 0.65) : 7_000;
   // Reserve 15% of the prompt allowance for new context instead of filling every byte.
   const maxPromptBytes = Math.floor(hardLimit * 0.85);
+  const projectInstructions = input.projectPath ? readLocalWorkerProjectInstructions(input.projectPath) : "";
   const fixed = [
     `[Task Session] ${input.taskId}; fresh context, same worktree`,
     `[Task] ${input.title}`,
+    projectInstructions ? `[Project instructions]\n${projectInstructions}` : "",
     input.departmentConstraint ? clipMiddle(input.departmentConstraint, 300) : "",
     input.departmentSharedPrompt ? clipMiddle(input.departmentSharedPrompt, 400) : "",
     input.interruptPrompt ? clipMiddle(input.interruptPrompt, 600) : "",
@@ -113,7 +118,13 @@ export function tryBuildCompactInitialTaskPrompt(
       finalize,
     ).replace("[Durable checkpoint]", "[Task requirements]");
   } catch (error) {
-    if (error instanceof Error && error.message === "context_rollover_prompt_exceeds_configured_window") return null;
+    if (
+      error instanceof Error &&
+      ["context_rollover_prompt_exceeds_configured_window", "local_worker_project_instructions_unavailable"].includes(
+        error.message,
+      )
+    )
+      return null;
     throw error;
   }
 }

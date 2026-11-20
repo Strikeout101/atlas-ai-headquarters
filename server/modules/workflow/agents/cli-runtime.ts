@@ -5,6 +5,11 @@ import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { getCurrentTaskModelRoute } from "../../model-routing.ts";
 import { createRunPerformanceTracker } from "../../agent-performance.ts";
+import {
+  AutonomousProviderBudgetError,
+  autonomousProviderBudgetBlockReason,
+  reserveAutonomyProviderInvocation,
+} from "../../autonomous-provider-budget.ts";
 import { createCodexCompletionDrain } from "./providers/codex-completion-drain.ts";
 import { createAgentTaskToken } from "../../../security/agent-task-token.ts";
 import { PORT } from "../../../config/runtime.ts";
@@ -239,8 +244,13 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
   ): ChildProcess {
     assertRunsAllowed();
     const autonomyBlock =
-      automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
-    if (autonomyBlock) throw new Error(autonomyBlock);
+      automaticStartBlockReason(db as any, taskId) ||
+      autonomyTaskUsageBlockReason(db as any, taskId, Date.now(), provider);
+    if (autonomyBlock) {
+      const budgetBlock = autonomousProviderBudgetBlockReason(db, taskId, Date.now(), { provider });
+      if (budgetBlock === autonomyBlock) throw new AutonomousProviderBudgetError(autonomyBlock);
+      throw new Error(autonomyBlock);
+    }
     clearCliOutputDedup(taskId);
     // Save prompt for debugging
     const promptPath = path.join(logsDir, `${taskId}.prompt.txt`);
@@ -249,6 +259,8 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     const taskRoute = getCurrentTaskModelRoute(db, taskId);
     const routed = taskRoute?.provider === provider ? taskRoute : null;
     const args = buildAgentArgs(provider, routed?.model ?? model, routed?.reasoning_level ?? reasoningLevel);
+    const invocationBlock = reserveAutonomyProviderInvocation(db, taskId, { provider });
+    if (invocationBlock) throw new AutonomousProviderBudgetError(invocationBlock);
     const logStream = fs.createWriteStream(logPath, { flags: "a" });
     const { safeWrite, safeEnd } = createSafeLogStreamOps(logStream);
     safeWrite(`\n===== task run start ${new Date().toISOString()} | provider=${provider} =====\n`);

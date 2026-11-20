@@ -142,8 +142,20 @@ describe("autonomy owner API", () => {
       { id: 2 },
     ])
       await patch("config", body).expect(400);
-    await patch("config", { daily_start_cap: 0, usage_threshold: 0.7, failure_limit: 2 }).expect(200);
-    expect(autonomyConfig(db)).toMatchObject({ daily_start_cap: 0, usage_threshold: 0.7, failure_limit: 2 });
+    await patch("config", { local_provider_daily_run_cap: -1 }).expect(400);
+    await patch("config", { local_provider_daily_run_cap: 1.5 }).expect(400);
+    await patch("config", {
+      daily_start_cap: 0,
+      usage_threshold: 0.7,
+      failure_limit: 2,
+      local_provider_daily_run_cap: 7,
+    }).expect(200);
+    expect(autonomyConfig(db)).toMatchObject({
+      daily_start_cap: 0,
+      usage_threshold: 0.7,
+      failure_limit: 2,
+      local_provider_daily_run_cap: 7,
+    });
   });
   it("builds an honest digest with full counts when recent-event display is capped", async () => {
     const { app, db } = harness();

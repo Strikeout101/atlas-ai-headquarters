@@ -86,6 +86,7 @@ export interface GoalMilestone {
 }
 export interface AutonomyConfig {
   daily_start_cap: number;
+  local_provider_daily_run_cap?: number;
   usage_threshold: number;
   failure_limit: number;
   planning_interval_minutes: number;

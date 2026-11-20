@@ -12,6 +12,10 @@ Initial local prompts preserve the task description and mandatory department/inj
 
 Subscription headroom checks apply to the provider being used. An eligible first local task can be admitted without an unrelated subscription; the launch path checks again against the actual saved route. Codex and Claude calls still require fresh valid usage below the configured threshold. Pauses, stop controls, daily caps and proposal approvals continue to apply.
 
+Local providers also have a daily invocation limit under **Autonomy > Limits** (default 20 per configured host, America/New_York day). Every autonomous worker or meeting invocation counts, including retries, resumes and failed starts. An invocation may use multiple model turns; this is not a token or dollar estimate. The task-start limit remains separate. The final transport reserves its invocation atomically, so simultaneous workers cannot all pass an old preflight count. Owner-started runs are unaffected. Idle-agent API thinking without a task attribution is skipped with a recorded explanation.
+
+Autonomous calls to paid or unclassified API providers stay disabled: reported usage is not an enforceable dollar ceiling. Adding a paid API key alone does not enable autonomous spending. Paid autonomous execution requires a future provider-specific enforceable budget; local hosts classified as Ollama are treated as owner-configured self-hosted services.
+
 ## Worker performance
 
 New worker invocations persist a record in `agent_worker_runs`, grouped by agent, provider and model. The director receives recent performance summaries and the page shows a compact table.

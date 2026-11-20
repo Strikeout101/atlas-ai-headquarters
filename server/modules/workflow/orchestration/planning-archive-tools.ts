@@ -212,6 +212,7 @@ export function createPlanningArchiveTools(deps: CreatePlanningArchiveToolsDeps)
       let summaryMarkdown = "";
       try {
         const run = await runAgentOneShot(planningLeader, consolidationPrompt, {
+          budgetTaskId: rootTaskId,
           projectPath,
           timeoutMs: 45_000,
           noTools: true,

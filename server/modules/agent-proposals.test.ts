@@ -88,6 +88,25 @@ describe("agent autonomy: who thinks", () => {
 });
 
 describe("agent autonomy: thinking", () => {
+  it("does not call an unattributed API model from the automatic think loop", async () => {
+    const db = harness();
+    db.exec("UPDATE agents SET cli_provider='api' WHERE id='lead'");
+    const runAgentOneShot = vi.fn();
+    const result = await runAutonomyTick({ db, runAgentOneShot, now: () => 10 * HOUR });
+    expect(result).toMatchObject({
+      agentId: "lead",
+      created: 0,
+      error: expect.stringContaining("Unattributed API thinking is disabled"),
+    });
+    expect(runAgentOneShot).not.toHaveBeenCalled();
+    expect(db.prepare("SELECT last_error FROM agent_autonomy_state WHERE agent_id='lead'").get()).toMatchObject({
+      last_error: expect.stringContaining("invocation budget"),
+    });
+    expect(
+      (await runAutonomyTick({ db, runAgentOneShot: vi.fn().mockResolvedValue(reply([])), now: () => 10 * HOUR }))
+        ?.agentId,
+    ).toBe("eager");
+  });
   it("stores useful suggestions and drops duplicates, board repeats and unknown projects", async () => {
     const db = harness();
     const runAgentOneShot = vi.fn().mockResolvedValue(

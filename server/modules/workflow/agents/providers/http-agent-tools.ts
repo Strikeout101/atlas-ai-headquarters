@@ -349,7 +349,8 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
   ): void {
     assertRunsAllowed();
     const autonomyBlock =
-      automaticStartBlockReason(db as any, taskId) || autonomyTaskUsageBlockReason(db as any, taskId);
+      automaticStartBlockReason(db as any, taskId) ||
+      autonomyTaskUsageBlockReason(db as any, taskId, Date.now(), agent);
     if (autonomyBlock) throw new Error(autonomyBlock);
     const logStream = fs.createWriteStream(logPath, { flags: "a" });
     const { safeWrite, safeEnd } = createSafeLogStreamOps(logStream);

@@ -27,6 +27,8 @@ export interface AgentRow {
 export type MeetingReviewDecision = "reviewing" | "approved" | "hold";
 
 export interface OneShotRunOptions {
+  /** Task attribution for autonomous API budgets, independent of whether output is streamed to the task UI. */
+  budgetTaskId?: string;
   projectPath?: string;
   timeoutMs?: number;
   streamTaskId?: string | null;

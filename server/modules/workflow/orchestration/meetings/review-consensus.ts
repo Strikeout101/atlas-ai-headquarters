@@ -132,7 +132,7 @@ export function createReviewConsensusTools(deps: ReviewConsensusDeps) {
         const lang = resolveLang(taskDescription ?? taskTitle);
         const transcript: any[] = [];
         const oneShotTimeoutMs = Math.max(5_000, Number(reviewMeetingOneShotTimeoutMs ?? 65_000));
-        const oneShotOptions = { projectPath, timeoutMs: oneShotTimeoutMs, noTools: true };
+        const oneShotOptions = { projectPath, timeoutMs: oneShotTimeoutMs, noTools: true, budgetTaskId: taskId };
         const isTimeoutRun = (run: { text?: string; error?: string } | null | undefined): boolean => {
           const source = `${run?.error ?? ""}\n${run?.text ?? ""}`;
           return /timeout after|timed out|request timed out|aborted/i.test(source);

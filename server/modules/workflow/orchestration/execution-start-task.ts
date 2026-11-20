@@ -231,6 +231,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     if (!compactRollover && localRoute?.provider === "api" && localRoute.context_window_tokens) {
       initialLocalPrompt = tryBuildCompactInitialTaskPrompt(
         {
+          projectPath: agentCwd,
           taskId: taskId,
           title: taskData.title,
           description: taskData.description,
@@ -263,6 +264,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       (compactRollover
         ? buildCompactContextRolloverPrompt(
             {
+              projectPath: provider === "api" ? agentCwd : undefined,
               taskId,
               title: taskData.title,
               checkpointText: rollover!.checkpointText,
@@ -367,6 +369,11 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       });
     }
 
+    // A synchronous policy/transport failure may already have restored the task.
+    const launchedTask = db.prepare("SELECT status FROM tasks WHERE id = ?").get(taskId) as
+      | { status: string }
+      | undefined;
+    if (launchedTask?.status !== "in_progress") return;
     const worktreeNote = pickL(l([` (isolated branch: climpire/${taskId.slice(0, 8)})`]), taskLang);
     notifyCeo(pickL(l([`${execName} started work on '${taskData.title}'.${worktreeNote}`]), taskLang), taskId);
     startProgressTimer(taskId, taskData.title, deptId);

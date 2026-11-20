@@ -169,6 +169,8 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
               rawOutput += text;
               return safeWrite(text);
             },
+            undefined,
+            opts.budgetTaskId,
           );
         } finally {
           clearTimeout(timeout);

@@ -46,26 +46,27 @@ Rules of thumb:
 
 **Business engine (section E)**
 
-| File                            | What it does                                                                                     |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `autonomy-store.ts`             | Tables: goals, opportunities, schedules, autonomy work, ledger, config                           |
-| `autonomy-planner.ts`           | VP planning beat: compares goals with results, scores opportunities, proposes work               |
-| `autonomy-engine.ts`            | Runs due schedules and admitted work: daily cap, usage gate, failure auto-pause                  |
-| `agent-proposals.ts`            | Think loop: idle agents suggest tasks                                                            |
-| `finance-store.ts`              | Deals, ledger entries (verified money), spend requests                                           |
-| `square-sync.ts`                | Read-only Square payment sync into the ledger                                                    |
-| `listings.ts`                   | Etsy and itch.io listing packages and the listing-fee budget                                     |
-| `spend-budgets.ts`              | Monthly spending budgets per category                                                            |
-| `etsy.ts`                       | Etsy connection (OAuth PKCE), draft and publish listings, sync orders, fees and favorites        |
-| `studio.ts`, `media-library.ts` | Image studio (free mockup renderer, optional image API with a monthly cap) and the media library |
-| `experiments.ts`                | Opportunity budgets, variants, metrics and the owner's stop rules                                |
-| `playbooks.ts`                  | Editable playbooks (default: Etsy digital products), step advance, `opportunity.propose`         |
-| `profit.ts`                     | Monthly costs and profit per business and opportunity                                            |
-| `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                           |
-| `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner             |
-| `streams.ts`                    | One income stream's page data (`GET /api/streams`)                                               |
-| `content-guard.ts`              | Flags web content that tries to instruct agents; flagged tasks' approvals go to the owner        |
-| `businesses.ts`                 | The business registry (`tech`, `rental`, `ventures`)                                             |
+| File                            | What it does                                                                                                                                        |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `autonomy-store.ts`             | Tables: goals, opportunities, schedules, autonomy work, ledger, config                                                                              |
+| `autonomy-planner.ts`           | VP planning beat: compares goals with results, scores opportunities, proposes work                                                                  |
+| `autonomy-engine.ts`            | Runs due schedules and admitted work: daily cap, usage gate, failure auto-pause                                                                     |
+| `autonomous-provider-budget.ts` | Caps autonomous local-provider invocations, including retries/resumes; blocks autonomous paid/unclassified APIs until an enforceable budget exists. |
+| `agent-proposals.ts`            | Think loop: idle agents suggest tasks                                                                                                               |
+| `finance-store.ts`              | Deals, ledger entries (verified money), spend requests                                                                                              |
+| `square-sync.ts`                | Read-only Square payment sync into the ledger                                                                                                       |
+| `listings.ts`                   | Etsy and itch.io listing packages and the listing-fee budget                                                                                        |
+| `spend-budgets.ts`              | Monthly spending budgets per category                                                                                                               |
+| `etsy.ts`                       | Etsy connection (OAuth PKCE), draft and publish listings, sync orders, fees and favorites                                                           |
+| `studio.ts`, `media-library.ts` | Image studio (free mockup renderer, optional image API with a monthly cap) and the media library                                                    |
+| `experiments.ts`                | Opportunity budgets, variants, metrics and the owner's stop rules                                                                                   |
+| `playbooks.ts`                  | Editable playbooks (default: Etsy digital products), step advance, `opportunity.propose`                                                            |
+| `profit.ts`                     | Monthly costs and profit per business and opportunity                                                                                               |
+| `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                                                                              |
+| `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner                                                                |
+| `streams.ts`                    | One income stream's page data (`GET /api/streams`)                                                                                                  |
+| `content-guard.ts`              | Flags web content that tries to instruct agents; flagged tasks' approvals go to the owner                                                           |
+| `businesses.ts`                 | The business registry (`tech`, `rental`, `ventures`)                                                                                                |
 
 **Approvals and safety**
 
@@ -133,22 +134,24 @@ Rules of thumb:
 
 ### server/modules/workflow/ (how tasks run)
 
-| Path                                                           | What it is                                                                    |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `orchestration/execution-start-task.ts`                        | Starts a task run: worktree, prompt, provider                                 |
-| `orchestration/run-complete-handler.ts`                        | After a run ends: results, lessons, review, retries                           |
-| `orchestration/review-finalize-tools.ts`                       | Review, merge and finishing (keeps failed merges in Review)                   |
-| `orchestration/planned-approval.ts`, `orchestration/meetings/` | Team lead meetings (planned and review consensus)                             |
-| `orchestration/report-*.ts`, `planning-archive-tools.ts`       | Report and deck flows                                                         |
-| `core/project-context-tools.ts`                                | Builds the task prompt (project context, knowledge block, policies)           |
-| `core/meeting-prompt-tools.ts`, `core/reply-core-tools.ts`     | Meeting and 1:1 chat prompts; reply cleanup                                   |
-| `core/one-shot-runner.ts`                                      | Single no-tools model calls (VPs, think loop, meetings)                       |
-| `core/gemini-command.ts`                                       | Resolves Antigravity CLI (`agy`) or legacy Gemini CLI on the worker PATH      |
-| `core/worktree/`                                               | Git worktrees per task: create, merge, clean up                               |
-| `agents/cli-runtime.ts`                                        | Spawns CLI workers (Claude, Codex, Gemini, OpenCode, Kimi)                    |
-| `agents/providers/`                                            | Provider adapters: HTTP and API workers, OAuth, usage readers, stream parsing |
-| `agents/context-rollover-*.ts`                                 | Continuing long tasks in a fresh context                                      |
-| `agents/subtask-*.ts`                                          | Splitting work into subtasks and routing them to departments                  |
+| Path                                                           | What it is                                                                                                                                                                                           |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `orchestration/execution-start-task.ts`                        | Starts a task run: worktree, prompt, provider                                                                                                                                                        |
+| `orchestration/run-complete-handler.ts`                        | After a run ends: results, lessons, review, retries                                                                                                                                                  |
+| `orchestration/review-finalize-tools.ts`                       | Review, merge and finishing (keeps failed merges in Review)                                                                                                                                          |
+| `orchestration/planned-approval.ts`, `orchestration/meetings/` | Team lead meetings (planned and review consensus)                                                                                                                                                    |
+| `orchestration/report-*.ts`, `planning-archive-tools.ts`       | Report and deck flows                                                                                                                                                                                |
+| `core/project-context-tools.ts`                                | Builds the task prompt (project context, knowledge block, policies)                                                                                                                                  |
+| `core/meeting-prompt-tools.ts`, `core/reply-core-tools.ts`     | Meeting and 1:1 chat prompts; reply cleanup                                                                                                                                                          |
+| `core/one-shot-runner.ts`                                      | Single no-tools model calls (VPs, think loop, meetings)                                                                                                                                              |
+| `core/gemini-command.ts`                                       | Resolves Antigravity CLI (`agy`) or legacy Gemini CLI on the worker PATH                                                                                                                             |
+| `core/worktree/`                                               | Git worktrees per task: create, merge, clean up                                                                                                                                                      |
+| `agents/cli-runtime.ts`                                        | Spawns CLI workers (Claude, Codex, Gemini, OpenCode, Kimi)                                                                                                                                           |
+| `agents/providers/`                                            | Provider adapters: HTTP and API workers, OAuth, usage readers, stream parsing                                                                                                                        |
+| `agents/providers/codex-completion-drain.ts`                   | Releases inherited Codex output pipes only after terminal-event and successful process-exit evidence; adjacent lifecycle tests plus `core/one-shot-runner.test.ts` cover shutdown, stop and timeout. |
+| `agents/providers/local-worker-config.ts`                      | Compact native local-worker tools/system and context limits; reads mandatory instructions only inside the target worktree, refusing missing access or oversized rules.                               |
+| `agents/context-rollover-*.ts`                                 | Continuing long tasks in a fresh context                                                                                                                                                             |
+| `agents/subtask-*.ts`                                          | Splitting work into subtasks and routing them to departments                                                                                                                                         |
 
 ## src/ (web app)
 

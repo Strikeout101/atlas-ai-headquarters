@@ -5,6 +5,7 @@ import { getFinancialGoalProgress } from "./finance-store.ts";
 export interface AutonomyConfig {
   id: number;
   daily_start_cap: number;
+  local_provider_daily_run_cap: number;
   usage_threshold: number;
   failure_limit: number;
   planning_interval_minutes: number;
@@ -64,6 +65,11 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_autonomy_work_status ON autonomy_work(status,created_at);
     CREATE INDEX IF NOT EXISTS idx_autonomy_work_task ON autonomy_work(task_id);
     CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(enabled,next_run_at);
+    CREATE TABLE IF NOT EXISTS autonomy_provider_invocations (
+      invocation_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, provider_id TEXT NOT NULL,
+      day TEXT NOT NULL, created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_autonomy_provider_invocations_day ON autonomy_provider_invocations(provider_id,day);
   `);
   if (
     !(db.prepare("PRAGMA table_info(business_goals)").all() as Array<{ name: string }>).some(
@@ -77,6 +83,14 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
   );
   if (!scheduleColumns.has("cron")) db.exec("ALTER TABLE schedules ADD COLUMN cron TEXT");
   if (!scheduleColumns.has("timezone")) db.exec("ALTER TABLE schedules ADD COLUMN timezone TEXT");
+  if (
+    !(db.prepare("PRAGMA table_info(autonomy_config)").all() as Array<{ name: string }>).some(
+      (column) => column.name === "local_provider_daily_run_cap",
+    )
+  )
+    db.exec(
+      "ALTER TABLE autonomy_config ADD COLUMN local_provider_daily_run_cap INTEGER NOT NULL DEFAULT 20 CHECK(local_provider_daily_run_cap BETWEEN 0 AND 1000)",
+    );
 }
 
 export function autonomyConfig(db: DatabaseSync): AutonomyConfig {

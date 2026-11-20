@@ -716,6 +716,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 {(
                   [
                     ["daily_start_cap", "Daily autonomous starts", 0, 100, 1],
+                    ["local_provider_daily_run_cap", "Daily local provider invocations (per host)", 0, 1000, 1],
                     ["usage_threshold", "Subscription usage ceiling (0–1)", 0, 1, 0.01],
                     ["failure_limit", "Pause schedule after failures", 1, 20, 1],
                     ["planning_interval_minutes", "Planning interval (minutes)", 1, 10080, 1],
@@ -729,7 +730,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                       min={min}
                       max={max}
                       step={step}
-                      defaultValue={data.config[key]}
+                      defaultValue={data.config[key] ?? (key === "local_provider_daily_run_cap" ? 20 : undefined)}
                       className={inputClass}
                       style={inputStyle}
                     />
@@ -738,7 +739,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
               </div>
               <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
                 {t({
-                  en: "Limits apply to new autonomous starts. Emergency controls remain available on every page.",
+                  en: "Local invocations include retries, resumes and task meetings; one worker invocation may use several model turns. Autonomous paid API calls remain blocked until an enforceable provider budget is available. Emergency controls remain available on every page.",
                 })}
               </p>
               <button type="submit" className="ax-btn-secondary" disabled={busy}>

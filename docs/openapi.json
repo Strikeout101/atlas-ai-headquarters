@@ -19778,6 +19778,13 @@
                     "minimum": 0,
                     "maximum": 100
                   },
+                  "local_provider_daily_run_cap": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "default": 20,
+                    "description": "Autonomous local worker and meeting invocations per configured host per America/New_York day, including retries and resumes. Paid or unclassified API autonomy remains disabled."
+                  },
                   "usage_threshold": {
                     "type": "number",
                     "minimum": 0,
@@ -19797,6 +19804,7 @@
               },
               "example": {
                 "daily_start_cap": 6,
+                "local_provider_daily_run_cap": 20,
                 "usage_threshold": 0.8,
                 "failure_limit": 3,
                 "planning_interval_minutes": 360

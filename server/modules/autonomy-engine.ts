@@ -10,6 +10,7 @@ import { evaluateOpportunities, opportunityBudgetBlock } from "./experiments.ts"
 import { advancePlaybook, ensurePlaybookSchema } from "./playbooks.ts";
 import { nextCronRun } from "./schedule-time.ts";
 import { evaluateMilestones } from "./goal-milestones.ts";
+import { autonomousProviderBudgetBlockReason } from "./autonomous-provider-budget.ts";
 
 type Row = Record<string, any>;
 const running = new WeakSet<DatabaseSync>();
@@ -216,22 +217,39 @@ export function queueAutonomyWork(db: DatabaseSync, input: QueueAutonomyWork, no
 }
 
 /** Headroom and emergency controls for every task in an autonomous delegation tree. */
-export function autonomyTaskUsageBlockReason(db: DatabaseSync, taskId: string, now = Date.now()): string | null {
+export function autonomyTaskUsageBlockReason(
+  db: DatabaseSync,
+  taskId: string,
+  now = Date.now(),
+  actualExecutionProvider?: string,
+): string | null {
   if (!table(db, "autonomy_config")) return null;
   const task = db.prepare("SELECT origin FROM tasks WHERE id=?").get(taskId) as Row | undefined;
   if (task?.origin !== "autonomy") return null;
   if (!isAutonomyAllowed()) return "Autonomy is paused";
   const route = table(db, "task_model_routes")
-    ? (db.prepare("SELECT provider FROM task_model_routes WHERE task_id=?").get(taskId) as Row | undefined)
+    ? (db
+        .prepare(
+          `SELECT r.provider FROM task_model_routes r JOIN tasks t
+        ON t.id=r.task_id AND t.assigned_agent_id=r.agent_id WHERE r.task_id=?`,
+        )
+        .get(taskId) as Row | undefined)
     : undefined;
   const assigned = db
     .prepare("SELECT a.cli_provider FROM agents a JOIN tasks t ON t.assigned_agent_id=a.id WHERE t.id=?")
     .get(taskId) as Row | undefined;
-  const provider = route?.provider ?? configuredLocalTaskProvider(db, taskId) ?? assigned?.cli_provider;
+  const provider = actualExecutionProvider
+    ? actualExecutionProvider === "opencode" && route?.provider === "api"
+      ? "api"
+      : actualExecutionProvider
+    : (route?.provider ?? configuredLocalTaskProvider(db, taskId) ?? assigned?.cli_provider);
   if (typeof provider !== "string" || !provider) return "Autonomous worker provider is not configured";
   if (!["codex", "claude", "gemini", "kimi", "opencode", "copilot", "antigravity", "api"].includes(provider))
     return "Autonomous worker provider is not supported";
-  return usageHeadroomBlockReason(db, now, [provider]);
+  return (
+    autonomousProviderBudgetBlockReason(db, taskId, now, { provider: actualExecutionProvider }) ||
+    usageHeadroomBlockReason(db, now, [provider])
+  );
 }
 
 /** Reserve every new autonomous task, including delegates, once; continuations reuse their reservation. */

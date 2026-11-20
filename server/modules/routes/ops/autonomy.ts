@@ -387,12 +387,19 @@ export function registerAutonomyRoutes(
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body))
       return res.status(400).json({ error: "invalid_payload" });
-    const fields = ["daily_start_cap", "usage_threshold", "failure_limit", "planning_interval_minutes"];
+    const fields = [
+      "daily_start_cap",
+      "local_provider_daily_run_cap",
+      "usage_threshold",
+      "failure_limit",
+      "planning_interval_minutes",
+    ];
     if (Object.keys(body).some((key) => !fields.includes(key))) return res.status(400).json({ error: "unknown_field" });
     if (!Object.keys(body).length) return res.status(400).json({ error: "no_fields" });
     try {
       const next = { ...autonomyConfig(db), ...body };
       numeric(next.daily_start_cap, "daily_start_cap", 0, 100, true);
+      numeric(next.local_provider_daily_run_cap, "local_provider_daily_run_cap", 0, 1000, true);
       numeric(next.usage_threshold, "usage_threshold", 0, 1);
       numeric(next.failure_limit, "failure_limit", 1, 20, true);
       numeric(next.planning_interval_minutes, "planning_interval_minutes", 1, 10080, true);

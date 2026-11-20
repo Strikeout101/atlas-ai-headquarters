@@ -32,6 +32,8 @@ function harness() {
   ensureAutonomyEngineSchema(db);
   db.exec(`INSERT INTO departments(id,name,name_ko,icon,color) VALUES ('research','Research','Research','','#123');
   INSERT INTO agents(id,name,department_id,role,cli_provider) VALUES ('leader','Research leader','research','team_leader','api'),('worker','Research worker','research','junior','api');
+  INSERT INTO api_providers(id,name,type,base_url) VALUES ('local-budget','Local test host','ollama','http://localhost:11434/v1');
+  UPDATE agents SET api_provider_id='local-budget';
   INSERT INTO projects(id,name,project_path,core_goal) VALUES ('project','Venture research','C:/Projects/ventures','Find evidence-backed opportunities');`);
   const setUsage = (
     provider = "codex",
@@ -319,10 +321,10 @@ describe("subscription headroom", () => {
   it("uses the actual routed provider and rechecks a later subscription upgrade", async () => {
     const h = harness();
     h.db.exec(
-      "UPDATE agents SET cli_provider='codex' WHERE id='leader'; CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY, provider TEXT)",
+      "UPDATE agents SET cli_provider='codex' WHERE id='leader'; CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY, agent_id TEXT, provider TEXT, api_provider_id TEXT)",
     );
     const taskId = h.approve(h.queue());
-    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'api')").run(taskId);
+    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'leader','api','local-budget')").run(taskId);
     h.setUsage("codex", [], NOW, "unauthenticated");
     await runAutonomyEngineTick(h.deps);
     expect(h.startTask).toHaveBeenCalledOnce();
@@ -343,6 +345,11 @@ describe("subscription headroom", () => {
     h.db.prepare("UPDATE tasks SET task_type='documentation' WHERE id=?").run(taskId);
     h.setUsage("codex", [], NOW, "unauthenticated");
     expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toBeNull();
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW, "codex")).toContain("unavailable");
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW, "api")).toBeNull();
+    h.db.exec("UPDATE autonomy_config SET local_provider_daily_run_cap=0");
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW, "api")).toContain("cap reached");
+    h.db.exec("UPDATE autonomy_config SET local_provider_daily_run_cap=20");
     await runAutonomyEngineTick(h.deps);
     expect(h.startTask).toHaveBeenCalledOnce();
     h.db.exec("UPDATE api_providers SET enabled=0 WHERE id='local'");
@@ -353,11 +360,27 @@ describe("subscription headroom", () => {
     h.db.exec("UPDATE agents SET cli_provider=NULL WHERE id='leader'");
     const taskId = h.approve(h.queue());
     expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("not configured");
-    h.db.exec("CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY,provider TEXT)");
-    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'unknown-provider')").run(taskId);
+    h.db.exec(
+      "CREATE TABLE task_model_routes(task_id TEXT PRIMARY KEY,agent_id TEXT,provider TEXT,api_provider_id TEXT)",
+    );
+    h.db.prepare("INSERT INTO task_model_routes VALUES (?,'leader','unknown-provider',NULL)").run(taskId);
     expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("not supported");
     await runAutonomyEngineTick(h.deps);
     expect(h.startTask).not.toHaveBeenCalled();
+  });
+  it("ignores a former assignee's API route when the current Codex worker is unauthenticated", () => {
+    const h = harness();
+    ensureModelRoutingSchema(h.db);
+    const taskId = h.approve(h.queue());
+    h.db
+      .prepare(
+        `INSERT INTO task_model_routes(task_id,agent_id,provider,model,source,reason,updated_at,api_provider_id)
+      VALUES (?,'worker','api','local','default','old assignment',?,'local-budget')`,
+      )
+      .run(taskId, NOW);
+    h.db.exec("UPDATE agents SET cli_provider='codex' WHERE id='leader'");
+    h.setUsage("codex", [], NOW, "unauthenticated");
+    expect(autonomyTaskUsageBlockReason(h.db, taskId, NOW)).toContain("unavailable");
   });
 });
 

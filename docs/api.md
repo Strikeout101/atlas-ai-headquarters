@@ -334,3 +334,9 @@ All owner-only (password session, plus CSRF for changes); agent task tokens are 
 | POST   | `/api/autonomy/milestones/:id/delete` | Remove a milestone                                                                                                                         |
 
 Schedules accept optional `cron` (5 fields: minute hour day month weekday; numbers, `*`, lists, ranges and steps) and `timezone` (IANA, default `America/New_York`). With a rule, `next_run_at` is computed from it and the interval is ignored; a time skipped by daylight saving runs at the next real minute, a doubled time runs once. Approvals listed by `GET /api/approvals` carry `untrusted_content: true` when the task (or the task it came from) read web content that tried to instruct it; those always go to the owner.
+
+## ATLAS autonomous provider limits (2026-11-19)
+
+`PATCH /api/autonomy/config` accepts `local_provider_daily_run_cap` (integer 0–1000, default 20). The same field is returned in the autonomy overview configuration and is editable under Autonomy > Limits. Owner session and CSRF checks apply to changes.
+
+The cap counts autonomous local worker/meeting invocations per configured host per America/New_York calendar day, including retries, resumes and failed starts. One invocation may contain several model turns; this is not a token or dollar estimate. Final transports reserve their invocation atomically. Autonomous paid or unclassified API providers remain blocked until an enforceable budget exists; owner-started calls are unchanged. Unattributed idle-agent API thinking is skipped rather than escaping this gate.
