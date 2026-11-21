@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -115,14 +116,16 @@ function buildSkillLearnLabel(repo: string, skillId: string): string {
   return `${repo}#${skillId}`;
 }
 
+/** Where a global (user-level) install of each agent's skills lives. */
 function resolveAgentSkillDir(agent: string): string | null {
-  if (agent === "claude-code") return path.join(process.cwd(), ".claude", "skills");
-  if (agent === "codex") return path.join(process.cwd(), ".codex", "skills");
-  if (agent === "gemini-cli") return path.join(process.cwd(), ".gemini", "skills");
-  if (agent === "kimi-code") return path.join(process.cwd(), ".kimi", "skills");
-  if (agent === "opencode") return path.join(process.cwd(), ".opencode", "skills");
-  if (agent === "github-copilot") return path.join(process.cwd(), ".copilot", "skills");
-  if (agent === "antigravity") return path.join(process.cwd(), ".antigravity", "skills");
+  const home = os.homedir();
+  if (agent === "claude-code") return path.join(home, ".claude", "skills");
+  if (agent === "codex") return path.join(home, ".codex", "skills");
+  if (agent === "gemini-cli") return path.join(home, ".gemini", "skills");
+  if (agent === "kimi-code") return path.join(home, ".kimi", "skills");
+  if (agent === "opencode") return path.join(home, ".config", "opencode", "skills");
+  if (agent === "github-copilot") return path.join(home, ".copilot", "skills");
+  if (agent === "antigravity") return path.join(home, ".antigravity", "skills");
   return null;
 }
 
@@ -279,7 +282,21 @@ export function createSkillLearnCore(ctx: RuntimeContext) {
     const agents = providers
       .map((provider) => SKILL_LEARN_PROVIDER_TO_AGENT[provider])
       .filter((value, index, arr) => arr.indexOf(value) === index);
-    const args = ["--yes", "skills@latest", "add", repo, "--yes", "--agent", ...agents];
+    // Global (user-level) installs: agents run in project folders and ATLAS runs from a release folder that each
+    // update replaces, so a project-level install would be invisible to them and lost. --copy avoids symlinks
+    // (Windows needs developer mode for those). --skill installs only the chosen skill, not the whole repository.
+    const args = [
+      "--yes",
+      "skills@latest",
+      "add",
+      repo,
+      "-g",
+      "--copy",
+      ...(skillId.trim() ? ["--skill", skillId.trim()] : []),
+      "--yes",
+      "--agent",
+      ...agents,
+    ];
     const job: SkillLearnJob = {
       id,
       repo,
@@ -426,7 +443,7 @@ export function createSkillLearnCore(ctx: RuntimeContext) {
     let removedSkill: string | null = null;
     let sawNoMatching = true;
     for (const candidate of candidates) {
-      const args = ["--yes", "skills@latest", "remove", "--yes", "--agent", agent, "--skill", candidate];
+      const args = ["--yes", "skills@latest", "remove", "-g", "--yes", "--agent", agent, "--skill", candidate];
       try {
         const rawOutput = await execWithTimeout(SKILLS_NPX_CMD, args, SKILL_UNLEARN_TIMEOUT_MS);
         const output = stripAnsiControl(rawOutput || "").trim();

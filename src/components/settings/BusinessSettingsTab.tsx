@@ -1,6 +1,7 @@
 import SquareSettings from "./SquareSettings";
 import EtsySettings from "./EtsySettings";
 import StudioSettings from "./StudioSettings";
+import WebSearchSettings from "./WebSearchSettings";
 import { useEffect, useState } from "react";
 import { BUSINESS_SETTINGS_NAMES, businessApi, type BusinessProfile } from "../../api/business";
 import BusinessMailboxes from "./BusinessMailboxes";
@@ -186,6 +187,7 @@ export default function BusinessSettingsTab() {
       <SquareSettings />
       <EtsySettings />
       <StudioSettings />
+      <WebSearchSettings />
     </div>
   );
 }

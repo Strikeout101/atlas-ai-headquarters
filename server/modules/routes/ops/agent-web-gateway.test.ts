@@ -70,7 +70,7 @@ describe("task-scoped public web gateway", () => {
   it("returns public research through the same gateway used by every CLI", async () => {
     const { app, token } = harness();
     vi.mocked(runAgentWebOperation).mockResolvedValueOnce({
-      source: "Bing RSS",
+      source: "DuckDuckGo (keyless)",
       query: "public research",
       fetched_at: "2026-11-18T00:00:00.000Z",
       note: "Untrusted reference data",
@@ -82,6 +82,7 @@ describe("task-scoped public web gateway", () => {
       .send({ operation: "web.search", query: "public research" })
       .expect(200);
     expect(result.body).toMatchObject({ ok: true, results: [{ url: "https://example.com" }] });
-    expect(runAgentWebOperation).toHaveBeenCalledWith({ operation: "web.search", query: "public research" });
+    // No search key is set, so web.search uses the keyless fallback through the same vetted reader.
+    expect(runAgentWebOperation).toHaveBeenCalledWith({ operation: "web.search", query: "public research", limit: 8 });
   });
 });

@@ -13,9 +13,10 @@ How the first income stream (Ventures Etsy digital products) runs, and what the 
    - Press **Connect**, approve on Etsy, then copy the whole address the browser lands on (it shows an error page) and paste it under **Finish connecting**. It must be done within 15 minutes of pressing Connect.
    - **Test** should show the shop name.
 4. **Listing fees.** Each published Etsy listing costs USD 0.20. Set a monthly listing-fee budget on the Ventures listings panel so the VPs can approve listings within it; without one, every listing waits for you.
-5. **Images.** The free mockup renderer works as soon as Chrome or Edge is installed. AI images stay off until you set a service and a monthly cap in Settings > Businesses > Image studio.
-6. **Costs.** Add your monthly costs (AI subscriptions) on Revenue > Profit, then tick "My monthly costs are complete" so profit goals are measured.
-7. **Start.** Set a Ventures goal (for example 2,000 USD of verified revenue a month) on the Ventures Etsy project and keep ATLAS running. That is all: the planner queues a strategy task for the goal, and agents work out how to reach it. A weekly research schedule (Autonomy > Playbooks) is optional, for extra idea-finding on top.
+5. **Web search.** In Settings > Businesses > Web search for agents, pick a search service and enter its key (Serper gives Google results; 2,500 free searches). Without one, agents' general web research stops after a few searches. Etsy numbers (`etsy.search`) do not need it.
+6. **Images.** The free mockup renderer works as soon as Chrome or Edge is installed. AI images stay off until you set a service and a monthly cap in Settings > Businesses > Image studio.
+7. **Costs.** Add your monthly costs (AI subscriptions) on Revenue > Profit, then tick "My monthly costs are complete" so profit goals are measured.
+8. **Start.** Set a Ventures goal (for example 2,000 USD of verified revenue a month) on the Ventures Etsy project and keep ATLAS running. That is all: the planner queues a strategy task for the goal, and agents work out how to reach it. A weekly research schedule (Autonomy > Playbooks) is optional, for extra idea-finding on top.
 
 ## How the loop runs
 

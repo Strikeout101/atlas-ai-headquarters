@@ -17,6 +17,7 @@ import { ensureAutonomyEngineSchema, runAutonomyEngineTick } from "./autonomy-en
 import { runVpPlanningTick } from "./autonomy-planner.ts";
 import { runSquareSyncTick, SQUARE_SYNC_INTERVAL_MS } from "./square-sync.ts";
 import { ETSY_SYNC_INTERVAL_MS, runEtsyTick } from "./etsy.ts";
+import { installRecommendedSkills } from "./skill-installer.ts";
 import {
   getContextRollover,
   releaseStaleContextRolloverClaims,
@@ -599,6 +600,16 @@ export function startLifecycle(ctx: RuntimeContext): void {
   };
   setTimeout(etsyTick, 90_000);
   setInterval(etsyTick, ETSY_SYNC_INTERVAL_MS);
+  // Recommended skills (skill-installer.ts): installed once for the providers the agents use, in the background.
+  setTimeout(() => {
+    if (db.prepare("SELECT 1 FROM settings WHERE key='__e2eRuntimeId'").get()) return;
+    installRecommendedSkills(db)
+      .then((result) => {
+        if (!result.skipped)
+          console.log(`[skills] recommended skills: ${result.installed} installed, ${result.failed} failed`);
+      })
+      .catch(() => console.error("[skills] Installing recommended skills failed; see Team > Library."));
+  }, 120_000);
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 

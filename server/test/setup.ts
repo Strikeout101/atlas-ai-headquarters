@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 process.env.NODE_ENV = "test";
+// Keyless web searches are spaced out in production; tests call them back to back.
+process.env.AGENT_WEB_SEARCH_SPACING_MS = "0";
+process.env.ETSY_MIN_INTERVAL_MS ??= "0";
 
 // Force isolated SQLite/log paths for server-side Vitest runs.
 const workerSuffix = process.env.VITEST_WORKER_ID || String(process.pid);

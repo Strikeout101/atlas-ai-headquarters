@@ -37,6 +37,8 @@ import { searchMedia } from "../../media-library.ts";
 import { startVariant } from "../../experiments.ts";
 import { etsyShopListings, searchEtsyListings, searchEtsyTaxonomy } from "../../etsy.ts";
 import { saveStrategy, strategyContextForTask } from "../../goal-strategy.ts";
+import { webSearch } from "../../web-search.ts";
+import { installedSkills, listRepoSkills, searchSkills } from "../../skill-installer.ts";
 import { proposeOpportunity } from "../../playbooks.ts";
 import {
   createDeal,
@@ -71,7 +73,10 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
       if (operation === "web.search" || operation === "web.read") {
         try {
           // Outside text is data: hidden characters are stripped and instruction-like text is flagged on the task.
-          const guarded = guardValue(await runAgentWebOperation(body));
+          // web.search goes through the owner's search provider (keyed), falling back to the keyless search.
+          const guarded = guardValue(
+            operation === "web.search" ? await webSearch(db, body) : await runAgentWebOperation(body),
+          );
           if (guarded.flags.length) {
             const source = `${String(operation)}: ${String(body.url ?? body.query ?? "").slice(0, 300)}`;
             recordUntrustedContent(db, claims.taskId, source, guarded.flags);
@@ -386,6 +391,48 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           .prepare("SELECT * FROM org_requests WHERE id=? AND requested_by=?")
           .get(typeof body.request_id === "string" ? body.request_id : "", claims.agentId);
         return request ? res.json({ ok: true, request }) : res.status(404).json({ error: "org_request_not_found" });
+      }
+      if (operation === "skills.search") {
+        // Published skills (skills.sh) and which are already installed. Names come from outside: screened.
+        try {
+          const have = new Set(installedSkills(db));
+          const items = (await searchSkills(body.query)).map((item) => ({
+            ...item,
+            installed: have.has(`${item.repo.toLowerCase()}#${item.skill.toLowerCase()}`),
+          }));
+          return res.json({ ok: true, items: guardValue(items).value });
+        } catch (error) {
+          return res.status(400).json({ error: error instanceof Error ? error.message : "skills_search_failed" });
+        }
+      }
+      if (operation === "skills.request") {
+        // A team leader or VP asks for a skill; both VPs review it with the skill's own description before install.
+        try {
+          const repo = typeof body.repo === "string" ? body.repo.trim() : "";
+          const skill = typeof body.skill === "string" ? body.skill.trim() : "";
+          if (installedSkills(db).includes(`${repo.toLowerCase()}#${skill.toLowerCase()}`))
+            return res.status(409).json({ error: "skill_already_installed" });
+          const offered = await listRepoSkills(repo);
+          const found = offered.find((item) => item.name.toLowerCase() === skill.toLowerCase());
+          if (!found)
+            return res
+              .status(404)
+              .json({ error: "skill_not_found_in_repo", available: offered.map((item) => item.name).slice(0, 60) });
+          const described = guardValue(found.description);
+          if (described.flags.length) {
+            recordUntrustedContent(db, claims.taskId, `skills.request: ${repo}#${skill}`, described.flags);
+            return res.status(400).json({ error: "skill_description_flagged" });
+          }
+          const request = createOrgRequest(db, "install_skill", claims.agentId, {
+            repo,
+            skill: found.name,
+            what_it_does: described.value,
+            reason: body.reason,
+          });
+          return res.status(201).json({ ok: true, request });
+        } catch (error) {
+          return res.status(400).json({ error: error instanceof Error ? error.message : "skills_request_failed" });
+        }
       }
       if (operation === "org.request_hire" || operation === "org.request_department") {
         const kind = operation === "org.request_hire" ? "hire_agent" : body.kind;

@@ -142,33 +142,46 @@ describe("agent public web access", () => {
     });
   });
 
-  it("returns real search source URLs and snippets, skipping duplicate/private links", async () => {
-    const rss =
-      "<rss><channel><item><title>Business &amp; technology</title><link>https://example.com/guide?a=1&amp;b=2</link><description><![CDATA[<b>Useful</b> facts]]></description></item><item><title>Private</title><link>http://127.0.0.1/</link></item></channel></rss>";
-    expect(parseSearchResults(rss, 5)).toEqual([
+  it("returns real search source URLs and snippets, skipping duplicate, private and ad links", async () => {
+    const page = `<table>
+      <tr><td>1.</td><td><a rel="nofollow" href="https://example.com/guide?a=1&amp;b=2" class='result-link'>Business &amp; technology</a></td></tr>
+      <tr><td></td><td class='result-snippet'><b>Useful</b> facts</td></tr>
+      <tr><td>2.</td><td><a rel="nofollow" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fshop.example.org%2Fbest&amp;rut=x" class='result-link'>Best sellers</a></td></tr>
+      <tr><td></td><td class='result-snippet'>Top picks</td></tr>
+      <tr><td>3.</td><td><a href="https://duckduckgo.com/y.js?ad=1" class='result-link'>Sponsored</a></td></tr>
+      <tr><td>4.</td><td><a href="http://127.0.0.1/" class='result-link'>Private</a></td></tr>
+      <tr><td>5.</td><td><a href="https://example.com/guide?a=1&amp;b=2" class='result-link'>Duplicate</a></td></tr>
+    </table>`;
+    expect(parseSearchResults(page, 5)).toEqual([
       { title: "Business & technology", url: "https://example.com/guide?a=1&b=2", snippet: "Useful facts" },
+      { title: "Best sellers", url: "https://shop.example.org/best", snippet: "Top picks" },
     ]);
-    const io = ioFor(rss, "application/rss+xml");
+    const io = ioFor(page);
     const result = await runAgentWebOperation(
       { operation: "web.search", query: "local business research", limit: 1 },
       io,
     );
     expect(result).toMatchObject({
-      source: "Bing RSS",
+      source: "DuckDuckGo (keyless)",
       query: "local business research",
       results: [{ title: "Business & technology" }],
     });
     expect(io.get).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: "www.bing.com", search: "?q=local+business+research&format=rss" }),
+      expect.objectContaining({ hostname: "lite.duckduckgo.com", search: "?q=local+business+research&kl=us-en" }),
       expect.anything(),
       expect.anything(),
     );
   });
 
-  it("reports search provider challenges instead of inventing results", async () => {
+  it("reports a refusal page as rate limited instead of inventing results, and an honest empty page as empty", async () => {
     await expect(
-      runAgentWebOperation({ operation: "web.search", query: "research" }, ioFor("<html>Challenge</html>")),
-    ).rejects.toThrow("web_search_unavailable");
+      runAgentWebOperation({ operation: "web.search", query: "refused research" }, ioFor("<html>Challenge</html>")),
+    ).rejects.toThrow("web_search_rate_limited");
+    const empty = await runAgentWebOperation(
+      { operation: "web.search", query: "nothing at all" },
+      ioFor("<html>No results.</html>"),
+    );
+    expect(empty).toMatchObject({ results: [] });
   });
 
   it.each([

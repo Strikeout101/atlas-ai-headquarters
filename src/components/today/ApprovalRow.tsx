@@ -64,7 +64,9 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
               : item.kind === "spend_request"
                 ? t({ en: "Spending request" })
                 : item.kind === "org_request"
-                  ? t({ en: "Organization request" })
+                  ? item.org_kind === "install_skill"
+                    ? t({ en: "Skill to install" })
+                    : t({ en: "Organization request" })
                   : t({ en: "Model upgrade" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)

@@ -16,6 +16,8 @@ type Row = Record<string, any>;
 const running = new WeakSet<DatabaseSync>();
 export const AUTONOMY_TIMEZONE = "America/New_York";
 export const USAGE_MAX_AGE_MS = 10 * 60_000;
+/** Waiting tasks in one department before its leader is told to consider a hire. */
+export const WORKLOAD_HINT_AT = 3;
 
 export function ensureAutonomyEngineSchema(db: DatabaseSync): void {
   ensureAutonomySchema(db);
@@ -155,6 +157,21 @@ export function queueAutonomyWork(db: DatabaseSync, input: QueueAutonomyWork, no
   }
   const id = randomUUID(),
     proposalId = randomUUID();
+  // Leaders are told when their department's queue backs up, so they can ask for a hire (org.request_hire).
+  const waiting = Number(
+    (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM autonomy_work w JOIN agent_task_proposals p ON p.id=w.proposal_id
+           WHERE p.department_id=? AND w.status IN ('pending','planned')`,
+        )
+        .get(input.department_id) as Row
+    ).n,
+  );
+  const workload =
+    waiting >= WORKLOAD_HINT_AT
+      ? `Workload: ${waiting} other tasks are already waiting for this department. If work keeps queuing, ask for a hire for your department with org.request_hire (name, role, reason with these numbers); both VPs review it.`
+      : "";
   const description = [
     input.description,
     `Business: ${input.business}. Preparation and implementation must use the existing business approval gateway for external actions.`,
@@ -162,7 +179,10 @@ export function queueAutonomyWork(db: DatabaseSync, input: QueueAutonomyWork, no
       ? "Scope: research, contacts, demos and drafts. Customer-facing delivery requires the owner through the approval gateway."
       : "Scope: ventures research and implementation. External delivery requires its separate approval gateway.",
     "Budget figures are estimates only; they do not authorize purchases.",
-  ].join("\n\n");
+    workload,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   db.exec("SAVEPOINT autonomy_queue");
   try {
     db.prepare(

@@ -228,26 +228,41 @@ export function extractWebPage(body: string, base: string, maxChars: number, tex
   return { title, text: text.slice(0, maxChars), truncated: text.length > maxChars, links };
 }
 
+/**
+ * DuckDuckGo's lite results page: each result is an `a.result-link` (a direct link, or a //duckduckgo.com/l/?uddg=
+ * redirect) followed by its `td.result-snippet`. Private and duplicate links are dropped.
+ */
 export function parseSearchResults(body: string, limit: number) {
   const results: Array<{ title: string; url: string; snippet: string }> = [];
-  for (const match of body.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+  const links = [...body.matchAll(/<a\b([^>]*class=['"]result-link['"][^>]*)>([\s\S]*?)<\/a>/gi)];
+  for (const [index, match] of links.entries()) {
     if (results.length >= limit) break;
-    const field = (name: string) =>
-      match[1].match(new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, "i"))?.[1] ?? "";
+    const href = decode(match[1].match(/href=['"]([^'"]+)['"]/i)?.[1] ?? "");
+    const next = links[index + 1]?.index ?? body.length;
+    const snippet =
+      body.slice(match.index ?? 0, next).match(/class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/i)?.[1] ?? "";
     try {
-      const url = publicWebUrl(decode(field("link").trim())).href;
+      const absolute = new URL(href, "https://duckduckgo.com");
+      const target =
+        absolute.hostname.endsWith("duckduckgo.com") && absolute.searchParams.get("uddg")
+          ? absolute.searchParams.get("uddg")!
+          : absolute.href;
+      if (/^https?:\/\/([^/]+\.)?duckduckgo\.com\/y\.js/i.test(target)) continue; // ads
+      const url = publicWebUrl(target).href;
       if (!results.some((item) => item.url === url))
-        results.push({
-          title: plain(field("title")).slice(0, 300),
-          url,
-          snippet: plain(field("description")).slice(0, 800),
-        });
+        results.push({ title: plain(match[2]).slice(0, 300), url, snippet: plain(snippet).slice(0, 800) });
     } catch {
       /* Discard invalid/private result URLs. */
     }
   }
   return results;
 }
+
+/** Keyless searches are spaced out and cached: DuckDuckGo refuses bursts from one address. */
+const SEARCH_SPACING_MS = 4_000;
+const SEARCH_CACHE_MS = 15 * 60_000;
+let nextSearchAt = 0;
+const searchCache = new Map<string, { at: number; value: Record<string, unknown> }>();
 
 let inFlight = 0;
 export async function runAgentWebOperation(body: Record<string, unknown>, io = transport) {
@@ -261,18 +276,32 @@ export async function runAgentWebOperation(body: Record<string, unknown>, io = t
       if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 10)
         throw new AgentWebError("web_invalid_limit");
       const query = body.query.trim();
-      const url = new URL("https://www.bing.com/search");
+      const cacheKey = `${query.toLowerCase()}|${limit}`;
+      const cached = searchCache.get(cacheKey);
+      if (cached && Date.now() - cached.at < SEARCH_CACHE_MS) return cached.value;
+      const configured = Number(process.env.AGENT_WEB_SEARCH_SPACING_MS);
+      const spacing = Number.isFinite(configured) && configured >= 0 ? configured : SEARCH_SPACING_MS;
+      const wait = nextSearchAt - Date.now();
+      nextSearchAt = Math.max(Date.now(), nextSearchAt) + spacing;
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(wait, 3 * spacing)));
+      const url = new URL("https://lite.duckduckgo.com/lite/");
       url.searchParams.set("q", query);
-      url.searchParams.set("format", "rss");
+      url.searchParams.set("kl", "us-en");
       const response = await fetchPublicWeb(url.href, io);
-      if (!/<rss\b/i.test(response.body)) throw new AgentWebError("web_search_unavailable", 502);
-      return {
-        source: "Bing RSS",
+      const results = parseSearchResults(response.body, limit);
+      // A refusal comes back as a 2xx page with no results; an honest "no results" page says so.
+      if (!results.length && !/no\s+(more\s+)?results/i.test(response.body))
+        throw new AgentWebError("web_search_rate_limited", 429);
+      const value = {
+        source: "DuckDuckGo (keyless)",
         query,
         fetched_at: new Date().toISOString(),
         note: UNTRUSTED,
-        results: parseSearchResults(response.body, limit),
+        results,
       };
+      searchCache.set(cacheKey, { at: Date.now(), value });
+      if (searchCache.size > 200) searchCache.delete(searchCache.keys().next().value!);
+      return value;
     }
     if (body.operation !== "web.read") throw new AgentWebError("web_unknown_operation");
     const maxChars = body.max_chars === undefined ? 12000 : body.max_chars;

@@ -16,10 +16,10 @@ This file is also what agents get from `knowledge.get {"topic":"tools"}`.
 
 ## Public web research
 
-| Operation    | Fields                                                 | Result                                                                                                     |
-| ------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `web.search` | `query` (1–300 characters), `limit?` (1–10, default 5) | Bing RSS search results with source URLs, titles, snippets and fetch time. No account or API key required. |
-| `web.read`   | `url`, `max_chars?` (500–20,000, default 12,000)       | Page title, readable text, up to 30 links, fetch time and truncation flag.                                 |
+| Operation    | Fields                                                 | Result                                                                                                                                                                                                                                                           |
+| ------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web.search` | `query` (1–300 characters), `limit?` (1–10, default 8) | Web results (titles, URLs, snippets) through the owner's search service: Google via Serper, Brave Search or Tavily, with related questions from Google. Without a key, a keyless DuckDuckGo search that refuses after a few queries (`web_search_rate_limited`). |
+| `web.read`   | `url`, `max_chars?` (500–20,000, default 12,000)       | Page title, readable text, up to 30 links, fetch time and truncation flag.                                                                                                                                                                                       |
 
 Use the shared task tools instead of relying on a particular CLI's own browser:
 
@@ -84,12 +84,14 @@ Never split or disguise a change to make it look read-only.
 
 ## Models and organization
 
-| Operation                | Fields                                                                                                                  | Notes                                                                                              |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `model.request_upgrade`  | `reason`, `model?`, `reasoning_level?`, `provider?` (`codex`/`claude` for API or local workers)                         | VP-reviewed. Stop and wait for the decision before resuming on the new route.                      |
-| `org.request_hire`       | `payload {name, department_id, role?, cli_provider?, reason}`                                                           | Team leaders, own department only. The reason must explain the workload.                           |
-| `org.request_department` | `kind` (`create_department`, `convert_department`, `dissolve_department`), `payload {department_id, name, reason, ...}` | VPs only. Dissolving needs `agents_action` `reassign` (with `reassign_department_id`) or `remove`. |
-| `org.request_status`     | `request_id`                                                                                                            | Requests you raised.                                                                               |
+| Operation                | Fields                                                                                                                  | Notes                                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model.request_upgrade`  | `reason`, `model?`, `reasoning_level?`, `provider?` (`codex`/`claude` for API or local workers)                         | VP-reviewed. Stop and wait for the decision before resuming on the new route.                                                                                                                              |
+| `org.request_hire`       | `payload {name, department_id, role?, cli_provider?, reason}`                                                           | Team leaders, own department only. The reason must explain the workload (your task says when work is queuing). Without `cli_provider`, the hire uses the department leader's provider. Both VPs review it. |
+| `skills.search`          | `query`                                                                                                                 | Published skills (skills.sh) matching the query, most installed first, and whether each is installed.                                                                                                      |
+| `skills.request`         | `repo` (owner/name), `skill`, `reason`                                                                                  | Team leaders and VPs. ATLAS checks the skill exists and attaches its own description; both VPs review; approval installs it for every provider the agents use.                                             |
+| `org.request_department` | `kind` (`create_department`, `convert_department`, `dissolve_department`), `payload {department_id, name, reason, ...}` | VPs only. Dissolving needs `agents_action` `reassign` (with `reassign_department_id`) or `remove`.                                                                                                         |
+| `org.request_status`     | `request_id`                                                                                                            | Requests you raised.                                                                                                                                                                                       |
 
 ## Money
 

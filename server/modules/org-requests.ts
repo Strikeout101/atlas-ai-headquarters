@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
 import { DEFAULT_DEPARTMENT_IDS } from "./approval-policy.ts";
+import { installSkill, SKILL_NAME_RE } from "./skill-installer.ts";
+import { SKILL_LEARN_REPO_RE } from "./routes/ops/skills/learn-constants.ts";
 export const MAX_AGENTS = 40;
 export const MAX_DEPARTMENT_AGENTS = 8;
 export const ORG_REQUEST_KINDS = [
@@ -9,6 +11,7 @@ export const ORG_REQUEST_KINDS = [
   "create_department",
   "convert_department",
   "dissolve_department",
+  "install_skill",
 ] as const;
 export type OrgRequestKind = (typeof ORG_REQUEST_KINDS)[number];
 export interface OrgRequest {
@@ -21,18 +24,44 @@ export interface OrgRequest {
   created_at: number;
   decided_by: string | null;
 }
-export function ensureOrgRequestSchema(db: DatabaseSync): void {
-  db.exec(`CREATE TABLE IF NOT EXISTS org_requests (
-    id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('hire_agent','create_department','convert_department','dissolve_department')),
+const ORG_REQUESTS_TABLE = `CREATE TABLE IF NOT EXISTS org_requests (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('hire_agent','create_department','convert_department','dissolve_department','install_skill')),
     requested_by TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied')),
     reason TEXT NOT NULL, created_at INTEGER NOT NULL, decided_by TEXT, decided_at INTEGER
-  )`);
+  )`;
+export function ensureOrgRequestSchema(db: DatabaseSync): void {
+  db.exec(ORG_REQUESTS_TABLE);
+  // Older databases allow fewer kinds in the CHECK; rebuild the table once to add install_skill, keeping every row.
+  const sql = String(
+    (db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='org_requests'").get() as { sql?: string })
+      ?.sql ?? "",
+  );
+  if (!sql.includes("install_skill")) {
+    db.exec("SAVEPOINT org_requests_kinds");
+    try {
+      db.exec("ALTER TABLE org_requests RENAME TO org_requests_old");
+      db.exec(ORG_REQUESTS_TABLE);
+      db.exec(
+        "INSERT INTO org_requests (id,kind,requested_by,payload,status,reason,created_at,decided_by,decided_at) SELECT id,kind,requested_by,payload,status,reason,created_at,decided_by,decided_at FROM org_requests_old",
+      );
+      db.exec("DROP TABLE org_requests_old");
+      db.exec("RELEASE org_requests_kinds");
+    } catch (error) {
+      db.exec("ROLLBACK TO org_requests_kinds; RELEASE org_requests_kinds");
+      throw error;
+    }
+  }
 }
 function text(value: unknown, max = 4000): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 function validatePayload(kind: OrgRequestKind, payload: Record<string, unknown>): void {
   if (!text(payload.reason)) throw new Error("org_workload_reason_required");
+  if (kind === "install_skill") {
+    if (!SKILL_LEARN_REPO_RE.test(text(payload.repo, 200))) throw new Error("invalid_skill_repo");
+    if (!SKILL_NAME_RE.test(text(payload.skill, 80))) throw new Error("invalid_skill_name");
+    return;
+  }
   if (kind === "hire_agent") {
     if (!text(payload.name, 100) || !text(payload.department_id, 128))
       throw new Error("org_name_and_department_required");
@@ -61,10 +90,11 @@ export function createOrgRequest(
   const requester = db.prepare("SELECT role,department_id FROM agents WHERE id=?").get(requestedBy) as
     | { role: string; department_id: string | null }
     | undefined;
-  if (!requester || (kind === "hire_agent" ? !["team_leader", "vp"].includes(requester.role) : requester.role !== "vp"))
+  const leadersMayAsk = kind === "hire_agent" || kind === "install_skill";
+  if (!requester || (leadersMayAsk ? !["team_leader", "vp"].includes(requester.role) : requester.role !== "vp"))
     throw new Error("org_request_role_forbidden");
   validatePayload(kind, payload);
-  if (requester.role === "team_leader" && payload.department_id !== requester.department_id)
+  if (kind === "hire_agent" && requester.role === "team_leader" && payload.department_id !== requester.department_id)
     throw new Error("org_hire_own_department_only");
   if (JSON.stringify(payload).length > 16000) throw new Error("org_payload_too_large");
   const id = randomUUID();
@@ -99,8 +129,19 @@ function deleteWorker(db: DatabaseSync, id: string): void {
   }
   db.prepare("DELETE FROM agents WHERE id=? AND role!='vp'").run(id);
 }
+export interface OrgDecisionDeps {
+  /** Installs an approved skill (default: the skills CLI, in the background). */
+  installSkill?: (payload: { repo: string; skill: string }) => Promise<unknown>;
+}
+
 /** Atomic decision and mutation; a failure leaves the request pending for owner review. */
-export function decideOrgRequest(db: DatabaseSync, id: string, approve: boolean, decidedBy = "owner"): OrgRequest {
+export function decideOrgRequest(
+  db: DatabaseSync,
+  id: string,
+  approve: boolean,
+  decidedBy = "owner",
+  deps: OrgDecisionDeps = {},
+): OrgRequest {
   ensureOrgRequestSchema(db);
   db.exec("SAVEPOINT org_decision");
   try {
@@ -110,7 +151,9 @@ export function decideOrgRequest(db: DatabaseSync, id: string, approve: boolean,
     const payload = JSON.parse(request.payload) as Record<string, unknown>;
     validatePayload(request.kind, payload);
     const departmentId = text(payload.department_id);
-    if (approve) {
+    if (approve && request.kind === "install_skill") {
+      // Recorded now; the install itself runs after the decision is saved (below).
+    } else if (approve) {
       if (
         request.kind === "dissolve_department" &&
         DEFAULT_DEPARTMENT_IDS.includes(departmentId as (typeof DEFAULT_DEPARTMENT_IDS)[number]) &&
@@ -129,6 +172,21 @@ export function decideOrgRequest(db: DatabaseSync, id: string, approve: boolean,
           ).count,
         );
         if (total >= MAX_AGENTS || count >= MAX_DEPARTMENT_AGENTS) throw new Error("org_agent_cap_reached");
+        // A hire with no provider named works like its department's leader; "api" without an API provider cannot run.
+        const leaderProvider = (
+          db
+            .prepare(
+              "SELECT cli_provider FROM agents WHERE department_id=? AND role='team_leader' ORDER BY created_at,id LIMIT 1",
+            )
+            .get(departmentId) as { cli_provider?: string } | undefined
+        )?.cli_provider;
+        const provider =
+          text(payload.cli_provider) ||
+          (text(payload.api_provider_id)
+            ? "api"
+            : leaderProvider && leaderProvider !== "api"
+              ? leaderProvider
+              : "codex");
         db.prepare(
           "INSERT INTO agents (id,name,department_id,role,cli_provider,avatar_emoji,personality,api_provider_id,api_model) VALUES (?,?,?,?,?,?,?,?,?)",
         ).run(
@@ -136,7 +194,7 @@ export function decideOrgRequest(db: DatabaseSync, id: string, approve: boolean,
           text(payload.name, 100),
           departmentId,
           text(payload.role) || "junior",
-          text(payload.cli_provider) || "api",
+          provider,
           "",
           text(payload.personality) || null,
           text(payload.api_provider_id) || null,
@@ -216,6 +274,13 @@ export function decideOrgRequest(db: DatabaseSync, id: string, approve: boolean,
       id,
     );
     db.exec("RELEASE org_decision");
+    if (approve && request.kind === "install_skill") {
+      const target = { repo: text(payload.repo, 200), skill: text(payload.skill, 80) };
+      const install = deps.installSkill ?? ((value: typeof target) => installSkill(db, value));
+      void install(target).catch((error) =>
+        console.warn(`[skills] approved install failed: ${error instanceof Error ? error.message : String(error)}`),
+      );
+    }
     return db.prepare("SELECT * FROM org_requests WHERE id=?").get(id) as unknown as OrgRequest;
   } catch (error) {
     db.exec("ROLLBACK TO org_decision; RELEASE org_decision");
