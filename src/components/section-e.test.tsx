@@ -143,6 +143,14 @@ describe("Etsy card", () => {
     await user.selectOptions(select, "o1");
     await user.click(within(list).getByRole("button", { name: "Bring into ATLAS" }));
     expect(etsyApi.adopt).toHaveBeenCalledWith("7000", "o1");
+    vi.mocked(etsyApi.sync).mockResolvedValue({
+      ok: true,
+      counts: { receipts: 4, fees: 9, refunds: 0, listings: 0, shop_listings: 2, changed_on_etsy: 0, windows: 26 },
+      settings: { ...etsy, connected: true },
+    });
+    await user.click(screen.getByRole("button", { name: "Re-read history" }));
+    expect(etsyApi.sync).toHaveBeenCalledWith(365);
+    expect(await screen.findByText(/Read 365 days of history: 4 orders, 9 fees/)).toBeVisible();
   });
 
   it("saves the app details without echoing the secret, and finishes connecting from the pasted address", async () => {

@@ -57,6 +57,7 @@ import { advancePlaybook, getPlaybook, proposeOpportunity, savePlaybook, startPl
 let projectDir: string;
 beforeAll(() => {
   process.env.OAUTH_ENCRYPTION_SECRET ||= "test-secret-for-etsy-money-loop-0123456789";
+  process.env.ETSY_MIN_INTERVAL_MS = "0";
   projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-etsy-"));
   fs.mkdirSync(path.join(projectDir, "products"), { recursive: true });
   fs.writeFileSync(path.join(projectDir, "products", "planner.pdf"), "%PDF-1.4 fake");
@@ -349,7 +350,15 @@ describe("Etsy connection", () => {
       "GET /v3/application/shops/777/listings": () => ({ body: { results: [{ listing_id: 9001, num_favorers: 7 }] } }),
     });
     const counts = await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
-    expect(counts).toEqual({ receipts: 1, fees: 2, refunds: 1, listings: 1, shop_listings: 1, changed_on_etsy: 0 });
+    expect(counts).toEqual({
+      receipts: 1,
+      fees: 2,
+      refunds: 1,
+      listings: 1,
+      shop_listings: 1,
+      changed_on_etsy: 0,
+      windows: 6,
+    });
     await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 1000 });
     const rows = db
       .prepare(
@@ -659,6 +668,196 @@ describe("Etsy listings after launch", () => {
     expect(String(db.prepare("SELECT last_sync_error FROM etsy_connection").get()!.last_sync_error)).toContain(
       "120 left",
     );
+  });
+});
+
+describe("Etsy sync date windows", () => {
+  const NOW_S = Math.floor(NOW / 1000);
+  const LIMIT_S = 2_678_400; // Etsy: min_created..max_created at most 31 days
+
+  /** Fake Etsy for receipts, ledger entries and listings. `ledger` and `receipts` answer one page for a window. */
+  function windowEtsy(opts: {
+    ledger?: (min: number, max: number, offset: number) => unknown[] | { status: number };
+    receipts?: (min: number, max: number, offset: number) => unknown[];
+  }) {
+    return fakeEtsy({
+      "GET /v3/application/shops/777/receipts": (_init, url) => {
+        const q = url.searchParams;
+        return {
+          body: {
+            results:
+              opts.receipts?.(
+                Number(q.get("min_last_modified")),
+                Number(q.get("max_last_modified")),
+                Number(q.get("offset")),
+              ) ?? [],
+          },
+        };
+      },
+      "GET /v3/application/shops/777/payment-account/ledger-entries": (_init, url) => {
+        const q = url.searchParams;
+        const result = opts.ledger?.(
+          Number(q.get("min_created")),
+          Number(q.get("max_created")),
+          Number(q.get("offset")),
+        );
+        if (result && !Array.isArray(result)) return { status: result.status, body: { error: "boom" } };
+        return { body: { results: result ?? [] } };
+      },
+      "GET /v3/application/shops/777/listings": () => ({ body: { results: [] } }),
+    });
+  }
+  const windows = (calls: Array<{ url: URL }>, path: string, min: string, max: string) =>
+    calls
+      .filter((call) => call.url.pathname.endsWith(path) && call.url.searchParams.get("offset") === "0")
+      .map((call) => [Number(call.url.searchParams.get(min)), Number(call.url.searchParams.get(max))]);
+  const fee = (id: number, at: number) => ({
+    entry_id: id,
+    amount: -20,
+    currency: "USD",
+    description: "listing fee",
+    ledger_type: "listing",
+    created_timestamp: at,
+  });
+
+  it("reads the first 90 days in consecutive windows Etsy accepts, for ledger entries and receipts", async () => {
+    const db = harness();
+    connected(db);
+    const { fetchFn, calls } = windowEtsy({});
+    const counts = await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
+    for (const [path, min, max] of [
+      ["/ledger-entries", "min_created", "max_created"],
+      ["/receipts", "min_last_modified", "max_last_modified"],
+    ] as const) {
+      const spans = windows(calls, path, min, max);
+      expect(spans).toHaveLength(3);
+      expect(spans[0][0]).toBe(NOW_S - 90 * 86_400);
+      expect(spans.at(-1)![1]).toBe(NOW_S);
+      for (const [index, [from, to]] of spans.entries()) {
+        expect(to - from).toBeGreaterThan(0);
+        expect(to - from).toBeLessThanOrEqual(LIMIT_S);
+        if (index > 0) expect(from).toBe(spans[index - 1][1]);
+      }
+    }
+    expect(counts.windows).toBe(6);
+    expect(db.prepare("SELECT receipts_after, ledger_after FROM etsy_connection").get()).toEqual({
+      receipts_after: NOW_S,
+      ledger_after: NOW_S,
+    });
+  });
+
+  it("pages through each window, splits a window too full to page, and writes each Etsy record once", async () => {
+    const db = harness();
+    connected(db);
+    const busyFrom = NOW_S - 20 * 86_400;
+    const { fetchFn, calls } = windowEtsy({
+      ledger: (min, max, offset) => {
+        // A crowded month: more than 2,000 entries when asked for more than 10 days at once.
+        if (max > busyFrom && max - min > 10 * 86_400)
+          return Array.from({ length: 100 }, (_, i) => fee(50_000 + i, min));
+        // Otherwise 150 entries per window (two pages); ids repeat across windows, as at window edges.
+        if (offset === 0) return Array.from({ length: 100 }, (_, i) => fee(1 + i, min));
+        if (offset === 100) return Array.from({ length: 50 }, (_, i) => fee(101 + i, min));
+        return [];
+      },
+    });
+    const counts = await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
+    const ledgerCalls = calls.filter((call) => call.url.pathname.endsWith("/ledger-entries"));
+    for (const call of ledgerCalls) {
+      const q = call.url.searchParams;
+      expect(Number(q.get("max_created")) - Number(q.get("min_created"))).toBeLessThanOrEqual(LIMIT_S);
+      expect(q.get("limit")).toBe("100");
+    }
+    // The windows that were finally read cover the whole range with no gap.
+    const read = windows(calls, "/ledger-entries", "min_created", "max_created").filter(
+      ([min, max]) => !(max > busyFrom && max - min > 10 * 86_400),
+    );
+    expect(read[0][0]).toBe(NOW_S - 90 * 86_400);
+    expect(read.at(-1)![1]).toBe(NOW_S);
+    for (let i = 1; i < read.length; i++) expect(read[i][0]).toBe(read[i - 1][1]);
+    expect(counts.fees).toBe(150);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM ledger_entries WHERE source='etsy_fee'").get()).toEqual({ n: 150 });
+  });
+
+  it("starts the next sync from the checkpoint with a one-hour overlap, and repeats without duplicating revenue", async () => {
+    const db = harness();
+    connected(db);
+    const receipt = {
+      receipt_id: 555,
+      status: "paid",
+      is_paid: true,
+      subtotal: { amount: 450, divisor: 100, currency_code: "USD" },
+      created_timestamp: NOW_S - 600,
+      transactions: [],
+    };
+    const first = windowEtsy({ receipts: () => [receipt], ledger: () => [fee(9, NOW_S - 600)] });
+    await syncEtsy(db, { fetch: first.fetchFn, now: () => NOW });
+    const LATER = NOW + 30 * 60_000;
+    const second = windowEtsy({ receipts: () => [receipt], ledger: () => [fee(9, NOW_S - 600)] });
+    await syncEtsy(db, { fetch: second.fetchFn, now: () => LATER });
+    expect(windows(second.calls, "/ledger-entries", "min_created", "max_created")).toEqual([
+      [NOW_S - 3600, Math.floor(LATER / 1000)],
+    ]);
+    expect(windows(second.calls, "/receipts", "min_last_modified", "max_last_modified")).toEqual([
+      [NOW_S - 3600, Math.floor(LATER / 1000)],
+    ]);
+    expect(
+      db.prepare("SELECT source, COUNT(*) AS n, SUM(amount_minor) AS total FROM ledger_entries GROUP BY source").all(),
+    ).toEqual([
+      { source: "etsy_fee", n: 1, total: 20 },
+      { source: "etsy_receipt", n: 1, total: 450 },
+    ]);
+  });
+
+  it("keeps the checkpoint at the last completed window when a later window fails, and resumes there", async () => {
+    const db = harness();
+    connected(db);
+    const firstWindowEnd = NOW_S - 90 * 86_400 + 30 * 86_400;
+    const failing = windowEtsy({ ledger: (min) => (min >= firstWindowEnd ? { status: 500 } : []) });
+    await expect(syncEtsy(db, { fetch: failing.fetchFn, now: () => NOW })).rejects.toThrow("etsy_api_500");
+    expect(db.prepare("SELECT ledger_after, last_sync_error FROM etsy_connection").get()).toMatchObject({
+      ledger_after: firstWindowEnd,
+      last_sync_error: expect.stringContaining("etsy_api_500"),
+    });
+    const retry = windowEtsy({});
+    await syncEtsy(db, { fetch: retry.fetchFn, now: () => NOW });
+    const spans = windows(retry.calls, "/ledger-entries", "min_created", "max_created");
+    expect(spans[0][0]).toBe(firstWindowEnd - 3600);
+    expect(spans.at(-1)![1]).toBe(NOW_S);
+  });
+
+  it("re-reads a requested history in windows without moving the checkpoint back", async () => {
+    const db = harness();
+    connected(db);
+    await syncEtsy(db, { fetch: windowEtsy({}).fetchFn, now: () => NOW });
+    const { fetchFn, calls } = windowEtsy({});
+    await expect(syncEtsy(db, { fetch: fetchFn, now: () => NOW }, { historyDays: 0 })).rejects.toThrow(
+      "invalid_history_days",
+    );
+    await syncEtsy(db, { fetch: fetchFn, now: () => NOW }, { historyDays: 400 });
+    const spans = windows(calls, "/ledger-entries", "min_created", "max_created");
+    expect(spans).toHaveLength(14);
+    expect(spans[0][0]).toBe(NOW_S - 400 * 86_400);
+    expect(spans.every(([from, to]) => to - from <= LIMIT_S)).toBe(true);
+    expect(db.prepare("SELECT ledger_after FROM etsy_connection").get()).toEqual({ ledger_after: NOW_S });
+  });
+
+  it("spaces requests to stay under 10 per second", async () => {
+    const db = harness();
+    connected(db);
+    const previous = process.env.ETSY_MIN_INTERVAL_MS;
+    process.env.ETSY_MIN_INTERVAL_MS = "125";
+    const waits: number[] = [];
+    try {
+      const { fetchFn } = fakeEtsy({ "GET /v3/application/users/me": () => ({ body: { user_id: 42 } }) });
+      const deps = { fetch: fetchFn, now: () => NOW, sleep: async (ms: number) => void waits.push(ms) };
+      await Promise.all([1, 2, 3].map(() => etsyRequest(db, "GET", "/users/me", {}, deps)));
+    } finally {
+      process.env.ETSY_MIN_INTERVAL_MS = previous;
+    }
+    expect(waits).toHaveLength(2);
+    expect(waits[0]).toBeGreaterThan(100);
+    expect(waits[1]).toBeGreaterThan(waits[0]);
   });
 });
 

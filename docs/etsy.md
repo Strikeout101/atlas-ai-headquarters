@@ -42,15 +42,25 @@ Every step is ordinary autonomy work, so the daily start cap, usage limits, VP a
 - **Stopped opportunities.** Their live Etsy listings are set inactive on the next sync, and a line is written to the autonomy ledger. Restarting the opportunity does not reactivate the listing; do that on Etsy. Nothing new is pushed for a stopped opportunity.
 - **The whole shop.** Every sync reads every listing in the shop (active, inactive, draft, expired, sold out), including ones ATLAS did not create. Settings > Businesses > Etsy > **Show shop listings** lists them. **Bring into ATLAS** turns one into a published package (optionally tied to an opportunity), so its sales count there and agents can propose revisions of it. A listing you brought in is never taken down automatically. Agents can read the shop with `etsy.listings`.
 - **Changes made on Etsy.** If you edit a listing's title, description, tags or price on Etsy, ATLAS's copy follows it (unless an approved revision is still waiting). An approved draft you publish on Etsy becomes published in ATLAS. A listing deleted on Etsy is marked removed.
-- **Daily allowance.** Etsy reports its daily request allowance on every call. The Etsy card shows what is left; background sync pauses when less than 2% (at least 50 requests) remains and resumes as it refills. Your own button presses still go through.
+- **Request limits.** The app allows 10 requests a second and 10,000 a day (confirmed 2026-11-21). ATLAS spaces its calls at least 125 ms apart (8 a second) and waits when Etsy answers 429. Etsy reports the daily allowance on every call; the Etsy card shows what is left, and background sync pauses when less than 2% (200 requests) remains and resumes as it refills. Your own button presses still go through. A normal sync uses about 7 requests, so 48 syncs a day use about 350.
 - **Half-pushed drafts.** If pushing a draft fails part way, pressing it again uploads only the images and files that are still missing.
+
+## How orders and payment records are read (fixed 2026-11-21)
+
+Etsy refuses a payment-ledger request whose `min_created` to `max_created` span is more than 31 days (2,678,400 seconds). The first sync used to ask for 90 days at once and failed.
+
+- **Windows.** Orders (by last-modified time) and payment-ledger entries (by created time) are read in consecutive windows of at most 30 days, each window starting where the last ended. Every page of each window is read. A window with more than 2,000 records is split in half until it fits, so nothing is cut off.
+- **Checkpoints.** After each completed window ATLAS saves how far it got (`receipts_after`, `ledger_after`). The next sync starts one hour before that checkpoint, to catch records Etsy shows a little late, and runs up to now. If a sync fails part way, the next one resumes at the last completed window. A checkpoint never moves back.
+- **No duplicates.** Each order and ledger entry is stored under Etsy's own id (`receipt_id`, `entry_id`), so the overlap, window edges and repeated syncs update the same Revenue row instead of adding one.
+- **First sync** reads the last 90 days. **Re-read history** on the Etsy card (up to 1,095 days) reads further back on demand, in the same windows, without adding duplicates or moving the checkpoint back.
+- Verified live 2026-11-21 (read-only, on a copy of the database): 11 requests, all 200, largest window 30 days; a repeat sync added no rows.
 
 ## What counts as money
 
 - Revenue: Etsy receipts that are paid (subtotal, so tax and shipping are excluded). Canceled orders count as zero.
 - Costs: Etsy payment-account entries that take money out (fees, refunds). Payouts to the bank are transfers and are skipped. Image generation is recorded at the cost per image you set (marked unverified, since it is ATLAS's estimate).
 - The listing fee for API-published listings arrives with Etsy's fee records, so it is not recorded twice.
-- **To verify once live:** how Etsy labels fee entries (`ledger_type`); the mapping in `classifyLedgerEntry` (`server/modules/etsy.ts`) is a best guess until real entries are seen.
+- **To verify once live:** how Etsy labels fee entries (`ledger_type`); the mapping in `classifyLedgerEntry` (`server/modules/etsy.ts`) is a best guess until real entries are seen. First real entries (2026-11-21): `seller_onboarding_fee` (money out, recorded as a fee) and `seller_onboarding_fee_payment` (money in, skipped, since revenue comes from orders). Listing, transaction and payment-processing fee labels are not seen yet.
 
 ## Not confirmed by Etsy's documentation (check on the first live draft)
 

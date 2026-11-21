@@ -57,6 +57,23 @@ const MAX_IMAGES = 10;
 const MAX_FILES = 5;
 /** Background work pauses when fewer requests than this are left today (or 2% of the daily limit, if larger). */
 const QUOTA_FLOOR = 50;
+/**
+ * The owner's app allows 10 requests a second and 10,000 a day (2026-11-21). Calls are spaced at least this far
+ * apart (8 a second), process-wide, to stay under the per-second limit with room to spare.
+ * `ETSY_MIN_INTERVAL_MS` overrides it (tests set 0).
+ */
+const DEFAULT_MIN_INTERVAL_MS = 125;
+let nextRequestAt = 0;
+
+async function waitForSlot(sleep: (ms: number) => Promise<void>): Promise<void> {
+  const configured = Number(process.env.ETSY_MIN_INTERVAL_MS);
+  const gap = Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_MIN_INTERVAL_MS;
+  if (!gap) return;
+  const now = Date.now();
+  const wait = nextRequestAt - now;
+  nextRequestAt = Math.max(now, nextRequestAt) + gap;
+  if (wait > 0) await sleep(wait);
+}
 
 export interface EtsyDeps {
   fetch?: typeof fetch;
@@ -365,6 +382,7 @@ export async function etsyRequest(
       headers["content-type"] = "application/json";
       body = JSON.stringify(req.json);
     }
+    await waitForSlot(sleep);
     const response = await (deps.fetch ?? fetch)(url, { method, headers, body, signal: AbortSignal.timeout(60_000) });
     recordQuota(db, response.headers, deps.now?.() ?? Date.now());
     if (response.status === 401 && !req.appOnly && !refreshed) {
@@ -1058,95 +1076,183 @@ async function pages(
   return out;
 }
 
-/** Paid orders into verified revenue, fees and refunds into expenses, favorites into experiment metrics. */
-export async function syncEtsy(db: Db, deps: EtsyDeps = {}) {
+/**
+ * Etsy refuses a min_created..max_created span over 31 days (2678400 s); ATLAS asks for at most 30 days at a time.
+ * The same windows are used for receipts (by last-modified time) so no list request is unbounded.
+ */
+export const ETSY_WINDOW_S = 30 * 86_400;
+/** Each sync re-reads this much before the saved checkpoint, for records Etsy shows a little late. */
+export const ETSY_OVERLAP_S = 3600;
+/** The longest history an owner can ask to re-read. */
+export const ETSY_MAX_HISTORY_DAYS = 3 * 365;
+const MIN_WINDOW_S = 3600;
+
+/**
+ * Reads a time-filtered list from `from` to `to` (Unix seconds) in consecutive windows Etsy accepts, every page of
+ * each. A window with more rows than ATLAS pages through (2,000) is split in half until it fits, so nothing is
+ * cut off. `handle` gets each completed window's rows and its end, so the caller can save a checkpoint there:
+ * a failure part way resumes at the last completed window.
+ */
+async function forEachWindow(
+  db: Db,
+  apiPath: string,
+  keys: { min: string; max: string },
+  range: { from: number; to: number },
+  extra: Record<string, string | number | boolean>,
+  deps: EtsyDeps,
+  handle: (rows: Row[], windowEnd: number) => void,
+): Promise<void> {
+  let start = range.from;
+  while (start < range.to) {
+    let end = Math.min(start + ETSY_WINDOW_S, range.to);
+    for (;;) {
+      const rows = await pages(db, apiPath, { ...extra, [keys.min]: start, [keys.max]: end }, deps);
+      if (rows.complete) {
+        handle(rows, end);
+        break;
+      }
+      if (end - start <= MIN_WINDOW_S) fail(`etsy_window_too_dense: more than ${MAX_PAGES * PAGE} records in one hour`);
+      end = start + Math.floor((end - start) / 2);
+    }
+    start = end;
+  }
+}
+
+export interface EtsySyncOptions {
+  /** Re-read this many days of orders and payment records instead of starting from the saved checkpoints. */
+  historyDays?: number;
+}
+
+/**
+ * Paid orders into verified revenue, fees and refunds into expenses, favorites into experiment metrics.
+ *
+ * Orders and payment records are read from a saved checkpoint (minus a one-hour overlap) up to now, in windows of
+ * at most 30 days, every page of each. The checkpoint moves forward after each completed window and never moves
+ * back. Records seen twice (overlap, window edges, a repeated sync) are written once: they are keyed by Etsy's own
+ * receipt and ledger-entry ids, both here and in the ledger.
+ */
+export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOptions = {}) {
   const now = deps.now?.() ?? Date.now();
   const r = row(db);
   const shop = shopId(db);
   const business = (isBusinessKey(r.business) ? r.business : "ventures") as BusinessKey;
   const nowS = Math.floor(now / 1000);
-  const counts = { receipts: 0, fees: 0, refunds: 0, listings: 0, shop_listings: 0, changed_on_etsy: 0 };
+  const counts = { receipts: 0, fees: 0, refunds: 0, listings: 0, shop_listings: 0, changed_on_etsy: 0, windows: 0 };
+  let historyFrom: number | null = null;
+  if (options.historyDays !== undefined) {
+    const days = options.historyDays;
+    if (!Number.isSafeInteger(days) || days < 1 || days > ETSY_MAX_HISTORY_DAYS) fail("invalid_history_days");
+    historyFrom = nowS - days * 86_400;
+  }
+  const startFrom = (checkpoint: unknown) =>
+    historyFrom ??
+    (checkpoint === null || checkpoint === undefined
+      ? nowS - FIRST_SYNC_LOOKBACK_S
+      : Math.min(nowS, Number(checkpoint)) - ETSY_OVERLAP_S);
+  const saveCheckpoint = (column: "receipts_after" | "ledger_after", end: number) =>
+    db
+      .prepare(`UPDATE etsy_connection SET ${column}=MAX(COALESCE(${column}, 0), ?), updated_at=? WHERE id=1`)
+      .run(end, now);
   try {
-    const receiptsAfter = Number(r.receipts_after ?? nowS - FIRST_SYNC_LOOKBACK_S);
-    const receipts = await pages(
+    const seenReceipts = new Set<string>();
+    const salesByOpportunity = new Map<string, { sales: number; revenue: number; currency: string; listing: string }>();
+    await forEachWindow(
       db,
       `/shops/${shop}/receipts`,
-      { min_last_modified: receiptsAfter, sort_on: "updated", sort_order: "asc" },
+      { min: "min_last_modified", max: "max_last_modified" },
+      { from: startFrom(r.receipts_after), to: nowS },
+      { sort_on: "updated", sort_order: "asc" },
       deps,
+      (receipts, windowEnd) => {
+        counts.windows++;
+        for (const receipt of receipts) {
+          const receiptId = String(receipt.receipt_id ?? "");
+          if (!receiptId || seenReceipts.has(receiptId)) continue;
+          seenReceipts.add(receiptId);
+          const subtotal = moneyMinor(receipt.subtotal) ?? moneyMinor(receipt.total_price);
+          if (!subtotal) continue;
+          const canceled = String(receipt.status ?? "").toLowerCase() === "canceled";
+          const paid = receipt.is_paid === true && !canceled;
+          const transactions = Array.isArray(receipt.transactions) ? (receipt.transactions as Row[]) : [];
+          const opportunityId =
+            transactions.map((t) => opportunityForEtsyListing(db, t.listing_id)).find(Boolean) ?? null;
+          upsertProviderLedgerEntry(
+            db,
+            {
+              business,
+              kind: "revenue",
+              amount_minor: paid ? Math.max(0, subtotal.minor) : 0,
+              currency: subtotal.currency,
+              source: "etsy_receipt",
+              external_id: `etsy:${shop}:receipt:${receiptId}`,
+              verified: paid,
+              description:
+                `Etsy order ${receiptId}${canceled ? " (canceled)" : paid ? "" : " (not paid yet)"}: ${transactions
+                  .map((t) => String(t.title ?? ""))
+                  .join(", ")}`.slice(0, 300),
+              occurred_at: Number(receipt.created_timestamp ?? nowS) * 1000,
+              opportunity_id: opportunityId,
+            },
+            now,
+          );
+          counts.receipts++;
+          if (opportunityId && paid) {
+            const entry = salesByOpportunity.get(opportunityId) ?? {
+              sales: 0,
+              revenue: 0,
+              currency: subtotal.currency,
+              listing: String(transactions[0]?.listing_id ?? ""),
+            };
+            entry.sales += transactions.reduce((sum, t) => sum + Number(t.quantity ?? 1), 0) || 1;
+            entry.revenue += subtotal.minor;
+            salesByOpportunity.set(opportunityId, entry);
+          }
+        }
+        saveCheckpoint("receipts_after", windowEnd);
+      },
     );
-    const salesByOpportunity = new Map<string, { sales: number; revenue: number; currency: string; listing: string }>();
-    for (const receipt of receipts) {
-      const subtotal = moneyMinor(receipt.subtotal) ?? moneyMinor(receipt.total_price);
-      if (!subtotal) continue;
-      const canceled = String(receipt.status ?? "").toLowerCase() === "canceled";
-      const paid = receipt.is_paid === true && !canceled;
-      const transactions = Array.isArray(receipt.transactions) ? (receipt.transactions as Row[]) : [];
-      const opportunityId = transactions.map((t) => opportunityForEtsyListing(db, t.listing_id)).find(Boolean) ?? null;
-      upsertProviderLedgerEntry(
-        db,
-        {
-          business,
-          kind: "revenue",
-          amount_minor: paid ? Math.max(0, subtotal.minor) : 0,
-          currency: subtotal.currency,
-          source: "etsy_receipt",
-          external_id: `etsy:${shop}:receipt:${receipt.receipt_id}`,
-          verified: paid,
-          description:
-            `Etsy order ${receipt.receipt_id}${canceled ? " (canceled)" : paid ? "" : " (not paid yet)"}: ${transactions
-              .map((t) => String(t.title ?? ""))
-              .join(", ")}`.slice(0, 300),
-          occurred_at: Number(receipt.created_timestamp ?? nowS) * 1000,
-          opportunity_id: opportunityId,
-        },
-        now,
-      );
-      counts.receipts++;
-      if (opportunityId && paid) {
-        const entry = salesByOpportunity.get(opportunityId) ?? {
-          sales: 0,
-          revenue: 0,
-          currency: subtotal.currency,
-          listing: String(transactions[0]?.listing_id ?? ""),
-        };
-        entry.sales += transactions.reduce((sum, t) => sum + Number(t.quantity ?? 1), 0) || 1;
-        entry.revenue += subtotal.minor;
-        salesByOpportunity.set(opportunityId, entry);
-      }
-    }
-    const ledgerAfter = Number(r.ledger_after ?? nowS - FIRST_SYNC_LOOKBACK_S);
-    const entries = await pages(
+    const seenEntries = new Set<string>();
+    await forEachWindow(
       db,
       `/shops/${shop}/payment-account/ledger-entries`,
-      { min_created: ledgerAfter, max_created: nowS },
+      { min: "min_created", max: "max_created" },
+      { from: startFrom(r.ledger_after), to: nowS },
+      {},
       deps,
+      (entries, windowEnd) => {
+        counts.windows++;
+        for (const entry of entries) {
+          const entryId = String(entry.entry_id ?? "");
+          if (!entryId || seenEntries.has(entryId)) continue;
+          seenEntries.add(entryId);
+          const type = classifyLedgerEntry(entry);
+          if (!type) continue;
+          const opportunityId = String(entry.reference_type ?? "")
+            .toLowerCase()
+            .includes("listing")
+            ? opportunityForEtsyListing(db, entry.reference_id)
+            : null;
+          upsertProviderLedgerEntry(
+            db,
+            {
+              business,
+              kind: "expense",
+              amount_minor: Math.abs(Math.round(Number(entry.amount))),
+              currency: typeof entry.currency === "string" ? entry.currency : "USD",
+              source: type === "refund" ? "etsy_refund" : "etsy_fee",
+              external_id: `etsy:${shop}:ledger:${entryId}`,
+              verified: true,
+              description: `Etsy ${type === "refund" ? "refund" : "fee"}: ${String(entry.description ?? entry.ledger_type ?? "").slice(0, 200)}`,
+              occurred_at: Number(entry.created_timestamp ?? entry.create_date ?? nowS) * 1000,
+              opportunity_id: opportunityId,
+            },
+            now,
+          );
+          counts[type === "refund" ? "refunds" : "fees"]++;
+        }
+        saveCheckpoint("ledger_after", windowEnd);
+      },
     );
-    for (const entry of entries) {
-      const type = classifyLedgerEntry(entry);
-      if (!type) continue;
-      const opportunityId = String(entry.reference_type ?? "")
-        .toLowerCase()
-        .includes("listing")
-        ? opportunityForEtsyListing(db, entry.reference_id)
-        : null;
-      upsertProviderLedgerEntry(
-        db,
-        {
-          business,
-          kind: "expense",
-          amount_minor: Math.abs(Math.round(Number(entry.amount))),
-          currency: typeof entry.currency === "string" ? entry.currency : "USD",
-          source: type === "refund" ? "etsy_refund" : "etsy_fee",
-          external_id: `etsy:${shop}:ledger:${entry.entry_id}`,
-          verified: true,
-          description: `Etsy ${type === "refund" ? "refund" : "fee"}: ${String(entry.description ?? entry.ledger_type ?? "").slice(0, 200)}`,
-          occurred_at: Number(entry.created_timestamp ?? entry.create_date ?? nowS) * 1000,
-          opportunity_id: opportunityId,
-        },
-        now,
-      );
-      counts[type === "refund" ? "refunds" : "fees"]++;
-    }
     const shopSync = await syncShopListings(db, shop, deps, now);
     counts.shop_listings = shopSync.seen;
     counts.changed_on_etsy = shopSync.changed;
@@ -1168,9 +1274,10 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}) {
       );
       counts.listings++;
     }
-    db.prepare(
-      "UPDATE etsy_connection SET receipts_after=?, ledger_after=?, last_sync_at=?, last_sync_error=NULL, updated_at=? WHERE id=1",
-    ).run(Math.max(receiptsAfter, nowS - 3600), nowS - 3600, now, now);
+    db.prepare("UPDATE etsy_connection SET last_sync_at=?, last_sync_error=NULL, updated_at=? WHERE id=1").run(
+      now,
+      now,
+    );
   } catch (error) {
     db.prepare("UPDATE etsy_connection SET last_sync_error=?, updated_at=? WHERE id=1").run(
       (error instanceof Error ? error.message : "etsy_sync_failed").slice(0, 300),

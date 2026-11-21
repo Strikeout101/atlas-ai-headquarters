@@ -82,7 +82,12 @@ export function registerEtsyRoutes(
   );
   app.post(
     "/api/etsy/sync",
-    handle(async () => ({ counts: await syncEtsy(db), settings: etsySettings(db) })),
+    handle(async (req) => {
+      // Optional { history_days }: re-read that much history (orders and payment records) in 30-day windows.
+      const days = body(req).history_days;
+      const options = days === undefined || days === null ? {} : { historyDays: days as number };
+      return { counts: await syncEtsy(db, {}, options), settings: etsySettings(db) };
+    }),
   );
   app.get("/api/etsy/listings", (_req, res) => res.json({ ok: true, items: etsyShopListings(db) }));
   app.post(

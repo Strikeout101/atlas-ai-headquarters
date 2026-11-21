@@ -18,6 +18,7 @@ const ERROR_TEXT: Record<string, string> = {
   etsy_listing_already_in_atlas: "That listing is already in ATLAS.",
   etsy_listing_removed: "That listing is no longer on Etsy.",
   etsy_listing_not_found: "Sync first: ATLAS has not read that listing yet.",
+  invalid_history_days: "History must be between 1 and 1095 days.",
   invalid_opportunity_id: "Pick an opportunity of the Etsy business, or none.",
   owner_session_required: "Sign in with your password in Settings > Security to change Etsy settings.",
 };
@@ -138,6 +139,7 @@ export default function EtsySettings() {
   const [redirect, setRedirect] = useState("");
   const [pasted, setPasted] = useState("");
   const [connectUrl, setConnectUrl] = useState("");
+  const [historyDays, setHistoryDays] = useState(365);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -352,6 +354,35 @@ export default function EtsySettings() {
               Disconnect
             </button>
           </div>
+          <form
+            aria-label="Re-read history"
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(async () => {
+                const result = await etsyApi.sync(historyDays);
+                apply(result.settings);
+                setMessage(
+                  `Read ${historyDays} days of history: ${result.counts.receipts} orders, ${result.counts.fees} fees, ${result.counts.refunds} refunds. Records already in Revenue were not added twice.`,
+                );
+              });
+            }}
+          >
+            <label className="text-xs">
+              Re-read history (days, up to 1095)
+              <input
+                className={`${field} w-32`}
+                type="number"
+                min={1}
+                max={1095}
+                value={historyDays}
+                onChange={(e) => setHistoryDays(Math.max(1, Math.min(1095, Math.floor(Number(e.target.value) || 1))))}
+              />
+            </label>
+            <button type="submit" className={button} disabled={busy}>
+              Re-read history
+            </button>
+          </form>
           <ShopListings business={settings.business} count={settings.shop_listings ?? 0} />
         </div>
       )}

@@ -60,7 +60,8 @@ export const etsyApi = {
   complete: async (url: string) =>
     (await post<{ ok: true; settings: EtsySettings }>("/api/etsy/connect/complete", { url })).settings,
   test: async () => (await post<{ ok: true; settings: EtsySettings }>("/api/etsy/test", {})).settings,
-  sync: () =>
+  /** `historyDays` re-reads that much history of orders and payment records (1 to 1095 days). */
+  sync: (historyDays?: number) =>
     post<{
       ok: true;
       counts: {
@@ -70,9 +71,10 @@ export const etsyApi = {
         listings: number;
         shop_listings: number;
         changed_on_etsy: number;
+        windows: number;
       };
       settings: EtsySettings;
-    }>("/api/etsy/sync", {}),
+    }>("/api/etsy/sync", historyDays === undefined ? {} : { history_days: historyDays }),
   shopListings: async () => (await request<{ ok: true; items: EtsyShopListing[] }>("/api/etsy/listings")).items,
   adopt: async (etsyListingId: string, opportunityId: string | null) =>
     (
