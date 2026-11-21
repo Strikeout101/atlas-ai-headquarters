@@ -55,9 +55,9 @@ Rules of thumb:
 | `agent-proposals.ts`            | Think loop: idle agents suggest tasks                                                                                                               |
 | `finance-store.ts`              | Deals, ledger entries (verified money), spend requests                                                                                              |
 | `square-sync.ts`                | Read-only Square payment sync into the ledger                                                                                                       |
-| `listings.ts`                   | Etsy and itch.io listing packages and the listing-fee budget                                                                                        |
+| `listings.ts`                   | Etsy and itch.io listing packages, revisions of live Etsy listings, and the listing-fee budget                                                      |
 | `spend-budgets.ts`              | Monthly spending budgets per category                                                                                                               |
-| `etsy.ts`                       | Etsy connection (OAuth PKCE), draft and publish listings, sync orders, fees and favorites                                                           |
+| `etsy.ts`                       | Etsy connection (OAuth PKCE), draft/publish/revise/deactivate listings, shop listing mirror, quota, sync orders, fees and favorites                 |
 | `studio.ts`, `media-library.ts` | Image studio (free mockup renderer, optional image API with a monthly cap) and the media library                                                    |
 | `experiments.ts`                | Opportunity budgets, variants, metrics and the owner's stop rules                                                                                   |
 | `playbooks.ts`                  | Editable playbooks (default: Etsy digital products), step advance, `opportunity.propose`                                                            |
@@ -121,7 +121,7 @@ Rules of thumb:
 | `ops/autonomy.ts`, `ops/agent-proposals.ts`, `ops/org-requests.ts`                   | Goals, opportunities, schedules; suggested tasks; hiring requests                                   |
 | `ops/business*.ts`                                                                   | Business records (contacts, tickets, quotes, drafts), email, mailboxes, profiles, social accounts   |
 | `ops/finance.ts`, `ops/square.ts`, `ops/listings.ts`                                 | Deals, ledger, spend; Square; listing packages                                                      |
-| `ops/etsy.ts`, `ops/studio.ts`                                                       | Etsy connection and listing push/publish; image studio and media library                            |
+| `ops/etsy.ts`, `ops/studio.ts`                                                       | Etsy connection, listing push/publish, shop listings and adopt; image studio and media library      |
 | `ops/knowledge.ts`                                                                   | Knowledge pages and memories (owner)                                                                |
 | `ops/system.ts`                                                                      | Service and backups (owner)                                                                         |
 | `ops/control.ts`                                                                     | Emergency controls                                                                                  |

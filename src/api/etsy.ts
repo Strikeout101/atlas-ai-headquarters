@@ -20,6 +20,31 @@ export interface EtsySettings {
   last_sync_at: number | null;
   last_sync_error: string | null;
   scopes: string[];
+  /** Etsy's daily request allowance as it last reported it (sliding 24 hours). */
+  rate_limit_per_day?: number | null;
+  rate_remaining_today?: number | null;
+  rate_seen_at?: number | null;
+  /** True when background sync is paused because the allowance is nearly used. */
+  quota_low?: boolean;
+  shop_listings?: number;
+}
+
+/** One listing in the shop as ATLAS last read it, and the ATLAS package it belongs to, if any. */
+export interface EtsyShopListing {
+  listing_id: string;
+  state: string;
+  title: string;
+  description: string;
+  tags: string[];
+  price_minor: number | null;
+  currency: string | null;
+  url: string | null;
+  num_favorers: number | null;
+  quantity: number | null;
+  seen_at: number;
+  package_id: string | null;
+  opportunity_id: string | null;
+  adopted: boolean;
 }
 
 export const etsyApi = {
@@ -38,9 +63,23 @@ export const etsyApi = {
   sync: () =>
     post<{
       ok: true;
-      counts: { receipts: number; fees: number; refunds: number; listings: number };
+      counts: {
+        receipts: number;
+        fees: number;
+        refunds: number;
+        listings: number;
+        shop_listings: number;
+        changed_on_etsy: number;
+      };
       settings: EtsySettings;
     }>("/api/etsy/sync", {}),
+  shopListings: async () => (await request<{ ok: true; items: EtsyShopListing[] }>("/api/etsy/listings")).items,
+  adopt: async (etsyListingId: string, opportunityId: string | null) =>
+    (
+      await post<{ ok: true; item: ListingPackage }>(`/api/etsy/listings/${encodeURIComponent(etsyListingId)}/adopt`, {
+        opportunity_id: opportunityId,
+      })
+    ).item,
   disconnect: async () => (await post<{ ok: true; settings: EtsySettings }>("/api/etsy/disconnect", {})).settings,
   pushDraft: async (listingId: string) =>
     (await post<{ ok: true; item: ListingPackage }>(`/api/listings/${encodeURIComponent(listingId)}/etsy-draft`, {}))

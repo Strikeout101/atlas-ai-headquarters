@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { etsyApi, type EtsySettings as Settings } from "../../api/etsy";
+import { getAutonomy, type Opportunity } from "../../api/autonomy";
+import { etsyApi, type EtsySettings as Settings, type EtsyShopListing } from "../../api/etsy";
 
 const field =
   "w-full rounded-lg border border-[var(--th-input-border)] bg-[var(--th-input-bg)] px-3 py-2 text-sm text-[var(--th-text-primary)]";
@@ -14,6 +15,10 @@ const ERROR_TEXT: Record<string, string> = {
   etsy_code_missing: "That address has no approval code in it. Paste the full address from the browser bar.",
   etsy_paste_the_address: "Paste the full address from the browser bar after approving on Etsy.",
   etsy_not_connected: "Connect the Etsy shop first.",
+  etsy_listing_already_in_atlas: "That listing is already in ATLAS.",
+  etsy_listing_removed: "That listing is no longer on Etsy.",
+  etsy_listing_not_found: "Sync first: ATLAS has not read that listing yet.",
+  invalid_opportunity_id: "Pick an opportunity of the Etsy business, or none.",
   owner_session_required: "Sign in with your password in Settings > Security to change Etsy settings.",
 };
 function describe(cause: unknown): string {
@@ -22,6 +27,105 @@ function describe(cause: unknown): string {
   return ERROR_TEXT[key] ?? (message || "Etsy request failed.");
 }
 const when = (at: number | null) => (at ? new Date(at).toLocaleString() : "never");
+const money = (minor: number | null, currency: string | null) =>
+  minor === null ? "" : `${(minor / 100).toFixed(2)} ${currency ?? "USD"}`;
+
+/**
+ * Every listing in the shop as last synced, including ones ATLAS did not create. The owner can bring one into
+ * ATLAS (optionally tied to an opportunity) so its sales count there and agents can propose revisions of it.
+ */
+function ShopListings({ business, count }: { business: Settings["business"]; count: number }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<EtsyShopListing[] | null>(null);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [choice, setChoice] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    const [listings, autonomy] = await Promise.all([etsyApi.shopListings(), getAutonomy().catch(() => null)]);
+    setItems(listings);
+    setOpportunities(
+      (autonomy?.opportunities ?? []).filter((item) => item.business === business && item.status !== "stopped"),
+    );
+  }, [business]);
+  useEffect(() => {
+    if (open) load().catch((cause) => setError(describe(cause)));
+  }, [open, load]);
+  return (
+    <div className="space-y-2">
+      <button type="button" className={button} aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? "Hide" : "Show"} shop listings ({count})
+      </button>
+      {error && (
+        <p role="alert" className="break-words text-sm text-red-500">
+          {error}
+        </p>
+      )}
+      {open && items && items.length === 0 && (
+        <p className="text-xs text-[var(--th-text-secondary)]">No listings read yet. Press Sync now.</p>
+      )}
+      {open && items && items.length > 0 && (
+        <ul aria-label="Shop listings" className="divide-y divide-[var(--th-border)] text-sm">
+          {items.map((item) => (
+            <li key={item.listing_id} className="flex min-w-0 flex-col gap-2 py-2 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                {item.url ? (
+                  <a className="break-words underline" href={item.url} target="_blank" rel="noopener noreferrer">
+                    {item.title || `Listing ${item.listing_id}`}
+                  </a>
+                ) : (
+                  <span className="break-words">{item.title || `Listing ${item.listing_id}`}</span>
+                )}
+                <span className="block text-xs text-[var(--th-text-secondary)]">
+                  {item.state.replace("_", " ")}
+                  {item.price_minor !== null ? ` · ${money(item.price_minor, item.currency)}` : ""}
+                  {item.num_favorers !== null ? ` · ${item.num_favorers} favorites` : ""}
+                </span>
+              </div>
+              {item.package_id ? (
+                <span className="text-xs text-[var(--th-text-secondary)]">
+                  {item.adopted ? "Brought into ATLAS" : "Made by ATLAS"}
+                </span>
+              ) : item.state !== "removed" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    aria-label={`Opportunity for ${item.title}`}
+                    className={`${field} sm:w-48`}
+                    value={choice[item.listing_id] ?? ""}
+                    onChange={(e) => setChoice({ ...choice, [item.listing_id]: e.target.value })}
+                  >
+                    <option value="">No opportunity</option>
+                    {opportunities.map((opportunity) => (
+                      <option key={opportunity.id} value={opportunity.id}>
+                        {opportunity.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={Boolean(busy)}
+                    onClick={() => {
+                      setBusy(item.listing_id);
+                      setError("");
+                      etsyApi
+                        .adopt(item.listing_id, choice[item.listing_id] || null)
+                        .then(load)
+                        .catch((cause) => setError(describe(cause)))
+                        .finally(() => setBusy(""));
+                    }}
+                  >
+                    Bring into ATLAS
+                  </button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * Etsy for the Ventures shop. Etsy only allows an https redirect, and ATLAS runs on plain http, so connecting is:
@@ -79,6 +183,13 @@ export default function EtsySettings() {
       {message && <p className="text-sm text-emerald-600">{message}</p>}
       {settings?.last_sync_error && (
         <p className="break-words text-xs text-amber-600">Last sync problem: {settings.last_sync_error}</p>
+      )}
+      {settings?.connected && typeof settings.rate_remaining_today === "number" && (
+        <p className={`text-xs ${settings.quota_low ? "text-amber-600" : "text-[var(--th-text-secondary)]"}`}>
+          Etsy requests left today: {settings.rate_remaining_today}
+          {settings.rate_limit_per_day ? ` of ${settings.rate_limit_per_day}` : ""}
+          {settings.quota_low ? " · background sync paused until it refills" : ""}
+        </p>
       )}
       <form
         aria-label="Etsy app"
@@ -201,8 +312,12 @@ export default function EtsySettings() {
               disabled={busy}
               onChange={(e) => void run(async () => apply(await etsyApi.save({ sync_enabled: e.target.checked })))}
             />
-            Read orders, fees and favorites every 30 minutes
+            Read orders, fees, favorites and shop listings every 30 minutes
           </label>
+          <p className="text-xs text-[var(--th-text-secondary)]">
+            Approved revisions are applied to live listings, and listings of stopped opportunities are taken down (never
+            ones you brought in).
+          </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -221,7 +336,7 @@ export default function EtsySettings() {
                   const result = await etsyApi.sync();
                   apply(result.settings);
                   setMessage(
-                    `Synced: ${result.counts.receipts} orders, ${result.counts.fees} fees, ${result.counts.refunds} refunds.`,
+                    `Synced: ${result.counts.receipts} orders, ${result.counts.fees} fees, ${result.counts.refunds} refunds, ${result.counts.shop_listings} shop listings (${result.counts.changed_on_etsy} changed on Etsy).`,
                   );
                 })
               }
@@ -237,6 +352,7 @@ export default function EtsySettings() {
               Disconnect
             </button>
           </div>
+          <ShopListings business={settings.business} count={settings.shop_listings ?? 0} />
         </div>
       )}
     </section>

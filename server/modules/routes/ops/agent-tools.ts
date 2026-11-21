@@ -24,6 +24,7 @@ import { AgentWebError, runAgentWebOperation } from "../../agent-web.ts";
 import { guardValue, recordUntrustedContent } from "../../content-guard.ts";
 import {
   createListing,
+  createRevision,
   ensureListingSchema,
   getListing,
   listingsOverview,
@@ -34,7 +35,7 @@ import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./busine
 import { generateImage, renderMockup, type StudioContext } from "../../studio.ts";
 import { searchMedia } from "../../media-library.ts";
 import { startVariant } from "../../experiments.ts";
-import { searchEtsyTaxonomy } from "../../etsy.ts";
+import { etsyShopListings, searchEtsyTaxonomy } from "../../etsy.ts";
 import { proposeOpportunity } from "../../playbooks.ts";
 import {
   createDeal,
@@ -221,6 +222,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
         operation === "media.search" ||
         operation === "experiment.start" ||
         operation === "etsy.taxonomy" ||
+        operation === "etsy.listings" ||
         operation === "opportunity.propose"
       ) {
         const context = resolveTaskContext(db, claims.taskId);
@@ -279,6 +281,16 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
             });
             return res.status(201).json({ ok: true, item });
           }
+          if (operation === "etsy.listings") {
+            // The shop as last synced, including listings ATLAS did not create. Read only.
+            const state = typeof body.state === "string" ? body.state : null;
+            return res.json({
+              ok: true,
+              items: etsyShopListings(db)
+                .filter((item) => (state ? item.state === state : item.state !== "removed"))
+                .map(({ description, ...item }) => ({ ...item, description: description.slice(0, 500) })),
+            });
+          }
           return res.json({ ok: true, items: await searchEtsyTaxonomy(db, body.query) });
         } catch (error) {
           const message = error instanceof Error ? error.message : "studio_request_failed";
@@ -309,6 +321,11 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           if (operation === "listings.get") return res.json({ ok: true, item: own() });
           if (operation === "listings.create") {
             const item = createListing(db, payload, { agentId: claims.agentId, taskId: claims.taskId });
+            return res.status(201).json({ ok: true, item });
+          }
+          if (operation === "listings.revise") {
+            // A change to a live Etsy listing: a draft copy that the agent submits for the usual approval.
+            const item = createRevision(db, id, payload, { agentId: claims.agentId, taskId: claims.taskId });
             return res.status(201).json({ ok: true, item });
           }
           if (operation === "listings.update") {

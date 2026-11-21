@@ -103,6 +103,12 @@ function PackageCard({
             {item.status === "ready" &&
               ` · ${item.approver === "vp" ? "the VPs can approve this" : "needs your approval"}`}
             {item.decided_by && ` · decided by ${item.decided_by.startsWith("vp:") ? "the VPs" : "you"}`}
+            {item.revision_of && " · change to a live listing"}
+            {item.etsy_adopted ? " · brought in from your Etsy shop" : ""}
+            {item.status === "published" &&
+              !item.revision_of &&
+              item.etsy_state &&
+              ` · on Etsy: ${item.etsy_state.replace("_", " ")}`}
           </p>
         </div>
         {item.status === "published" && item.listing_url && (
@@ -129,19 +135,29 @@ function PackageCard({
       {item.status === "approved" && item.platform === "etsy" && etsyConnected && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--th-bg-surface)] p-3">
           <p className="text-xs text-[var(--th-text-secondary)]">
-            {item.etsy_listing_id
-              ? `Etsy draft created (listing ${item.etsy_listing_id}). Publishing makes it public and Etsy charges its fee.`
-              : "Not on Etsy yet. Create the draft (private), check it on Etsy, then publish."}
+            {item.revision_of
+              ? `Approved change to live Etsy listing ${item.etsy_listing_id}. ATLAS applies it on the next sync; no listing fee.`
+              : item.etsy_listing_id
+                ? `Etsy draft created (listing ${item.etsy_listing_id}). Publishing makes it public and Etsy charges its fee.`
+                : "Not on Etsy yet. Create the draft (private), check it on Etsy, then publish."}
           </p>
           <div className="flex flex-wrap gap-2">
-            {!item.etsy_listing_id && (
-              <button type="button" className={buttonClass} disabled={busy} onClick={onEtsyDraft}>
-                Create Etsy draft
+            {item.revision_of ? (
+              <button type="button" className={primaryClass} disabled={busy} onClick={onEtsyDraft}>
+                Apply to Etsy now
               </button>
+            ) : (
+              <>
+                {!item.etsy_listing_id && (
+                  <button type="button" className={buttonClass} disabled={busy} onClick={onEtsyDraft}>
+                    Create Etsy draft
+                  </button>
+                )}
+                <button type="button" className={primaryClass} disabled={busy} onClick={onEtsyPublish}>
+                  Publish on Etsy
+                </button>
+              </>
             )}
-            <button type="button" className={primaryClass} disabled={busy} onClick={onEtsyPublish}>
-              Publish on Etsy
-            </button>
           </div>
         </div>
       )}
@@ -152,7 +168,7 @@ function PackageCard({
             Reject
           </button>
           <button type="button" className={primaryClass} disabled={busy} onClick={() => onDecide(true)}>
-            Approve for publishing
+            {item.revision_of ? "Approve change" : "Approve for publishing"}
           </button>
         </div>
       )}
@@ -167,7 +183,9 @@ function PackageCard({
         >
           <div className="min-w-0 flex-1">
             <label htmlFor={`listing-url-${item.id}`} className="text-xs">
-              {`After you publish it on ${platform}, paste the listing address`}
+              {item.revision_of
+                ? "After you make this change on Etsy yourself, paste the listing address"
+                : `After you publish it on ${platform}, paste the listing address`}
             </label>
             <input
               id={`listing-url-${item.id}`}

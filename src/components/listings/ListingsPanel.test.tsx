@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import ListingsPanel from "./ListingsPanel";
 import ApprovalRow from "../today/ApprovalRow";
 import { listingsApi, type ListingPackage, type ListingsOverview } from "../../api/listings";
+import { etsyApi, type EtsySettings } from "../../api/etsy";
 import type { PendingApproval } from "../../api";
 
 vi.mock("../../api/listings", async (importOriginal) => ({
@@ -16,6 +17,10 @@ vi.mock("../../api/listings", async (importOriginal) => ({
     markPublished: vi.fn(),
     withdraw: vi.fn(),
   },
+}));
+
+vi.mock("../../api/etsy", () => ({
+  etsyApi: { get: vi.fn(), pushDraft: vi.fn(), publish: vi.fn() },
 }));
 
 const base: ListingPackage = {
@@ -57,6 +62,10 @@ const overview = (items: ListingPackage[], cap = 1000, used = 20): ListingsOverv
 beforeEach(() => {
   localStorage.setItem("climpire.language", "en");
   vi.mocked(listingsApi.list).mockReset();
+  vi.mocked(etsyApi.get).mockReset().mockRejectedValue(new Error("not connected"));
+  vi.mocked(etsyApi.pushDraft)
+    .mockReset()
+    .mockResolvedValue(undefined as never);
   for (const fn of [listingsApi.setBudget, listingsApi.decide, listingsApi.markPublished, listingsApi.withdraw])
     vi.mocked(fn)
       .mockReset()
@@ -101,6 +110,41 @@ describe("Listings panel", () => {
     await user.click(within(card).getByRole("button", { name: "Mark published" }));
     expect(listingsApi.markPublished).toHaveBeenCalledWith("l1", "https://www.etsy.com/listing/123");
     expect(listingsApi.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("presents an approved revision as a change to the live Etsy listing and applies it without a fee", async () => {
+    const user = userEvent.setup();
+    vi.mocked(etsyApi.get).mockResolvedValue({ connected: true } as EtsySettings);
+    vi.mocked(listingsApi.list).mockResolvedValue(
+      overview([
+        {
+          ...base,
+          id: "r1",
+          title: "Minimal budget planner 2027",
+          fee_minor: 0,
+          revision_of: "l0",
+          etsy_listing_id: "9001",
+        },
+        {
+          ...base,
+          id: "l0",
+          status: "published",
+          listing_url: "https://www.etsy.com/listing/9001",
+          etsy_listing_id: "9001",
+          etsy_state: "sold_out",
+        },
+      ]),
+    );
+    render(<ListingsPanel business="ventures" />);
+    const ready = await screen.findByRole("region", { name: "Ready to publish" });
+    const card = within(ready).getByRole("listitem", { name: "Minimal budget planner 2027" });
+    expect(within(card).getByText(/change to a live listing/)).toBeVisible();
+    expect(await within(card).findByText(/Approved change to live Etsy listing 9001/)).toBeVisible();
+    expect(within(card).queryByRole("button", { name: "Publish on Etsy" })).toBeNull();
+    await user.click(within(card).getByRole("button", { name: "Apply to Etsy now" }));
+    expect(etsyApi.pushDraft).toHaveBeenCalledWith("r1");
+    const published = screen.getByRole("region", { name: "Published" });
+    expect(within(published).getByText(/on Etsy: sold out/)).toBeVisible();
   });
 
   it("shows who can approve a waiting package and lets the owner decide it", async () => {

@@ -88,7 +88,16 @@ Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP appr
   - Count AI subscriptions as monthly costs, and per-use costs (studio, listing fees, ads) as expenses.
   - Show profit per opportunity, per stream and per business.
   - Profit goals (section 10) depend on this.
-- [ ] **P1** Verify the Etsy connection live once the developer app is approved: connect, push one real draft, check its images and file, publish, then confirm one order and its fees land in Revenue. Adjust `classifyLedgerEntry` in `server/modules/etsy.ts` to Etsy's real fee labels.
+- [x] **P1** (2026-11-21, `server/modules/etsy.ts`, `listings.ts` (`createRevision`), Settings > Businesses > Etsy > Show shop listings, `docs/etsy.md` "After a listing is live". Tested against fakes; verify live with the item below) **Etsy after launch:**
+  - Experiment changes reach Etsy: `listings.revise` makes an approved revision that ATLAS applies to the live listing (title, description, tags; price through inventory; images and files replaced without leaving the listing empty). Price moves over 50% need the owner.
+  - Listings of stopped opportunities are set inactive on Etsy (never ones the owner brought in).
+  - Every shop listing is mirrored, including ones ATLAS did not create; the owner can bring one into ATLAS; agents read them with `etsy.listings`.
+  - Edits, publishing and deletion done on Etsy are read back into ATLAS.
+  - Tags read back after saving (falls back to one field per tag), image alt text, half-pushed drafts finish on retry.
+  - Etsy's daily request allowance is tracked; background sync pauses near the limit.
+- [ ] **P1** Verify the Etsy connection live once the developer app is approved: connect, push one real draft, check its images (with alt text), file and all 13 tags, publish, then confirm one order and its fees land in Revenue. Adjust `classifyLedgerEntry` in `server/modules/etsy.ts` to Etsy's real fee labels. Also check once: a revision that changes the price (inventory update), one that replaces images, a stopped opportunity's listing going inactive, a shop sync that reads existing listings, and the "requests left today" line on the Etsy card.
+- [ ] **P3** Etsy webhooks (order paid/canceled, listing updated) instead of the 30-minute poll. Needs a public https address (tunnel) and the endpoint registered in Etsy's developer portal (**YOU**), plus signature checking (Standard Webhooks HMAC). Only worth it if 30 minutes proves too slow.
+- [ ] **P3** Read Etsy shop reviews for agents (Etsy has a reviews API), through `guardValue` and `recordUntrustedContent` like other outside text. Customer messages and shop statistics are not in Etsy's API.
 - [ ] **P2** Run the real-model playbook check when a subscription is under the 80% usage limit: `pnpm exec tsx scripts/qa/etsy-playbook-planner.ts --run` (blocked on 2026-11-18: Claude 7-day at 94%, Codex also over the limit).
 - [ ] **P2** Owner create and edit of listing packages from the Listings panel (agents create them today; the owner can only approve, publish and withdraw).
 - [x] **P2** (2026-11-19, Revenue > Income streams, `server/modules/streams.ts`, `GET /api/streams`) **Income stream page:** per stream, the goal against verified revenue, the products and opportunities with their status, spend, results and what the engine plans next.

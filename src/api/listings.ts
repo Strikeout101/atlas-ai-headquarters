@@ -39,6 +39,12 @@ export interface ListingPackage {
   when_made?: string;
   /** Set once the package has been pushed to Etsy as a draft. */
   etsy_listing_id?: string | null;
+  /** A change to a live Etsy listing: the package it revises. Once approved, ATLAS applies it to that listing. */
+  revision_of?: string | null;
+  /** The listing's state on Etsy as last read: active, inactive, draft, expired, sold_out or removed. */
+  etsy_state?: string | null;
+  /** 1 when the owner brought an existing Etsy listing into ATLAS. */
+  etsy_adopted?: number;
   /** Who can approve it right now: the VPs, or the owner (always, for fees outside the budget). */
   approver: "owner" | "vp";
 }

@@ -31,8 +31,19 @@ How the first income stream (Ventures Etsy digital products) runs, and what the 
 | Publish         | You, or auto-publish               | Publishing makes it public; Etsy charges the fee                                                                                                |
 | Measure         | ATLAS (every 30 minutes)           | Paid orders become verified revenue; fees and refunds become costs; favorites are recorded                                                      |
 | Improve or stop | VP planner and stop rules          | Variants (title, price, images, tags) are tried one at a time; opportunities that use their budget, time or task limit with no sale are stopped |
+| Revise          | Planning, then VPs or you          | A change to a live listing is a revision (`listings.revise`), approved like any package, then applied to the same Etsy listing                  |
+| Take down       | ATLAS                              | When an opportunity stops, its live Etsy listings are set inactive (never listings you brought in)                                              |
 
 Every step is ordinary autonomy work, so the daily start cap, usage limits, VP approval of each task, the opportunity's budget and the emergency buttons all apply.
+
+## After a listing is live (added 2026-11-21)
+
+- **Revisions.** Agents never edit a live listing directly. `listings.revise` makes a draft copy with the change; it is submitted and approved like any package (no listing fee, so the VPs can approve it, except a price move of more than 50% either way, which goes to you). ATLAS then applies it to the same Etsy listing: title, description and tags through Etsy's listing update, price through the listing's inventory (Etsy's listing update does not take a price), and images or files by uploading the new ones and removing the old ones without ever leaving the listing empty. Experiment variants tied to the revision are measured from that moment. A listing whose price varies by option on Etsy is refused, so its prices are not flattened; change those on Etsy.
+- **Stopped opportunities.** Their live Etsy listings are set inactive on the next sync, and a line is written to the autonomy ledger. Restarting the opportunity does not reactivate the listing; do that on Etsy. Nothing new is pushed for a stopped opportunity.
+- **The whole shop.** Every sync reads every listing in the shop (active, inactive, draft, expired, sold out), including ones ATLAS did not create. Settings > Businesses > Etsy > **Show shop listings** lists them. **Bring into ATLAS** turns one into a published package (optionally tied to an opportunity), so its sales count there and agents can propose revisions of it. A listing you brought in is never taken down automatically. Agents can read the shop with `etsy.listings`.
+- **Changes made on Etsy.** If you edit a listing's title, description, tags or price on Etsy, ATLAS's copy follows it (unless an approved revision is still waiting). An approved draft you publish on Etsy becomes published in ATLAS. A listing deleted on Etsy is marked removed.
+- **Daily allowance.** Etsy reports its daily request allowance on every call. The Etsy card shows what is left; background sync pauses when less than 2% (at least 50 requests) remains and resumes as it refills. Your own button presses still go through.
+- **Half-pushed drafts.** If pushing a draft fails part way, pressing it again uploads only the images and files that are still missing.
 
 ## What counts as money
 
@@ -40,6 +51,14 @@ Every step is ordinary autonomy work, so the daily start cap, usage limits, VP a
 - Costs: Etsy payment-account entries that take money out (fees, refunds). Payouts to the bank are transfers and are skipped. Image generation is recorded at the cost per image you set (marked unverified, since it is ATLAS's estimate).
 - The listing fee for API-published listings arrives with Etsy's fee records, so it is not recorded twice.
 - **To verify once live:** how Etsy labels fee entries (`ledger_type`); the mapping in `classifyLedgerEntry` (`server/modules/etsy.ts`) is a best guess until real entries are seen.
+
+## Not confirmed by Etsy's documentation (check on the first live draft)
+
+- **Tags.** Etsy's spec calls tags "a comma-separated list" but types them as an array. ATLAS sends the comma form, reads back what Etsy saved, and if any tag is missing sends each tag as its own field and checks again. A listing where neither works fails with `etsy_tags_not_saved`.
+- **Image alt text** is sent as `alt_text` with each image (title plus "image N of M").
+- **Inventory price units.** Etsy's examples send the price as a decimal (5.00), which ATLAS does; one sentence in its tutorial mentions pennies.
+- **Webhooks** (order paid, listing updated) exist but need a public https address registered in Etsy's developer portal. ATLAS polls every 30 minutes instead.
+- **Not in Etsy's API at all:** customer messages and shop statistics (visits, views).
 
 ## Files
 

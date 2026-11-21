@@ -56,6 +56,12 @@ export interface ListingPackage {
   who_made: string;
   when_made: string;
   etsy_listing_id: string | null;
+  /** A change to a live listing: the package it revises. Approved like any package, then applied to the same listing. */
+  revision_of: string | null;
+  /** The listing's state on Etsy as last read (active, inactive, draft, expired, sold_out, removed). */
+  etsy_state: string | null;
+  /** 1 when the owner brought an existing Etsy listing into ATLAS (it was not created here). */
+  etsy_adopted: number;
   submitted_at: number | null;
   decided_at: number | null;
   published_at: number | null;
@@ -95,6 +101,10 @@ export function ensureListingSchema(db: DatabaseSync): void {
   if (!have.has("when_made"))
     db.exec("ALTER TABLE listing_packages ADD COLUMN when_made TEXT NOT NULL DEFAULT 'made_to_order'");
   if (!have.has("etsy_listing_id")) db.exec("ALTER TABLE listing_packages ADD COLUMN etsy_listing_id TEXT");
+  if (!have.has("revision_of")) db.exec("ALTER TABLE listing_packages ADD COLUMN revision_of TEXT");
+  if (!have.has("etsy_state")) db.exec("ALTER TABLE listing_packages ADD COLUMN etsy_state TEXT");
+  if (!have.has("etsy_adopted"))
+    db.exec("ALTER TABLE listing_packages ADD COLUMN etsy_adopted INTEGER NOT NULL DEFAULT 0");
 }
 
 /** Etsy's allowed values (from its OpenAPI spec). Digital goods made by the shop: `i_did` and `made_to_order`. */
@@ -289,13 +299,125 @@ export function submitListing(db: DatabaseSync, id: string, now = Date.now()): L
   ensureListingSchema(db);
   const current = getListing(db, id) ?? fail("listing_not_found");
   if (current.status !== "draft") fail("listing_not_editable");
-  if (!current.description || !current.files.length || current.price_minor <= 0) fail("listing_incomplete");
+  const target = current.revision_of ? getListing(db, current.revision_of) : null;
+  if (current.revision_of && !target) fail("listing_not_found");
+  // A revision keeps the live listing's files and images when it leaves them empty (adopted listings have none here).
+  if (!current.description || (!target && !current.files.length) || current.price_minor <= 0)
+    fail("listing_incomplete");
+  if (target && revisionChanges(current, target).length === 0) fail("listing_revision_unchanged");
   // Etsy will not create a listing without a category (taxonomy). Agents look one up with etsy.taxonomy.
   if (current.platform === "etsy" && !current.taxonomy_id) fail("listing_taxonomy_required");
   db.prepare(
     "UPDATE listing_packages SET status='ready',submitted_at=?,updated_at=? WHERE id=? AND status='draft'",
   ).run(now, now, id);
   return getListing(db, id)!;
+}
+
+/** VPs may approve a revision that moves the price by at most this share (50%) either way. */
+export const REVISION_PRICE_SWING = 0.5;
+export type RevisionField = "title" | "description" | "tags" | "price" | "images" | "files";
+
+/** What a revision changes on the live listing. Empty images or files mean "keep the ones on Etsy". */
+export function revisionChanges(revision: ListingPackage, target: ListingPackage): RevisionField[] {
+  const same = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(b);
+  const changes: RevisionField[] = [];
+  if (revision.title !== target.title) changes.push("title");
+  if (revision.description !== target.description) changes.push("description");
+  if (!same(revision.tags, target.tags)) changes.push("tags");
+  if (revision.price_minor !== target.price_minor) changes.push("price");
+  if (revision.mockups.length && !same(revision.mockups, target.mockups)) changes.push("images");
+  if (revision.files.length && !same(revision.files, target.files)) changes.push("files");
+  return changes;
+}
+
+const REVISABLE = ["title", "description", "tags", "price_minor", "files", "mockups", "notes"] as const;
+
+/**
+ * A change to a live Etsy listing (an experiment variant, a better title, new images). It starts as a draft copy of
+ * the live package with the changes applied, and goes through the same submit and approval as any package. Once
+ * approved, ATLAS applies it to the same Etsy listing. It costs no listing fee. One open revision per listing.
+ */
+export function createRevision(
+  db: DatabaseSync,
+  targetId: string,
+  input: Row,
+  author: { agentId?: string | null; taskId?: string | null } = {},
+  now = Date.now(),
+): ListingPackage {
+  ensureListingSchema(db);
+  const target = getListing(db, targetId) ?? fail("listing_not_found");
+  if (target.platform !== "etsy" || target.status !== "published" || !target.etsy_listing_id || target.revision_of)
+    fail("listing_not_revisable");
+  if (Object.keys(input).some((key) => !(REVISABLE as readonly string[]).includes(key)))
+    fail("listing_protected_field");
+  const open = db
+    .prepare("SELECT id FROM listing_packages WHERE revision_of=? AND status IN ('draft','ready','approved') LIMIT 1")
+    .get(target.id);
+  if (open) fail("listing_revision_open");
+  const values = contentValues({
+    ...Object.fromEntries(REVISABLE.map((key) => [key, target[key]])),
+    notes: "",
+    ...input,
+    currency: target.currency,
+    project_id: target.project_id,
+    opportunity_id: target.opportunity_id,
+    taxonomy_id: target.taxonomy_id,
+    who_made: target.who_made,
+    when_made: target.when_made,
+  });
+  const id = randomUUID();
+  db.prepare(
+    `INSERT INTO listing_packages (id,business,platform,project_id,opportunity_id,title,description,tags,price_minor,currency,
+      files,mockups,notes,fee_minor,fee_currency,status,agent_id,task_id,created_at,updated_at,taxonomy_id,who_made,when_made,
+      etsy_listing_id,revision_of,listing_url)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,'draft',?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id,
+    target.business,
+    target.platform,
+    values.project_id,
+    values.opportunity_id,
+    values.title,
+    values.description,
+    JSON.stringify(values.tags),
+    values.price_minor,
+    values.currency,
+    JSON.stringify(values.files),
+    JSON.stringify(values.mockups),
+    values.notes,
+    target.fee_currency,
+    author.agentId ?? null,
+    author.taskId ?? null,
+    now,
+    now,
+    values.taxonomy_id,
+    values.who_made,
+    values.when_made,
+    target.etsy_listing_id,
+    target.id,
+    target.listing_url,
+  );
+  return getListing(db, id)!;
+}
+
+/** After a revision is live on Etsy, the live package holds what Etsy now shows. */
+export function applyRevisionLocally(db: DatabaseSync, revisionId: string, now = Date.now()): ListingPackage {
+  const revision = getListing(db, revisionId) ?? fail("listing_not_found");
+  const target = getListing(db, revision.revision_of ?? "") ?? fail("listing_not_found");
+  const changes = revisionChanges(revision, target);
+  db.prepare(
+    "UPDATE listing_packages SET title=?,description=?,tags=?,price_minor=?,mockups=?,files=?,updated_at=? WHERE id=?",
+  ).run(
+    revision.title,
+    revision.description,
+    JSON.stringify(revision.tags),
+    revision.price_minor,
+    JSON.stringify(changes.includes("images") ? revision.mockups : target.mockups),
+    JSON.stringify(changes.includes("files") ? revision.files : target.files),
+    now,
+    target.id,
+  );
+  return getListing(db, target.id)!;
 }
 
 export function feeBudgetMonth(now: number): string {
@@ -356,6 +478,13 @@ export function feeNeedsOwner(
 /** Who may approve this package right now. Fails closed to the owner. */
 export function listingApprover(db: DatabaseSync, listing: ListingPackage, now = Date.now()): "owner" | "vp" {
   if (businessPolicy(listing.business).customer_sends !== "vp") return "owner";
+  if (listing.revision_of) {
+    // A big price move on a live listing is the owner's call, not the VPs'.
+    const target = getListing(db, listing.revision_of);
+    if (!target) return "owner";
+    const ratio = target.price_minor > 0 ? listing.price_minor / target.price_minor : Infinity;
+    if (ratio < 1 - REVISION_PRICE_SWING || ratio > 1 + REVISION_PRICE_SWING) return "owner";
+  }
   return feeNeedsOwner(db, listing, now) ? "owner" : "vp";
 }
 
@@ -375,6 +504,7 @@ export function listingContentHash(listing: ListingPackage): string {
         listing.mockups,
         listing.fee_minor,
         listing.fee_currency,
+        listing.revision_of ?? null,
         ...(listing.platform === "etsy" ? [listing.taxonomy_id, listing.who_made, listing.when_made] : []),
       ]),
     )

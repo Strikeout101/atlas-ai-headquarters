@@ -2,10 +2,12 @@ import type { Express, Request, Response } from "express";
 import type { DatabaseSync } from "node:sqlite";
 import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../security/auth.ts";
 import {
+  adoptEtsyListing,
   completeEtsyConnect,
   disconnectEtsy,
   ensureEtsySchema,
   etsySettings,
+  etsyShopListings,
   publishEtsyListing,
   pushListingDraft,
   saveEtsySettings,
@@ -81,6 +83,15 @@ export function registerEtsyRoutes(
   app.post(
     "/api/etsy/sync",
     handle(async () => ({ counts: await syncEtsy(db), settings: etsySettings(db) })),
+  );
+  app.get("/api/etsy/listings", (_req, res) => res.json({ ok: true, items: etsyShopListings(db) }));
+  app.post(
+    "/api/etsy/listings/:id/adopt",
+    handle((req) => {
+      const item = adoptEtsyListing(db, String(req.params.id), body(req));
+      broadcast("listings_changed", { id: item.id });
+      return { item };
+    }),
   );
   app.post(
     "/api/etsy/disconnect",

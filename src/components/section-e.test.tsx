@@ -21,6 +21,8 @@ vi.mock("../api/etsy", () => ({
     disconnect: vi.fn(),
     pushDraft: vi.fn(),
     publish: vi.fn(),
+    shopListings: vi.fn(),
+    adopt: vi.fn(),
   },
 }));
 vi.mock("../api/studio", () => ({
@@ -37,6 +39,7 @@ vi.mock("../api/autonomy", async (original) => ({
   savePlaybook: vi.fn(),
   resetPlaybook: vi.fn(),
   addPlaybookResearchSchedule: vi.fn(),
+  getAutonomy: vi.fn(),
 }));
 
 const etsy: EtsyState = {
@@ -79,6 +82,69 @@ beforeEach(() => {
 });
 
 describe("Etsy card", () => {
+  it("shows the requests left today and lets the owner bring an existing shop listing into ATLAS", async () => {
+    const user = userEvent.setup();
+    vi.mocked(etsyApi.get).mockResolvedValue({
+      ...etsy,
+      connected: true,
+      shop_id: "777",
+      shop_name: "Ventures",
+      rate_limit_per_day: 10000,
+      rate_remaining_today: 120,
+      quota_low: true,
+      shop_listings: 2,
+    });
+    const listing = {
+      description: "",
+      tags: [],
+      currency: "USD",
+      quantity: 1,
+      seen_at: 1,
+      opportunity_id: null,
+      adopted: false,
+      num_favorers: 4,
+    };
+    vi.mocked(etsyApi.shopListings).mockResolvedValue([
+      {
+        ...listing,
+        listing_id: "9001",
+        state: "active",
+        title: "Made here",
+        price_minor: 450,
+        url: null,
+        package_id: "p1",
+      },
+      {
+        ...listing,
+        listing_id: "7000",
+        state: "inactive",
+        title: "Old calendar",
+        price_minor: 300,
+        url: null,
+        package_id: null,
+      },
+    ]);
+    vi.mocked(etsyApi.adopt).mockResolvedValue({} as never);
+    vi.mocked(autonomy.getAutonomy).mockResolvedValue({
+      opportunities: [
+        { id: "o1", business: "ventures", title: "Calendars", status: "launched" },
+        { id: "o2", business: "tech", title: "Websites", status: "launched" },
+      ],
+    } as never);
+    render(<EtsySettings />);
+    expect(await screen.findByText(/Etsy requests left today: 120 of 10000/)).toBeVisible();
+    expect(screen.getByText(/background sync paused until it refills/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Show shop listings (2)" }));
+    const list = await screen.findByRole("list", { name: "Shop listings" });
+    expect(within(list).getByText("Made by ATLAS")).toBeVisible();
+    expect(within(list).getByText(/inactive · 3\.00 USD · 4 favorites/)).toBeVisible();
+    const select = within(list).getByLabelText("Opportunity for Old calendar");
+    expect(within(select).queryByText("Websites")).toBeNull();
+    await user.selectOptions(select, "o1");
+    await user.click(within(list).getByRole("button", { name: "Bring into ATLAS" }));
+    expect(etsyApi.adopt).toHaveBeenCalledWith("7000", "o1");
+  });
+
   it("saves the app details without echoing the secret, and finishes connecting from the pasted address", async () => {
     const user = userEvent.setup();
     vi.mocked(etsyApi.save).mockResolvedValue({

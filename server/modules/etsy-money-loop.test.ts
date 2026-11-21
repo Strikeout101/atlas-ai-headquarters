@@ -14,10 +14,25 @@ import {
   getFinancialGoalProgress,
 } from "./finance-store.ts";
 import { saveRecurringCost, setCostsComplete, profitLines } from "./profit.ts";
-import { createListing, decideListing, getListing, submitListing, setFeeBudget } from "./listings.ts";
 import {
+  createListing,
+  createRevision,
+  decideListing,
+  getListing,
+  listingApprover,
+  markListingPublished,
+  submitListing,
+  setFeeBudget,
+} from "./listings.ts";
+import {
+  adoptEtsyListing,
+  applyEtsyRevision,
   classifyLedgerEntry,
   completeEtsyConnect,
+  deactivateStoppedListings,
+  etsyQuotaLow,
+  etsyShopListings,
+  runEtsyTick,
   etsyRequest,
   pkcePair,
   publishEtsyListing,
@@ -334,7 +349,7 @@ describe("Etsy connection", () => {
       "GET /v3/application/shops/777/listings": () => ({ body: { results: [{ listing_id: 9001, num_favorers: 7 }] } }),
     });
     const counts = await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
-    expect(counts).toEqual({ receipts: 1, fees: 2, refunds: 1, listings: 1 });
+    expect(counts).toEqual({ receipts: 1, fees: 2, refunds: 1, listings: 1, shop_listings: 1, changed_on_etsy: 0 });
     await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 1000 });
     const rows = db
       .prepare(
@@ -352,6 +367,298 @@ describe("Etsy connection", () => {
       sales: 1,
     });
     expect(classifyLedgerEntry({ amount: -5, ledger_type: "payout" })).toBeNull();
+  });
+});
+
+function publishedEtsyListing(db: DatabaseSync) {
+  const listing = approvedEtsyListing(db);
+  db.prepare("UPDATE listing_packages SET etsy_listing_id='9001', etsy_state='active' WHERE id=?").run(listing.id);
+  return markListingPublished(db, listing.id, "https://www.etsy.com/listing/9001/budget-planner", NOW, {
+    recordFee: false,
+  });
+}
+
+describe("Etsy listings after launch", () => {
+  it("sends alt text with images, and falls back to one field per tag when Etsy did not keep the comma list", async () => {
+    const db = harness();
+    connected(db);
+    const listing = approvedEtsyListing(db);
+    const { fetchFn, calls } = fakeEtsy({
+      "POST /v3/application/shops/777/listings": () => ({
+        status: 201,
+        body: { listing_id: 9001, tags: ["planner,budget"] },
+      }),
+      "PATCH /v3/application/shops/777/listings/9001": () => ({
+        body: { listing_id: 9001, tags: ["planner", "budget"] },
+      }),
+      "POST /v3/application/shops/777/listings/9001/images": () => ({ body: { listing_image_id: 1 } }),
+      "POST /v3/application/shops/777/listings/9001/files": () => ({ body: { listing_file_id: 2 } }),
+    });
+    await pushListingDraft(db, listing.id, { fetch: fetchFn, now: () => NOW });
+    const retry = calls.find((call) => call.method === "PATCH")!;
+    expect(new URLSearchParams(String(retry.init.body)).getAll("tags")).toEqual(["planner", "budget"]);
+    const image = calls.find((call) => call.url.pathname.endsWith("/images"))!;
+    expect((image.init.body as FormData).get("alt_text")).toBe("Budget planner - image 1 of 1");
+    expect(getListing(db, listing.id)).toMatchObject({ etsy_listing_id: "9001", etsy_state: "draft" });
+  });
+
+  it("finishes a half-pushed draft by uploading only what is missing", async () => {
+    const db = harness();
+    connected(db);
+    const listing = approvedEtsyListing(db);
+    db.prepare("UPDATE listing_packages SET etsy_listing_id='9001' WHERE id=?").run(listing.id);
+    const { fetchFn, calls } = fakeEtsy({
+      "GET /v3/application/listings/9001/images": () => ({ body: { results: [{ listing_image_id: 1 }] } }),
+      "GET /v3/application/shops/777/listings/9001/files": () => ({ body: { results: [] } }),
+      "POST /v3/application/shops/777/listings/9001/files": () => ({ body: { listing_file_id: 2 } }),
+    });
+    await pushListingDraft(db, listing.id, { fetch: fetchFn, now: () => NOW });
+    expect(calls.map((call) => `${call.method} ${call.url.pathname.replace("/v3/application", "")}`)).toEqual([
+      "GET /listings/9001/images",
+      "GET /shops/777/listings/9001/files",
+      "POST /shops/777/listings/9001/files",
+    ]);
+  });
+
+  it("applies an approved revision to the live listing: text by update, price by inventory, new images safely", async () => {
+    const db = harness();
+    connected(db);
+    const live = publishedEtsyListing(db);
+    expect(() => createRevision(db, live.id, { business: "tech" })).toThrow("listing_protected_field");
+    const unchanged = createRevision(db, live.id, {}, { agentId: "lead-p" }, NOW);
+    expect(() => submitListing(db, unchanged.id, NOW)).toThrow("listing_revision_unchanged");
+    db.prepare("UPDATE listing_packages SET status='withdrawn' WHERE id=?").run(unchanged.id);
+
+    const big = createRevision(db, live.id, { price_minor: 1500 }, { agentId: "lead-p" }, NOW);
+    expect(listingApprover(db, submitListing(db, big.id, NOW), NOW)).toBe("owner");
+    expect(() => createRevision(db, live.id, { title: "x" })).toThrow("listing_revision_open");
+    db.prepare("UPDATE listing_packages SET status='withdrawn' WHERE id=?").run(big.id);
+
+    const revision = createRevision(
+      db,
+      live.id,
+      { title: "Budget planner 2027", tags: ["planner", "budget", "2027"], price_minor: 500 },
+      { agentId: "lead-p", taskId: "t1" },
+      NOW,
+    );
+    expect(revision).toMatchObject({ revision_of: live.id, etsy_listing_id: "9001", fee_minor: 0, status: "draft" });
+    const submitted = submitListing(db, revision.id, NOW);
+    expect(listingApprover(db, submitted, NOW)).toBe("vp");
+    decideListing(db, revision.id, true, "owner", "", NOW);
+    startVariant(db, { opportunity_id: "o1", variable: "price", value: "5.00", listing_id: revision.id }, {}, NOW);
+
+    const { fetchFn, calls } = fakeEtsy({
+      "PATCH /v3/application/shops/777/listings/9001": () => ({
+        body: { listing_id: 9001, tags: ["planner", "budget", "2027"] },
+      }),
+      "GET /v3/application/listings/9001/inventory": () => ({
+        body: {
+          products: [
+            {
+              product_id: 1,
+              sku: "",
+              property_values: [],
+              offerings: [
+                {
+                  offering_id: 5,
+                  price: { amount: 450, divisor: 100, currency_code: "USD" },
+                  quantity: 999,
+                  is_enabled: true,
+                },
+              ],
+            },
+          ],
+          price_on_property: [],
+          quantity_on_property: [],
+          sku_on_property: [],
+        },
+      }),
+      "PUT /v3/application/listings/9001/inventory": () => ({ body: {} }),
+    });
+    const LATER = NOW + 60_000;
+    const applied = await applyEtsyRevision(db, revision.id, { fetch: fetchFn, now: () => LATER });
+    expect(applied.status).toBe("published");
+    const update = new URLSearchParams(String(calls[0].init.body));
+    expect(Object.fromEntries(update)).toEqual({ title: "Budget planner 2027", tags: "planner,budget,2027" });
+    const put = calls.find((call) => call.method === "PUT")!;
+    expect((put.init.headers as Record<string, string>)["content-type"]).toBe("application/json");
+    expect(JSON.parse(String(put.init.body))).toEqual({
+      products: [{ sku: "", property_values: [], offerings: [{ price: 5, quantity: 999, is_enabled: true }] }],
+      price_on_property: [],
+      quantity_on_property: [],
+      sku_on_property: [],
+    });
+    // Same images as the live listing, so they are left alone.
+    expect(calls.some((call) => call.url.pathname.includes("/images"))).toBe(false);
+    expect(getListing(db, live.id)).toMatchObject({ title: "Budget planner 2027", price_minor: 500 });
+    expect(db.prepare("SELECT started_at FROM opportunity_variants WHERE listing_id=?").get(revision.id)).toEqual({
+      started_at: LATER,
+    });
+    expect(db.prepare("SELECT event FROM autonomy_ledger WHERE event='etsy_revised'").get()).toEqual({
+      event: "etsy_revised",
+    });
+  });
+
+  it("replaces images without leaving the listing empty, and refuses to flatten prices that vary by option", async () => {
+    const db = harness();
+    connected(db);
+    const live = publishedEtsyListing(db);
+    db.prepare("UPDATE listing_packages SET mockups='[]' WHERE id=?").run(live.id);
+    const revision = createRevision(db, live.id, { mockups: ["products/page.png"] }, {}, NOW);
+    submitListing(db, revision.id, NOW);
+    decideListing(db, revision.id, true, "owner", "", NOW);
+    const { fetchFn, calls } = fakeEtsy({
+      "GET /v3/application/listings/9001/images": () => ({
+        body: { results: [{ listing_image_id: 11 }, { listing_image_id: 12 }] },
+      }),
+      "DELETE /v3/application/shops/777/listings/9001/images/\\d+": () => ({ body: {} }),
+      "POST /v3/application/shops/777/listings/9001/images": () => ({ body: { listing_image_id: 13 } }),
+    });
+    await applyEtsyRevision(db, revision.id, { fetch: fetchFn, now: () => NOW });
+    expect(calls.map((call) => `${call.method} ${call.url.pathname.split("/").slice(-2).join("/")}`)).toEqual([
+      "GET 9001/images",
+      "DELETE images/12",
+      "POST 9001/images",
+      "DELETE images/11",
+    ]);
+
+    const priced = createRevision(db, live.id, { price_minor: 400 }, {}, NOW);
+    submitListing(db, priced.id, NOW);
+    decideListing(db, priced.id, true, "owner", "", NOW);
+    const varies = fakeEtsy({
+      "GET /v3/application/listings/9001/inventory": () => ({
+        body: { products: [{ offerings: [] }], price_on_property: [513] },
+      }),
+    });
+    await expect(applyEtsyRevision(db, priced.id, { fetch: varies.fetchFn, now: () => NOW })).rejects.toThrow(
+      "etsy_price_varies_by_option",
+    );
+    expect(getListing(db, priced.id)!.status).toBe("approved");
+  });
+
+  it("takes down listings of stopped opportunities, but never one the owner brought in", async () => {
+    const db = harness();
+    connected(db);
+    const live = publishedEtsyListing(db);
+    db.prepare("UPDATE opportunities SET status='stopped', stop_reason='no sales in 30 days live' WHERE id='o1'").run();
+    db.prepare(
+      `INSERT INTO listing_packages (id,business,platform,opportunity_id,title,status,etsy_listing_id,etsy_state,etsy_adopted,created_at,updated_at)
+       VALUES ('adopted','ventures','etsy','o1','Old planner','published','8000','active',1,1,1)`,
+    ).run();
+    const { fetchFn, calls } = fakeEtsy({
+      "PATCH /v3/application/shops/777/listings/9001": () => ({ body: { listing_id: 9001, state: "inactive" } }),
+    });
+    expect(await deactivateStoppedListings(db, { fetch: fetchFn, now: () => NOW })).toBe(1);
+    expect(Object.fromEntries(new URLSearchParams(String(calls[0].init.body)))).toEqual({ state: "inactive" });
+    expect(getListing(db, live.id)!.etsy_state).toBe("inactive");
+    expect(getListing(db, "adopted")!.etsy_state).toBe("active");
+    expect(await deactivateStoppedListings(db, { fetch: fetchFn, now: () => NOW })).toBe(0);
+  });
+
+  it("mirrors the whole shop, follows changes made on Etsy, and lets the owner bring a listing in", async () => {
+    const db = harness();
+    connected(db);
+    const live = publishedEtsyListing(db);
+    const waiting = createListing(
+      db,
+      {
+        business: "ventures",
+        platform: "etsy",
+        title: "Habit tracker",
+        description: "Printable",
+        price_minor: 300,
+        files: ["products/planner.pdf"],
+        project_id: "p1",
+        taxonomy_id: 2078,
+      },
+      {},
+      NOW,
+    );
+    submitListing(db, waiting.id, NOW);
+    decideListing(db, waiting.id, true, "owner", "", NOW);
+    db.prepare("UPDATE listing_packages SET etsy_listing_id='9002' WHERE id=?").run(waiting.id);
+    const byState: Record<string, unknown[]> = {
+      active: [
+        {
+          listing_id: 9001,
+          title: "Budget planner (edited on Etsy)",
+          description: "Printable monthly budget planner",
+          tags: ["budget", "planner"],
+          price: { amount: 600, divisor: 100, currency_code: "USD" },
+          num_favorers: 3,
+          url: "https://www.etsy.com/listing/9001/budget-planner",
+        },
+        {
+          listing_id: 9002,
+          title: "Habit tracker",
+          description: "Printable",
+          tags: [],
+          price: { amount: 300, divisor: 100, currency_code: "USD" },
+          url: "https://www.etsy.com/listing/9002/habit-tracker",
+        },
+      ],
+      inactive: [
+        { listing_id: 7000, title: "Old calendar", tags: ["calendar"], who_made: "i_did", when_made: "2020_2026" },
+      ],
+    };
+    const { fetchFn } = fakeEtsy({
+      "GET /v3/application/shops/777/receipts": () => ({ body: { results: [] } }),
+      "GET /v3/application/shops/777/payment-account/ledger-entries": () => ({ body: { results: [] } }),
+      "GET /v3/application/shops/777/listings": (_init, url) => ({
+        body: { results: byState[url.searchParams.get("state") ?? ""] ?? [] },
+        headers: { "x-limit-per-day": "10000", "x-remaining-today": "9000" },
+      }),
+    });
+    const counts = await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
+    expect(counts).toMatchObject({ shop_listings: 3, changed_on_etsy: 1, listings: 1 });
+    expect(getListing(db, live.id)).toMatchObject({ title: "Budget planner (edited on Etsy)", price_minor: 600 });
+    expect(getListing(db, waiting.id)).toMatchObject({ status: "published", etsy_state: "active" });
+    expect(etsyQuotaLow(db, NOW)).toBe(false);
+
+    const shop = etsyShopListings(db);
+    expect(shop.map((item) => [item.listing_id, item.state, item.package_id !== null])).toEqual([
+      ["9001", "active", true],
+      ["9002", "active", true],
+      ["7000", "inactive", false],
+    ]);
+    expect(() => adoptEtsyListing(db, "9001", {}, NOW)).toThrow("etsy_listing_already_in_atlas");
+    expect(() => adoptEtsyListing(db, "7000", { opportunity_id: "nope" }, NOW)).toThrow("invalid_opportunity_id");
+    const adopted = adoptEtsyListing(db, "7000", { opportunity_id: "o1" }, NOW);
+    expect(adopted).toMatchObject({
+      status: "published",
+      etsy_adopted: 1,
+      opportunity_id: "o1",
+      project_id: "p1",
+      tags: ["calendar"],
+      when_made: "2020_2026",
+    });
+    // An adopted listing can be revised like any live one.
+    expect(createRevision(db, adopted.id, { title: "Old calendar 2027" }, {}, NOW).revision_of).toBe(adopted.id);
+
+    // Gone from Etsy on a complete read: marked removed.
+    byState.active = byState.active.slice(1);
+    await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 1000 });
+    expect(getListing(db, live.id)!.etsy_state).toBe("removed");
+  });
+
+  it("tracks Etsy's daily allowance and pauses background work when it is nearly used", async () => {
+    const db = harness();
+    connected(db);
+    approvedEtsyListing(db);
+    const { fetchFn, calls } = fakeEtsy({
+      "GET /v3/application/users/me": () => ({
+        body: { user_id: 42, shop_id: 777 },
+        headers: { "x-limit-per-day": "10000", "x-remaining-today": "120" },
+      }),
+    });
+    await etsyRequest(db, "GET", "/users/me", {}, { fetch: fetchFn, now: () => NOW });
+    expect(etsyQuotaLow(db, NOW)).toBe(true);
+    expect(etsyQuotaLow(db, NOW + 86_400_001)).toBe(false);
+    await runEtsyTick(db, { fetch: fetchFn, now: () => NOW });
+    expect(calls).toHaveLength(1);
+    expect(String(db.prepare("SELECT last_sync_error FROM etsy_connection").get()!.last_sync_error)).toContain(
+      "120 left",
+    );
   });
 });
 
@@ -707,4 +1014,39 @@ describe("agent tools through the gateway", () => {
     },
     60_000,
   );
+
+  it("lets an agent read the shop and propose a revision of a live listing, which waits for approval", async () => {
+    const { default: express } = await import("express");
+    const { default: request } = await import("supertest");
+    const { registerAgentToolRoutes } = await import("./routes/ops/agent-tools.ts");
+    const { createAgentTaskToken } = await import("../security/agent-task-token.ts");
+    const db = harness();
+    connected(db);
+    const live = publishedEtsyListing(db);
+    db.prepare(
+      "INSERT INTO etsy_shop_listings (listing_id,state,title,seen_at) VALUES ('9001','active','Budget planner',1),('5','removed','Gone',1)",
+    ).run();
+    db.exec(
+      "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-rev','Better title','in_progress','lead-p','p1',1,1)",
+    );
+    const app = express();
+    app.use(express.json());
+    registerAgentToolRoutes(app, db, (() => {}) as never);
+    const call = (data: Record<string, unknown>) =>
+      request(app)
+        .post("/api/agent-tools")
+        .set("x-agent-task-token", createAgentTaskToken("t-rev", "lead-p"))
+        .send(data);
+    const shop = await call({ operation: "etsy.listings" }).expect(200);
+    expect(shop.body.items.map((item: { listing_id: string }) => item.listing_id)).toEqual(["9001"]);
+    const revised = await call({
+      operation: "listings.revise",
+      id: live.id,
+      payload: { title: "Budget planner 2027" },
+    }).expect(201);
+    expect(revised.body.item).toMatchObject({ revision_of: live.id, status: "draft", agent_id: "lead-p" });
+    const submitted = await call({ operation: "listings.submit", id: revised.body.item.id }).expect(200);
+    expect(submitted.body.item.status).toBe("ready");
+    expect(getListing(db, live.id)!.title).toBe("Budget planner");
+  });
 });

@@ -307,22 +307,24 @@ Memory changes need the owner password session and CSRF. Agent task tokens are r
 
 All owner-only (password session, plus CSRF for changes); agent task tokens are refused. Details: `docs/etsy.md`.
 
-| Method     | Path                                                                                   | What it does                                                             |
-| ---------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| GET/PATCH  | `/api/etsy`                                                                            | Etsy connection (secrets never returned) / save app details and switches |
-| POST       | `/api/etsy/connect`, `/api/etsy/connect/complete`                                      | Start OAuth (PKCE) / finish with the pasted redirect address             |
-| POST       | `/api/etsy/test`, `/api/etsy/sync`, `/api/etsy/disconnect`                             | Check the shop / read orders, fees and favorites now / forget tokens     |
-| POST       | `/api/listings/:id/etsy-draft`, `/api/listings/:id/etsy-publish`                       | Push an approved package as a private Etsy draft / make it public        |
-| GET/PATCH  | `/api/studio`                                                                          | Image studio settings (provider off by default, monthly cap)             |
-| POST       | `/api/studio/test`                                                                     | Image service model list (no paid image)                                 |
-| GET        | `/api/media`, `/api/media/:id/file`                                                    | Media library / one image file                                           |
-| POST/PATCH | `/api/finance/recurring-costs`, `/api/finance/recurring-costs/:id`                     | Monthly costs                                                            |
-| POST       | `/api/finance/recurring-costs/:id/delete`                                              | Remove a monthly cost                                                    |
-| PATCH      | `/api/finance/profit-settings`                                                         | `{costs_complete}`: profit goals are measured only once true             |
-| PATCH      | `/api/autonomy/experiment-rules`                                                       | Stop rules                                                               |
-| POST       | `/api/autonomy/opportunities/:id/restart`                                              | Restart a stopped opportunity with a fresh window                        |
-| PUT        | `/api/autonomy/playbooks/:key`                                                         | Edit a playbook's steps                                                  |
-| POST       | `/api/autonomy/playbooks/:key/reset`, `/api/autonomy/playbooks/:key/research-schedule` | Default steps back / add its research schedule (off)                     |
+| Method     | Path                                                                                   | What it does                                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| GET/PATCH  | `/api/etsy`                                                                            | Etsy connection (secrets never returned) / save app details and switches                                                       |
+| POST       | `/api/etsy/connect`, `/api/etsy/connect/complete`                                      | Start OAuth (PKCE) / finish with the pasted redirect address                                                                   |
+| POST       | `/api/etsy/test`, `/api/etsy/sync`, `/api/etsy/disconnect`                             | Check the shop / read orders, fees and favorites now / forget tokens                                                           |
+| POST       | `/api/listings/:id/etsy-draft`, `/api/listings/:id/etsy-publish`                       | Push an approved package as a private Etsy draft / make it public. An approved revision is applied to its live listing instead |
+| GET        | `/api/etsy/listings`                                                                   | Every shop listing as last synced, with its ATLAS package if any                                                               |
+| POST       | `/api/etsy/listings/:id/adopt`                                                         | Bring an existing shop listing into ATLAS (`opportunity_id?`)                                                                  |
+| GET/PATCH  | `/api/studio`                                                                          | Image studio settings (provider off by default, monthly cap)                                                                   |
+| POST       | `/api/studio/test`                                                                     | Image service model list (no paid image)                                                                                       |
+| GET        | `/api/media`, `/api/media/:id/file`                                                    | Media library / one image file                                                                                                 |
+| POST/PATCH | `/api/finance/recurring-costs`, `/api/finance/recurring-costs/:id`                     | Monthly costs                                                                                                                  |
+| POST       | `/api/finance/recurring-costs/:id/delete`                                              | Remove a monthly cost                                                                                                          |
+| PATCH      | `/api/finance/profit-settings`                                                         | `{costs_complete}`: profit goals are measured only once true                                                                   |
+| PATCH      | `/api/autonomy/experiment-rules`                                                       | Stop rules                                                                                                                     |
+| POST       | `/api/autonomy/opportunities/:id/restart`                                              | Restart a stopped opportunity with a fresh window                                                                              |
+| PUT        | `/api/autonomy/playbooks/:key`                                                         | Edit a playbook's steps                                                                                                        |
+| POST       | `/api/autonomy/playbooks/:key/reset`, `/api/autonomy/playbooks/:key/research-schedule` | Default steps back / add its research schedule (off)                                                                           |
 
 `GET /api/finance` now also returns `profit` (lines per business, monthly costs, `costs_complete`) and each opportunity's `spent_minor` and `earned_minor`. `GET /api/autonomy` also returns `experiment_rules`, `playbooks` and `milestones`.
 
