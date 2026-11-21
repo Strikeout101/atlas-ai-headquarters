@@ -64,6 +64,7 @@ Rules of thumb:
 | `profit.ts`                     | Monthly costs and profit per business and opportunity                                                                                               |
 | `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                                                                              |
 | `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner                                                                |
+| `goal-strategy.ts`              | Goal strategy: a goal with no current strategy gets a research task; `strategy.save`; ideas tied to the goal                                        |
 | `streams.ts`                    | One income stream's page data (`GET /api/streams`)                                                                                                  |
 | `content-guard.ts`              | Flags web content that tries to instruct agents; flagged tasks' approvals go to the owner                                                           |
 | `businesses.ts`                 | The business registry (`tech`, `rental`, `ventures`)                                                                                                |

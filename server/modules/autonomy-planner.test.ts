@@ -4,6 +4,14 @@ import { applyBaseSchema } from "./bootstrap/schema/base-schema.ts";
 import { ensureControlStateSchema, resetControlStateForTests, setControlMode } from "./control-state.ts";
 import { ensureAutonomyEngineSchema } from "./autonomy-engine.ts";
 import { opportunityPriority, parsePlanningReply, runVpPlanningTick } from "./autonomy-planner.ts";
+import {
+  ensureGoalStrategySchema,
+  goalNeedsStrategy,
+  latestStrategies,
+  saveStrategy,
+  strategyContextForTask,
+} from "./goal-strategy.ts";
+import { proposeOpportunity } from "./playbooks.ts";
 
 const NOW = Date.parse("2026-11-16T16:00:00Z");
 const dbs: DatabaseSync[] = [];
@@ -35,7 +43,7 @@ function idea(overrides: Record<string, unknown> = {}) {
 function reply(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({ opportunities: [], actions: [], ...overrides });
 }
-function harness() {
+function harness(opts: { strategy?: boolean } = {}) {
   const db = new DatabaseSync(":memory:");
   dbs.push(db);
   applyBaseSchema(db);
@@ -53,6 +61,12 @@ function harness() {
       JSON.stringify({ windows: [{ utilization: 0.2 }], error: null }),
       NOW,
     );
+  // Most planning tests start from a goal that already has a researched strategy.
+  ensureGoalStrategySchema(db);
+  if (opts.strategy !== false)
+    db.prepare(
+      "INSERT INTO goal_strategies(id,goal_id,business,project_id,summary,created_at) VALUES ('s0','goal','ventures','project',?,?)",
+    ).run("Existing strategy: sell planning templates to small venues.", NOW - 86_400_000);
   const runAgentOneShot = vi.fn<Parameters<typeof runVpPlanningTick>[0]["runAgentOneShot"]>(async () => ({
     text: reply(),
   }));
@@ -286,5 +300,96 @@ describe("VP planning beat", () => {
     expect(db.prepare("SELECT opportunity_id,status FROM autonomy_work").all()).toEqual([
       { opportunity_id: "idea", status: "pending" },
     ]);
+  });
+});
+
+describe("goal strategy", () => {
+  const DAY = 86_400_000;
+  const longSummary = (text: string) =>
+    `${text} ${"Average price 6 USD, so about 330 sales a month; 40 listings at 0.3 sales a day each. ".repeat(4)}`;
+
+  it("turns a goal with no strategy into one approvable research task, without a model call", async () => {
+    const { db, deps, runAgentOneShot } = harness({ strategy: false });
+    db.prepare("UPDATE business_goals SET metric='verified_revenue', target=2000").run();
+    await runVpPlanningTick(deps);
+    expect(runAgentOneShot).not.toHaveBeenCalled();
+    const work = db
+      .prepare(
+        "SELECT w.goal_id, w.purpose, w.status, p.department_id, p.title, p.description FROM autonomy_work w JOIN agent_task_proposals p ON p.id=w.proposal_id",
+      )
+      .all() as Array<Record<string, string>>;
+    expect(work).toHaveLength(1);
+    // The Etsy playbook's research department has no leader here, so it falls back to one that does.
+    expect(work[0]).toMatchObject({
+      goal_id: "goal",
+      purpose: "strategy",
+      status: "pending",
+      department_id: "research",
+    });
+    expect(work[0].description).toContain("GOAL: 2,000 USD of verified revenue");
+    expect(work[0].description).toContain("Nobody will tell you how to research");
+    expect(work[0].description).toContain("strategy.save");
+    expect(work[0].description).toContain("etsy.search");
+    expect(goalNeedsStrategy(db, db.prepare("SELECT * FROM business_goals").get() as never, NOW)).toBeNull();
+    // A later beat does not queue a second one while it is open.
+    await runVpPlanningTick({ ...deps, now: () => NOW + 7 * 3_600_000 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM autonomy_work").get()).toEqual({ n: 1 });
+    expect(db.prepare("SELECT event FROM autonomy_ledger WHERE event='strategy_queued'").all()).toHaveLength(1);
+  });
+
+  it("lets the strategy task save its plan and tie its ideas to the goal, then plans with that strategy", async () => {
+    const { db, deps, runAgentOneShot } = harness({ strategy: false });
+    await runVpPlanningTick(deps);
+    db.exec(
+      "INSERT INTO tasks (id,title,status,project_id,created_at,updated_at) VALUES ('t-strategy','Strategy','in_progress','project',1,1)",
+    );
+    db.prepare("UPDATE autonomy_work SET task_id='t-strategy', status='running'").run();
+    expect(() => saveStrategy(db, { summary: "too short" }, { taskId: "t-strategy", agentId: "leader" }, NOW)).toThrow(
+      "invalid_summary",
+    );
+    expect(() => saveStrategy(db, { summary: longSummary("x") }, { taskId: "other", agentId: "leader" }, NOW)).toThrow(
+      "strategy_needs_strategy_task",
+    );
+    saveStrategy(
+      db,
+      { summary: longSummary("Focus on wedding planners.") },
+      { taskId: "t-strategy", agentId: "leader" },
+      NOW,
+    );
+    expect(strategyContextForTask(db, "t-strategy")).toEqual({ goalId: "goal", playbook: "etsy_digital" });
+    const idea = proposeOpportunity(
+      db,
+      { title: "Printable wedding planner", description: "1,200 active listings, median 7 USD", demand_score: 70 },
+      { business: "ventures", projectId: "project", taskId: "t-strategy", playbook: "etsy_digital", goalId: "goal" },
+      NOW,
+    );
+    expect(idea).toMatchObject({ goal_id: "goal", playbook: "etsy_digital", status: "idea" });
+    expect(latestStrategies(db)).toEqual([
+      expect.objectContaining({ goal_id: "goal", summary: expect.stringContaining("wedding planners") }),
+    ]);
+    db.prepare("UPDATE autonomy_work SET status='done'").run();
+    const LATER = NOW + 12 * 3_600_000;
+    db.prepare("UPDATE cli_usage_cache SET updated_at=?").run(LATER);
+    await runVpPlanningTick({ ...deps, now: () => LATER });
+    expect(runAgentOneShot).toHaveBeenCalledTimes(1);
+    const prompt = runAgentOneShot.mock.calls[0][1];
+    expect(prompt).toContain("Focus on wedding planners.");
+    expect(prompt).toContain("STRATEGY below was researched");
+  });
+
+  it("refreshes a strategy after 14 days, or after 3 days once no ideas are left", () => {
+    const { db } = harness({ strategy: false });
+    const goal = db.prepare("SELECT * FROM business_goals").get() as never;
+    db.prepare(
+      "INSERT INTO goal_strategies(id,goal_id,business,project_id,summary,created_at) VALUES ('s1','goal','ventures','project','Plan',?)",
+    ).run(NOW);
+    db.prepare(
+      "INSERT INTO opportunities(id,business,project_id,title,status,created_at,updated_at) VALUES ('o1','ventures','project','Idea','idea',1,1)",
+    ).run();
+    expect(goalNeedsStrategy(db, goal, NOW + 4 * DAY)).toBeNull();
+    expect(goalNeedsStrategy(db, goal, NOW + 15 * DAY)).toBe("strategy is more than 14 days old");
+    db.prepare("UPDATE opportunities SET status='stopped'").run();
+    expect(goalNeedsStrategy(db, goal, NOW + 2 * DAY)).toBeNull();
+    expect(goalNeedsStrategy(db, goal, NOW + 4 * DAY)).toBe("no ideas left to work on");
   });
 });

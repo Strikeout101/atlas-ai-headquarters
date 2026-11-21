@@ -47,10 +47,11 @@ export const DEFAULT_ETSY_PLAYBOOK: Omit<Playbook, "updated_at"> = {
     title: "Etsy niche research",
     department_id: "planning",
     instructions: [
-      "Find 3 to 5 digital-product niches for the Ventures Etsy shop (printables, planners, templates, spreadsheets, digital art).",
-      "For each, gather evidence with web.search and web.read: what buyers search for, what sells (bestseller badges, review counts), price range, and how crowded it is.",
+      "Find 3 to 5 digital-product niches the Ventures Etsy shop could win in (printables, planners, templates, spreadsheets, digital art or anything better the evidence shows).",
+      "Choose your own approach. etsy.search gives live numbers per search: how many listings compete, their prices, favorites, views and common tags. Compare niches by demand against competition, and look for gaps (few strong listings, weak titles or images, missing variants).",
+      "web.search and web.read help with trends and buyer language; Etsy's search pages refuse automated readers, its category pages do not.",
       "Avoid trademarks, licensed characters and anything the business profile rules out.",
-      "Record each niche with opportunity.propose: title, description (evidence and the product you would make), the five scores 0-100 and a budget in USD (usually 0-10 for listing fees and images).",
+      "Record each niche with opportunity.propose: title, description (the evidence with its numbers, and the product you would make), the five scores 0-100 and a budget in USD (usually 0-10 for listing fees and images).",
       "Do not make products in this task.",
     ].join("\n"),
   },
@@ -87,7 +88,7 @@ export const DEFAULT_ETSY_PLAYBOOK: Omit<Playbook, "updated_at"> = {
         "Prepare an Etsy listing package with listings.create (business ventures, platform etsy, opportunity_id {opportunity_id}):",
         "- taxonomy_id from etsy.taxonomy, who_made i_did, when_made made_to_order",
         "- a clear, searchable title (max 140 characters) and a description that says exactly what the buyer downloads",
-        "- 13 tags, a price based on the research, files = the product files, mockups = the preview images",
+        "- 13 tags of at most 20 characters each (check what similar listings use with etsy.search), a price based on the research, files = the product files, mockups = the preview images",
         "Then listings.submit. Do not publish anything yourself.",
       ].join("\n"),
     },
@@ -108,16 +109,20 @@ export function ensurePlaybookSchema(db: Db): void {
     (db.prepare("PRAGMA table_info(schedules)").all() as Array<{ name: string }>).map((c) => c.name),
   );
   if (!schedules.has("playbook")) db.exec("ALTER TABLE schedules ADD COLUMN playbook TEXT");
-  if (!db.prepare("SELECT 1 FROM playbooks WHERE key=?").get(DEFAULT_ETSY_PLAYBOOK.key)) {
-    const { key, title, business, research, steps } = DEFAULT_ETSY_PLAYBOOK;
+  const { key, title, business, research, steps } = DEFAULT_ETSY_PLAYBOOK;
+  const definition = JSON.stringify({ research, steps });
+  const seeded = db.prepare("SELECT definition, updated_at FROM playbooks WHERE key=?").get(key) as Row | undefined;
+  if (!seeded)
     db.prepare("INSERT INTO playbooks(key,title,business,definition,updated_at) VALUES (?,?,?,?,?)").run(
       key,
       title,
       business,
-      JSON.stringify({ research, steps }),
+      definition,
       0,
     );
-  }
+  // A default the owner never edited (updated_at 0) follows improvements to the default; an edited one is theirs.
+  else if (Number(seeded.updated_at) === 0 && seeded.definition !== definition)
+    db.prepare("UPDATE playbooks SET title=?, definition=? WHERE key=? AND updated_at=0").run(title, definition, key);
 }
 
 function fail(message: string): never {
@@ -335,7 +340,14 @@ export function advancePlaybook(db: Db, work: Row, queue: Queue, now = Date.now(
 export function proposeOpportunity(
   db: Db,
   input: Row,
-  ctx: { business: BusinessKey | null; projectId: string | null; taskId: string; playbook?: string | null },
+  ctx: {
+    business: BusinessKey | null;
+    projectId: string | null;
+    taskId: string;
+    playbook?: string | null;
+    /** Set when a goal's strategy task proposes the idea. */
+    goalId?: string | null;
+  },
   now = Date.now(),
 ): Row {
   ensurePlaybookSchema(db);
@@ -361,13 +373,14 @@ export function proposeOpportunity(
     typeof input.budget === "number" && Number.isFinite(input.budget) ? Math.max(0, Math.min(1000, input.budget)) : 0;
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO opportunities(id,business,project_id,title,description,demand_score,revenue_score,cost_score,difficulty_score,
+    `INSERT INTO opportunities(id,business,project_id,goal_id,title,description,demand_score,revenue_score,cost_score,difficulty_score,
        time_to_launch_score,budget,status,playbook,source_task_id,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,'idea',?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'idea',?,?,?,?)`,
   ).run(
     id,
     ctx.business,
     ctx.projectId,
+    ctx.goalId ?? null,
     title,
     description,
     score("demand_score"),

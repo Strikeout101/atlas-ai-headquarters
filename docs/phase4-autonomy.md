@@ -14,6 +14,8 @@ The bounded VP planning beat compares one active unmet goal with observed result
 
 Planning advances its durable per-goal timestamp before invoking the model to prevent repeated calls after failures/restarts. Edited goals, stopped autonomy, revoked security readiness and changed headroom discard late results. Duplicate tasks and out-of-scope projects/departments are rejected. Invalid replies queue no work.
 
+A goal is enough to start (2026-11-21, `goal-strategy.ts`): when a goal has no strategy, or its strategy is over 14 days old (3 days once no ideas are left), the planning beat queues one strategy task instead of asking a VP to plan from nothing. That agent decides how to research, saves the plan with `strategy.save` and proposes ideas tied to the goal; later VP planning beats receive the saved strategy. The strategy is shown under the goal in Autonomy.
+
 Generated work enters the existing proposal feed for independent VP reviews. Only an attributed approved proposal can produce an eligible planned task. The engine checks the reviewed content, project, team-leader assignment and source again before admitting a start, and again after model routing awaits. Only linked work created by this engine is automatically picked up; arbitrary owner tasks and older suggestions are not swept into the planner.
 
 Ventures preparation/implementation may start after review. Tech and rental routines prepare research, qualified contacts, demos and drafts. Outgoing email and other customer-facing actions continue through their existing owner approval gateways. Spending, paid accounts, contracts, destructive SSH and default-department dissolution keep phase 3's owner floors. Planning cannot approve its own tasks.

@@ -181,8 +181,15 @@ const EDITABLE = [
 ] as const;
 const CREATE_FIELDS = ["business", "platform", ...EDITABLE] as const;
 
+/** Etsy refuses tags longer than this; checked when the package is written, not when the draft is pushed. */
+export const ETSY_TAG_MAX = 20;
+
 function contentValues(input: Row, current?: ListingPackage) {
   const merged = { ...(current ?? {}), ...input } as Row;
+  const tags = list(merged.tags, "tags", 13, 40);
+  const longTag = merged.platform === "etsy" ? tags.find((tag) => tag.length > ETSY_TAG_MAX) : undefined;
+  if (longTag !== undefined)
+    fail(`etsy_tag_too_long: "${longTag.slice(0, 40)}" (Etsy allows ${ETSY_TAG_MAX} characters)`);
   const price = merged.price_minor ?? 0;
   if (typeof price !== "number" || !Number.isSafeInteger(price) || price < 0 || price > 100_000_000)
     fail("invalid_price_minor");
@@ -191,7 +198,7 @@ function contentValues(input: Row, current?: ListingPackage) {
   return {
     title: text(merged.title, "title", 140, true),
     description: text(merged.description, "description", 12000),
-    tags: list(merged.tags, "tags", 13, 40),
+    tags,
     price_minor: price as number,
     currency,
     files: filePaths(merged.files, "files"),
@@ -358,6 +365,7 @@ export function createRevision(
     ...Object.fromEntries(REVISABLE.map((key) => [key, target[key]])),
     notes: "",
     ...input,
+    platform: target.platform,
     currency: target.currency,
     project_id: target.project_id,
     opportunity_id: target.opportunity_id,

@@ -637,6 +637,29 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           {row.progress_scope === "business" ? ` · ${t({ en: "Business-wide records" })}` : ""}
                         </p>
                       )}
+                      {"metric" in row &&
+                        (() => {
+                          const strategy = (data.strategies ?? []).find((item) => item.goal_id === row.id);
+                          return strategy ? (
+                            <details className="mt-2 text-xs">
+                              <summary className="cursor-pointer">
+                                {t({ en: "Strategy" })} · {new Date(strategy.created_at).toLocaleDateString(locale)}
+                              </summary>
+                              <p
+                                className="mt-1 whitespace-pre-wrap break-words"
+                                style={{ color: "var(--th-text-muted)" }}
+                              >
+                                {strategy.summary}
+                              </p>
+                            </details>
+                          ) : (
+                            <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
+                              {t({
+                                en: "No strategy yet: agents research one for this goal while ATLAS is running.",
+                              })}
+                            </p>
+                          );
+                        })()}
                       {"metric" in row && (
                         <GoalMilestones
                           goalId={row.id}

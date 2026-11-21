@@ -479,6 +479,119 @@ export async function searchEtsyTaxonomy(db: Db, query: unknown, deps: EtsyDeps 
     .map(({ score: _score, ...node }) => node);
 }
 
+// --- Market research (public Etsy search) ---------------------------------------------------------------------
+
+export const ETSY_SEARCH_SORTS = ["score", "created", "price", "updated"] as const;
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/**
+ * Active Etsy listings matching `keywords`, for research agents: how many compete, what they charge, how much
+ * attention they get (favorites, views) and which tags they use. Etsy's public listing search
+ * (findAllListingsActive) needs only the app key; Etsy's own search pages refuse automated readers.
+ * Titles and tags come from other sellers, so the gateway screens them like any outside text.
+ */
+export async function searchEtsyListings(db: Db, input: Row, deps: EtsyDeps = {}) {
+  const keywords = typeof input.keywords === "string" ? input.keywords.trim() : "";
+  if (keywords.length < 2 || keywords.length > 200) fail("invalid_keywords");
+  const sortOn = input.sort_on === undefined ? "score" : input.sort_on;
+  if (!(ETSY_SEARCH_SORTS as readonly unknown[]).includes(sortOn)) fail("invalid_sort_on");
+  const limit = input.limit === undefined ? 25 : input.limit;
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 100) fail("invalid_limit");
+  const offset = input.offset === undefined ? 0 : input.offset;
+  if (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0 || offset > 10_000) fail("invalid_offset");
+  const price = (key: string) => {
+    const value = input[key];
+    if (value === undefined || value === null) return undefined;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 100_000) fail(`invalid_${key}`);
+    return value;
+  };
+  const taxonomy = input.taxonomy_id;
+  if (taxonomy !== undefined && (typeof taxonomy !== "number" || !Number.isSafeInteger(taxonomy) || taxonomy < 1))
+    fail("invalid_taxonomy_id");
+  const body = await etsyRequest(
+    db,
+    "GET",
+    "/listings/active",
+    {
+      appOnly: true,
+      query: {
+        keywords,
+        sort_on: String(sortOn),
+        sort_order: input.sort_order === "asc" ? "asc" : "desc",
+        limit,
+        offset,
+        min_price: price("min_price"),
+        max_price: price("max_price"),
+        taxonomy_id: taxonomy as number | undefined,
+      },
+    },
+    deps,
+  );
+  const listings = results(body).map((listing) => {
+    const money = moneyMinor(listing.price);
+    return {
+      listing_id: String(listing.listing_id ?? ""),
+      title: String(listing.title ?? "").slice(0, 200),
+      price: money ? money.minor / 100 : null,
+      currency: money?.currency ?? null,
+      num_favorers: Number.isFinite(Number(listing.num_favorers)) ? Number(listing.num_favorers) : null,
+      views: Number.isFinite(Number(listing.views)) ? Number(listing.views) : null,
+      tags: Array.isArray(listing.tags) ? listing.tags.map(String).slice(0, 13) : [],
+      // Etsy marks digital listings with listing_type (download or both) and lists their files in file_data ("1 PDF").
+      is_digital: ["download", "both"].includes(String(listing.listing_type)) || Boolean(listing.file_data),
+      files: typeof listing.file_data === "string" && listing.file_data ? listing.file_data.slice(0, 60) : null,
+      listed_at: Number.isFinite(Number(listing.original_creation_timestamp))
+        ? new Date(Number(listing.original_creation_timestamp) * 1000).toISOString().slice(0, 10)
+        : null,
+      url: typeof listing.url === "string" && listing.url.startsWith("https://") ? listing.url.split("?")[0] : null,
+    };
+  });
+  // Price summary in the most common currency (Etsy reports each listing in its shop's currency).
+  const currencies = new Map<string, number>();
+  for (const listing of listings)
+    if (listing.currency) currencies.set(listing.currency, (currencies.get(listing.currency) ?? 0) + 1);
+  const currency = [...currencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const prices = listings
+    .filter((listing) => listing.currency === currency && listing.price !== null)
+    .map((listing) => Math.round(listing.price! * 100));
+  const tagCounts = new Map<string, number>();
+  for (const listing of listings)
+    for (const tag of listing.tags) tagCounts.set(tag.toLowerCase(), (tagCounts.get(tag.toLowerCase()) ?? 0) + 1);
+  const average = (key: "num_favorers" | "views") => {
+    const values = listings.map((listing) => listing[key]).filter((value): value is number => value !== null);
+    return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+  };
+  return {
+    source: "Etsy public listing search",
+    keywords,
+    total_active_listings: Number.isFinite(Number(body.count)) ? Number(body.count) : null,
+    returned: listings.length,
+    summary: {
+      price_currency: currency,
+      price_min: prices.length ? Math.min(...prices) / 100 : null,
+      price_median: median(prices) === null ? null : median(prices)! / 100,
+      price_max: prices.length ? Math.max(...prices) / 100 : null,
+      average_favorites: average("num_favorers"),
+      average_views: average("views"),
+      digital_share: listings.length
+        ? Math.round((listings.filter((listing) => listing.is_digital).length / listings.length) * 100) / 100
+        : null,
+      common_tags: [...tagCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([tag, count]) => ({ tag, count })),
+    },
+    listings,
+    note: "Favorites and views are lifetime counts for each listing; Etsy's API does not report other shops' sales.",
+  };
+}
+
 // --- Listings ----------------------------------------------------------------------------------------------------
 
 function projectRoot(db: Db, projectId: string | null): string {

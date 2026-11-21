@@ -74,6 +74,12 @@ export interface AutonomySchedule {
   cron?: string | null;
   timezone?: string | null;
 }
+export interface GoalStrategy {
+  goal_id: string;
+  summary: string;
+  created_at: number;
+  task_id: string | null;
+}
 export interface GoalMilestone {
   id: string;
   goal_id: string;
@@ -109,6 +115,8 @@ export interface AutonomyOverview {
   experiment_rules?: ExperimentRules;
   playbooks?: Playbook[];
   milestones?: GoalMilestone[];
+  /** The newest strategy agents researched for each goal. */
+  strategies?: GoalStrategy[];
 }
 export interface AutonomyDigest {
   events: LedgerEvent[];

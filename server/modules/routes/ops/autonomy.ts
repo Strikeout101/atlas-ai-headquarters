@@ -11,6 +11,7 @@ import { ensurePlaybookSchema, getPlaybook, listPlaybooks, resetPlaybook, savePl
 import { nextCronRun, validTimeZone } from "../../schedule-time.ts";
 import { addMilestone, deleteMilestone, listMilestones, setMilestoneDone } from "../../goal-milestones.ts";
 import { streamOverview } from "../../streams.ts";
+import { latestStrategies } from "../../goal-strategy.ts";
 
 type Body = Record<string, unknown>;
 const SCORE_FIELDS = ["demand_score", "revenue_score", "cost_score", "difficulty_score", "time_to_launch_score"];
@@ -191,6 +192,7 @@ export function registerAutonomyRoutes(
       experiment_rules: experimentRules(db),
       playbooks: listPlaybooks(db),
       milestones: listMilestones(db),
+      strategies: latestStrategies(db),
     }),
   );
   const ownerJson =

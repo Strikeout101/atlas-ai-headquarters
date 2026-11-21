@@ -115,7 +115,16 @@ Starnet mechanisms already in ATLAS: emergency stop and pause, owner and VP appr
 
 ### Owner steps for the Etsy path
 
-- [ ] **P1 YOU** Create or confirm the Ventures Etsy shop (billing, payout account, shop name), and apply for an Etsy developer app at etsy.com/developers. Enter the key in Settings once it is approved. Until then, agents prepare listings and you publish them.
+- [x] **P1 YOU** (2026-11-21: shop and developer app set up, connected in Settings, sync verified live) Create or confirm the Ventures Etsy shop (billing, payout account, shop name), and apply for an Etsy developer app at etsy.com/developers. Enter the key in Settings once it is approved. Until then, agents prepare listings and you publish them.
+- [ ] **P1 YOU** Sign Claude in again for ATLAS: run `claude` once in a terminal (or sign in from Settings). The saved Claude login expired on 2026-11-19, so the usage check reports Claude as unavailable, which blocks all autonomy work and leaves the Claude VP unable to review (both VPs must be signed in). Found 2026-11-21.
+- [ ] **P1 YOU** Create the Ventures Etsy project (Projects > New: business Ventures, a folder for product files, for example `C:\Users\Strikeout\Projects\ventures-etsy`). There is no Ventures project yet, and the playbook's research schedule and every step need one.
+- [ ] **P1 YOU** Switch ATLAS from Stopped to Running (emergency controls on Today). It has been Stopped since 2026-11-19.
+- [ ] **P1 YOU** Decide auto-publish: it is ON, so a listing you approve is published at once (USD 0.20 each). Turn it off to check each Etsy draft before publishing.
+- [x] **P1** (2026-11-21, `goal-strategy.ts`, `autonomy-planner.ts`; strategy shown under each goal in Autonomy) **A goal is enough to start.** A goal with no current strategy gets a strategy task (VP-approved): the agent chooses how to research, saves a plan with the arithmetic (`strategy.save`) and proposes ideas tied to the goal and playbook; the planner then plans within that strategy. Refreshed every 14 days, or after 3 days with no ideas left. No research schedule or research instructions needed from the owner.
+- [x] **P1** (2026-11-21, `searchEtsyListings` in `etsy.ts`, agent tool `etsy.search`; research step rewritten around it) Etsy market research for agents through Etsy's public listing search. General web search below is still open.
+- [x] **P1** (2026-11-21, `ETSY_TAG_MAX` in `listings.ts`) Etsy tags are checked to 20 characters when a package or revision is written.
+- [ ] **P1** General web search for agents (found 2026-11-21): `web.search` (Bing RSS) matches only the first word of a query, so results are unrelated. A keyed search service would replace Bing RSS (**YOU**: pick one and add its key). Etsy research no longer depends on it (`etsy.search`).
+- [ ] **P2** Run the real-model playbook check (`scripts/qa/etsy-playbook-planner.ts --run`) once Claude is signed in and usage is under 80%, before switching the research schedule on.
 - [ ] **P1 YOU** Choose how images are made (a paid image service with a monthly cap, or a free model on the homelab or Precision) and set the monthly cap. Agents ask before going over it.
 - [ ] **P1 YOU** Set the Etsy listing-fee budget. Today it is $0, so every $0.20 listing waits for you (also in section 6).
 - [ ] **P2 YOU** When the playbook is ready, set the first Ventures goal (for example, verified revenue per month) and turn on its routines (see section 10).

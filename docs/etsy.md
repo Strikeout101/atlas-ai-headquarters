@@ -15,24 +15,25 @@ How the first income stream (Ventures Etsy digital products) runs, and what the 
 4. **Listing fees.** Each published Etsy listing costs USD 0.20. Set a monthly listing-fee budget on the Ventures listings panel so the VPs can approve listings within it; without one, every listing waits for you.
 5. **Images.** The free mockup renderer works as soon as Chrome or Edge is installed. AI images stay off until you set a service and a monthly cap in Settings > Businesses > Image studio.
 6. **Costs.** Add your monthly costs (AI subscriptions) on Revenue > Profit, then tick "My monthly costs are complete" so profit goals are measured.
-7. **Start.** On Autonomy > Playbooks, pick the Ventures project and **Add weekly research schedule (off)**, then switch the schedule on and set a Ventures goal when you are ready.
+7. **Start.** Set a Ventures goal (for example 2,000 USD of verified revenue a month) on the Ventures Etsy project and keep ATLAS running. That is all: the planner queues a strategy task for the goal, and agents work out how to reach it. A weekly research schedule (Autonomy > Playbooks) is optional, for extra idea-finding on top.
 
 ## How the loop runs
 
-| Step            | Who                                | What happens                                                                                                                                    |
-| --------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Research        | Planning (schedule)                | Finds niches with evidence, records each with `opportunity.propose` as an idea                                                                  |
-| Pick            | VP planner                         | Scores ideas against the goal; queuing work for one starts its playbook                                                                         |
-| Build           | Design                             | Makes the product files in the project folder                                                                                                   |
-| Mockups         | Design                             | Makes preview images with `studio.mockup` (and `studio.generate` if enabled)                                                                    |
-| Listing         | Planning                           | Builds the Etsy package (`etsy.taxonomy` for the category) and submits it                                                                       |
-| Approve         | VPs (within the fee budget) or you | The usual listing approval                                                                                                                      |
-| Draft           | ATLAS                              | When Etsy is connected, the approved package is pushed as a private Etsy draft                                                                  |
-| Publish         | You, or auto-publish               | Publishing makes it public; Etsy charges the fee                                                                                                |
-| Measure         | ATLAS (every 30 minutes)           | Paid orders become verified revenue; fees and refunds become costs; favorites are recorded                                                      |
-| Improve or stop | VP planner and stop rules          | Variants (title, price, images, tags) are tried one at a time; opportunities that use their budget, time or task limit with no sale are stopped |
-| Revise          | Planning, then VPs or you          | A change to a live listing is a revision (`listings.revise`), approved like any package, then applied to the same Etsy listing                  |
-| Take down       | ATLAS                              | When an opportunity stops, its live Etsy listings are set inactive (never listings you brought in)                                              |
+| Step            | Who                                | What happens                                                                                                                                                                            |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Strategy        | Planning (from the goal)           | When a goal has no current strategy, researches the market its own way (`etsy.search`, web), saves a plan with the arithmetic (`strategy.save`) and proposes the best products as ideas |
+| Research        | Planning (optional schedule)       | Finds more niches with evidence, records each with `opportunity.propose` as an idea                                                                                                     |
+| Pick            | VP planner                         | Scores ideas against the goal; queuing work for one starts its playbook                                                                                                                 |
+| Build           | Design                             | Makes the product files in the project folder                                                                                                                                           |
+| Mockups         | Design                             | Makes preview images with `studio.mockup` (and `studio.generate` if enabled)                                                                                                            |
+| Listing         | Planning                           | Builds the Etsy package (`etsy.taxonomy` for the category) and submits it                                                                                                               |
+| Approve         | VPs (within the fee budget) or you | The usual listing approval                                                                                                                                                              |
+| Draft           | ATLAS                              | When Etsy is connected, the approved package is pushed as a private Etsy draft                                                                                                          |
+| Publish         | You, or auto-publish               | Publishing makes it public; Etsy charges the fee                                                                                                                                        |
+| Measure         | ATLAS (every 30 minutes)           | Paid orders become verified revenue; fees and refunds become costs; favorites are recorded                                                                                              |
+| Improve or stop | VP planner and stop rules          | Variants (title, price, images, tags) are tried one at a time; opportunities that use their budget, time or task limit with no sale are stopped                                         |
+| Revise          | Planning, then VPs or you          | A change to a live listing is a revision (`listings.revise`), approved like any package, then applied to the same Etsy listing                                                          |
+| Take down       | ATLAS                              | When an opportunity stops, its live Etsy listings are set inactive (never listings you brought in)                                                                                      |
 
 Every step is ordinary autonomy work, so the daily start cap, usage limits, VP approval of each task, the opportunity's budget and the emergency buttons all apply.
 

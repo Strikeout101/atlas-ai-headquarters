@@ -23,6 +23,7 @@ import {
   markListingPublished,
   submitListing,
   setFeeBudget,
+  updateListing,
 } from "./listings.ts";
 import {
   adoptEtsyListing,
@@ -33,6 +34,7 @@ import {
   etsyQuotaLow,
   etsyShopListings,
   runEtsyTick,
+  searchEtsyListings,
   etsyRequest,
   pkcePair,
   publishEtsyListing,
@@ -861,6 +863,109 @@ describe("Etsy sync date windows", () => {
   });
 });
 
+describe("research tools and listing checks", () => {
+  it("searches live Etsy listings with only the app key and summarizes prices, attention and tags", async () => {
+    const db = harness();
+    connected(db);
+    const listing = (id: number, amount: number, favorers: number, tags: string[], currency = "USD") => ({
+      listing_id: id,
+      title: `Wedding planner ${id}`,
+      price: { amount, divisor: 100, currency_code: currency },
+      num_favorers: favorers,
+      views: favorers * 10,
+      tags,
+      listing_type: "download",
+      file_data: "1 PDF",
+      original_creation_timestamp: Math.floor(NOW / 1000),
+      url: `https://www.etsy.com/listing/${id}/x?ref=search`,
+    });
+    const { fetchFn, calls } = fakeEtsy({
+      "GET /v3/application/listings/active": () => ({
+        body: {
+          count: 1234,
+          results: [
+            listing(1, 500, 10, ["wedding", "planner"]),
+            listing(2, 700, 30, ["wedding", "binder"]),
+            listing(3, 1200, 20, ["Wedding"]),
+            listing(4, 900, 0, ["mariage"], "EUR"),
+          ],
+        },
+      }),
+    });
+    const result = await searchEtsyListings(
+      db,
+      { keywords: "printable wedding planner", sort_on: "price", max_price: 20, limit: 4 },
+      { fetch: fetchFn, now: () => NOW },
+    );
+    const call = calls[0];
+    expect((call.init.headers as Record<string, string>).authorization).toBeUndefined();
+    expect(Object.fromEntries(call.url.searchParams)).toEqual({
+      keywords: "printable wedding planner",
+      sort_on: "price",
+      sort_order: "desc",
+      limit: "4",
+      offset: "0",
+      max_price: "20",
+    });
+    expect(result).toMatchObject({
+      total_active_listings: 1234,
+      returned: 4,
+      summary: {
+        price_currency: "USD",
+        price_min: 5,
+        price_median: 7,
+        price_max: 12,
+        average_favorites: 15,
+        average_views: 150,
+        digital_share: 1,
+      },
+    });
+    expect(result.summary.common_tags[0]).toEqual({ tag: "wedding", count: 3 });
+    expect(result.listings[0].url).toBe("https://www.etsy.com/listing/1/x");
+    await expect(searchEtsyListings(db, { keywords: "x" })).rejects.toThrow("invalid_keywords");
+    await expect(searchEtsyListings(db, { keywords: "planner", sort_on: "sales" })).rejects.toThrow("invalid_sort_on");
+    await expect(searchEtsyListings(db, { keywords: "planner", limit: 500 })).rejects.toThrow("invalid_limit");
+  });
+
+  it("refuses Etsy tags longer than 20 characters when the package is written, not when it is pushed", () => {
+    const db = harness();
+    const base = {
+      business: "ventures",
+      title: "Planner",
+      description: "Printable",
+      price_minor: 300,
+      files: ["products/planner.pdf"],
+      project_id: "p1",
+    };
+    const longTag = "printable budget planner";
+    expect(() => createListing(db, { ...base, platform: "etsy", tags: [longTag] }, {}, NOW)).toThrow(
+      "etsy_tag_too_long",
+    );
+    expect(createListing(db, { ...base, platform: "itch", tags: [longTag] }, {}, NOW).tags).toEqual([longTag]);
+    const draft = createListing(db, { ...base, platform: "etsy", tags: ["budget planner"] }, {}, NOW);
+    expect(() => updateListing(db, draft.id, { tags: [longTag] }, NOW)).toThrow("etsy_tag_too_long");
+    const live = publishedEtsyListing(db);
+    expect(() => createRevision(db, live.id, { tags: [longTag] }, {}, NOW)).toThrow("etsy_tag_too_long");
+  });
+
+  it("keeps the default playbook current until the owner edits it", () => {
+    const db = harness();
+    getPlaybook(db, "etsy_digital");
+    db.prepare("UPDATE playbooks SET definition=? WHERE key='etsy_digital'").run(
+      JSON.stringify({ research: { ...getPlaybook(db, "etsy_digital")!.research, instructions: "old" }, steps: [] }),
+    );
+    expect(getPlaybook(db, "etsy_digital")!.research.instructions).toContain("etsy.search");
+    const edited = getPlaybook(db, "etsy_digital")!;
+    savePlaybook(
+      db,
+      "etsy_digital",
+      { research: { ...edited.research, instructions: "Owner's own research notes" } },
+      NOW,
+    );
+    expect(getPlaybook(db, "etsy_digital")!.research.instructions).toBe("Owner's own research notes");
+  });
+});
+
 describe("costs and profit", () => {
   it("adds recurring costs (shared ones split across businesses) and only measures profit goals once costs are confirmed", () => {
     const db = harness();
@@ -1213,6 +1318,48 @@ describe("agent tools through the gateway", () => {
     },
     60_000,
   );
+
+  it("gives a goal's strategy task strategy.save and ties the ideas it proposes to the goal and playbook", async () => {
+    const { default: express } = await import("express");
+    const { default: request } = await import("supertest");
+    const { registerAgentToolRoutes } = await import("./routes/ops/agent-tools.ts");
+    const { createAgentTaskToken } = await import("../security/agent-task-token.ts");
+    const { queueGoalStrategy } = await import("./goal-strategy.ts");
+    const db = harness();
+    db.prepare(
+      "INSERT INTO business_goals(id,business,project_id,metric,target,period_start,period_end,created_at,updated_at) VALUES ('g1','ventures','p1','verified_revenue',2000,?,?,?,?)",
+    ).run(NOW, NOW + 30 * 86_400_000, NOW, NOW);
+    const workId = queueGoalStrategy(
+      db,
+      db.prepare("SELECT * FROM business_goals").get() as never,
+      "no strategy yet",
+      NOW,
+    );
+    db.exec(
+      "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-plan','Strategy','in_progress','lead-p','p1',1,1)",
+    );
+    db.prepare("UPDATE autonomy_work SET task_id='t-plan', status='running' WHERE id=?").run(workId);
+    const app = express();
+    app.use(express.json());
+    registerAgentToolRoutes(app, db, (() => {}) as never);
+    const call = (data: Record<string, unknown>, task = "t-plan") =>
+      request(app).post("/api/agent-tools").set("x-agent-task-token", createAgentTaskToken(task, "lead-p")).send(data);
+    const summary = `Sell printable wedding planners. ${"Median price 7 USD; 290 sales a month needed; start with 30 listings. ".repeat(4)}`;
+    const saved = await call({ operation: "strategy.save", summary }).expect(201);
+    expect(saved.body.item).toMatchObject({ goal_id: "g1", task_id: "t-plan", agent_id: "lead-p" });
+    const idea = await call({
+      operation: "opportunity.propose",
+      title: "Printable wedding planner",
+      description: "1,200 listings, median 7 USD",
+      demand_score: 70,
+    }).expect(201);
+    expect(idea.body.item).toMatchObject({ goal_id: "g1", playbook: "etsy_digital", status: "idea" });
+    db.exec(
+      "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-other','Other','in_progress','lead-p','p1',1,1)",
+    );
+    await call({ operation: "strategy.save", summary }, "t-other").expect(400);
+    await call({ operation: "etsy.search", keywords: "wedding planner" }).expect(400); // no Etsy app in this database
+  });
 
   it("lets an agent read the shop and propose a revision of a live listing, which waits for approval", async () => {
     const { default: express } = await import("express");
