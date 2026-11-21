@@ -43,8 +43,6 @@ const manualChunks = (id: string): string | undefined => {
   }
   if (id.includes("/node_modules/pixi.js/")) return "vendor-pixi";
   if (id.includes("/node_modules/pptxgenjs/")) return "vendor-pptx";
-  if (id.includes("/node_modules/react-router-dom/") || id.includes("/node_modules/react-router/"))
-    return "vendor-router";
   if (
     id.includes("/node_modules/react-dom/") ||
     id.includes("/node_modules/react/") ||

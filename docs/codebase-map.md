@@ -186,7 +186,7 @@ Rules of thumb:
 | `openapi-contract.mjs`                   | `openapi:sync` / `openapi:check`                                                                                                            |
 | `qa/`                                    | Real-provider checks (autonomy cycle, local worker) and office QA scripts                                                                   |
 | `setup.mjs`, `openclaw-setup.*`          | First-time setup and OpenClaw AGENTS install                                                                                                |
-| Others                                   | Upstream helpers (sprites, office map assets, architecture report, staff cleanup)                                                           |
+| Others                                   | Upstream helpers (office map assets, staff cleanup, skill migration, audit log check)                                                       |
 
 ## docs/
 
