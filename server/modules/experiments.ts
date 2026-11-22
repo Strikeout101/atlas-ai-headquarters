@@ -61,6 +61,9 @@ export function ensureExperimentSchema(db: Db): void {
     updated_at INTEGER NOT NULL DEFAULT 0
   );
   INSERT OR IGNORE INTO experiment_rules(id) VALUES (1);`);
+  // Lifetime views of the listing, read from Etsy with favorites (2026-11-22).
+  if (!columns(db, "opportunity_metrics").has("views"))
+    db.exec("ALTER TABLE opportunity_metrics ADD COLUMN views INTEGER");
 }
 
 function fail(message: string): never {
@@ -276,6 +279,7 @@ export function recordOpportunityMetric(
     opportunity_id: string;
     listing_id?: string | null;
     favorers?: number | null;
+    views?: number | null;
     sales?: number | null;
     revenue_minor?: number | null;
     currency?: string | null;
@@ -284,11 +288,12 @@ export function recordOpportunityMetric(
 ): void {
   ensureExperimentSchema(db);
   db.prepare(
-    "INSERT INTO opportunity_metrics(opportunity_id,listing_id,favorers,sales,revenue_minor,currency,recorded_at) VALUES (?,?,?,?,?,?,?)",
+    "INSERT INTO opportunity_metrics(opportunity_id,listing_id,favorers,views,sales,revenue_minor,currency,recorded_at) VALUES (?,?,?,?,?,?,?,?)",
   ).run(
     input.opportunity_id,
     input.listing_id ?? null,
     input.favorers ?? null,
+    input.views ?? null,
     input.sales ?? null,
     input.revenue_minor ?? null,
     input.currency ?? null,
@@ -296,7 +301,7 @@ export function recordOpportunityMetric(
   );
 }
 
-/** Sales and revenue (verified ledger rows) and favorites gained during each variant's window. */
+/** Sales and revenue (verified ledger rows), and favorites and views gained, during each variant's window. */
 export function variantResults(db: Db, opportunityId: string, now = Date.now()) {
   ensureExperimentSchema(db);
   const variants = db
@@ -304,7 +309,15 @@ export function variantResults(db: Db, opportunityId: string, now = Date.now()) 
     .all(opportunityId) as Row[];
   const hasLedger = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get();
   return variants.map(
-    (variant): Row & { days: number; sales: number; revenue_minor: number; favorers_gained: number | null } => {
+    (
+      variant,
+    ): Row & {
+      days: number;
+      sales: number;
+      revenue_minor: number;
+      favorers_gained: number | null;
+      views_gained: number | null;
+    } => {
       const from = Number(variant.started_at);
       const to = Number(variant.ended_at ?? now);
       const money = hasLedger
@@ -325,12 +338,23 @@ export function variantResults(db: Db, opportunityId: string, now = Date.now()) 
           .get(opportunityId, at) as { favorers: number } | undefined;
       const startFav = favorers(from, "first")?.favorers;
       const endFav = favorers(to, "last")?.favorers;
+      const views = (at: number, dir: "first" | "last") =>
+        db
+          .prepare(
+            `SELECT views FROM opportunity_metrics WHERE opportunity_id=? AND views IS NOT NULL AND recorded_at${
+              dir === "first" ? ">=" : "<="
+            }? ORDER BY recorded_at ${dir === "first" ? "ASC" : "DESC"} LIMIT 1`,
+          )
+          .get(opportunityId, at) as { views: number } | undefined;
+      const startViews = views(from, "first")?.views;
+      const endViews = views(to, "last")?.views;
       return {
         ...variant,
         days: Math.max(0, (to - from) / DAY_MS),
         sales: Number(money.sales),
         revenue_minor: Number(money.revenue),
         favorers_gained: startFav !== undefined && endFav !== undefined ? endFav - startFav : null,
+        views_gained: startViews !== undefined && endViews !== undefined ? endViews - startViews : null,
       };
     },
   );
@@ -348,6 +372,16 @@ export function opportunitySummary(db: Db, opportunity: Row, now = Date.now()) {
     task_limit: Number(opportunity.task_limit ?? 10),
     playbook_stage: opportunity.playbook_stage ?? null,
     stop_reason: opportunity.stop_reason ?? null,
+    // Latest lifetime views and favorites across the opportunity's listings, as Etsy last reported them.
+    views:
+      (
+        db
+          .prepare(
+            `SELECT SUM(views) AS n FROM (SELECT listing_id, views FROM opportunity_metrics m WHERE opportunity_id=? AND views IS NOT NULL
+             AND recorded_at=(SELECT MAX(recorded_at) FROM opportunity_metrics x WHERE x.opportunity_id=m.opportunity_id AND x.listing_id IS m.listing_id))`,
+          )
+          .get(String(opportunity.id)) as { n: number | null }
+      ).n ?? null,
     variants: variantResults(db, String(opportunity.id), now).map((v) => ({
       variable: v.variable,
       value: String(v.value).slice(0, 200),
@@ -355,6 +389,7 @@ export function opportunitySummary(db: Db, opportunity: Row, now = Date.now()) {
       sales: v.sales,
       revenue_usd: v.revenue_minor / 100,
       favorers_gained: v.favorers_gained,
+      views_gained: v.views_gained,
       active: v.ended_at === null || v.ended_at === undefined,
     })),
   };

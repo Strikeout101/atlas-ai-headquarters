@@ -64,6 +64,7 @@ Rules of thumb:
 | `profit.ts`                     | Monthly costs and profit per business and opportunity                                                                                               |
 | `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                                                                              |
 | `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner                                                                |
+| `etsy-shop.ts`                  | The Etsy shop itself: profile read on each sync, missing setup, shop changes (VP-approved, applied by API), owner uploads, shop setup task          |
 | `web-search.ts`                 | `web.search` through the owner's search service (Serper/Google, Brave, Tavily; monthly cap), keyless DuckDuckGo fallback in `agent-web.ts`          |
 | `skill-installer.ts`            | Skills: recommended list installed once, `skills.search` (skills.sh), install for every agent provider, recorded in the Library                     |
 | `goal-strategy.ts`              | Goal strategy: a goal with no current strategy gets a research task; `strategy.save`; ideas tied to the goal                                        |

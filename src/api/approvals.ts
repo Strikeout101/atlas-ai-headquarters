@@ -53,6 +53,20 @@ export type PendingApproval =
       title: string;
     })
   | (PendingApprovalBase & {
+      /** An Etsy shop setup or change: ATLAS applies the text and sections, the owner uploads logo, banner and story. */
+      kind: "shop_change";
+      business: BusinessKind;
+      title: string | null;
+      announcement: string | null;
+      about: string | null;
+      sale_message: string | null;
+      digital_sale_message: string | null;
+      policy_additional: string | null;
+      sections: string[];
+      logo_path: string | null;
+      banner_path: string | null;
+    })
+  | (PendingApprovalBase & {
       /** A storefront listing package an agent prepared. Approving allows it to be published; it publishes nothing. */
       kind: "listing_publish";
       business: BusinessKind;
@@ -143,6 +157,10 @@ export async function decidePendingApproval(item: PendingApproval, approve: bool
   }
   if (item.kind === "listing_publish") {
     await post(`/api/listings/${encodeURIComponent(item.id)}/decide`, { approve });
+    return;
+  }
+  if (item.kind === "shop_change") {
+    await post(`/api/etsy/shop-changes/${encodeURIComponent(item.id)}/decide`, { approve });
     return;
   }
   if (item.kind === "business_email") {

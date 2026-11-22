@@ -38,6 +38,7 @@ import { startVariant } from "../../experiments.ts";
 import { etsyShopListings, searchEtsyListings, searchEtsyTaxonomy } from "../../etsy.ts";
 import { saveStrategy, strategyContextForTask } from "../../goal-strategy.ts";
 import { webSearch } from "../../web-search.ts";
+import { listShopChanges, proposeShopChange, shopProfile } from "../../etsy-shop.ts";
 import { installedSkills, listRepoSkills, searchSkills } from "../../skill-installer.ts";
 import { proposeOpportunity } from "../../playbooks.ts";
 import {
@@ -231,6 +232,8 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
         operation === "etsy.taxonomy" ||
         operation === "etsy.listings" ||
         operation === "etsy.search" ||
+        operation === "etsy.shop" ||
+        operation === "etsy.shop_propose" ||
         operation === "strategy.save" ||
         operation === "opportunity.propose"
       ) {
@@ -314,6 +317,17 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
               });
             }
             return res.json({ ok: true, ...guarded.value });
+          }
+          if (operation === "etsy.shop")
+            return res.json({ ok: true, ...shopProfile(db), changes: listShopChanges(db, 5) });
+          if (operation === "etsy.shop_propose") {
+            const item = proposeShopChange(db, body, {
+              projectId: context?.projectId ?? null,
+              projectPath: context?.projectPath ?? null,
+              agentId: claims.agentId,
+              taskId: claims.taskId,
+            });
+            return res.status(201).json({ ok: true, item });
           }
           if (operation === "strategy.save") {
             const item = saveStrategy(db, body, { taskId: claims.taskId, agentId: claims.agentId });

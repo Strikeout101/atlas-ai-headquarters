@@ -59,15 +59,17 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
           ? t({ en: "Record change" })
           : item.kind === "code_push"
             ? t({ en: "Code push" })
-            : item.kind === "listing_publish"
-              ? t({ en: "Listing to publish" })
-              : item.kind === "spend_request"
-                ? t({ en: "Spending request" })
-                : item.kind === "org_request"
-                  ? item.org_kind === "install_skill"
-                    ? t({ en: "Skill to install" })
-                    : t({ en: "Organization request" })
-                  : t({ en: "Model upgrade" });
+            : item.kind === "shop_change"
+              ? t({ en: "Etsy shop setup" })
+              : item.kind === "listing_publish"
+                ? t({ en: "Listing to publish" })
+                : item.kind === "spend_request"
+                  ? t({ en: "Spending request" })
+                  : item.kind === "org_request"
+                    ? item.org_kind === "install_skill"
+                      ? t({ en: "Skill to install" })
+                      : t({ en: "Organization request" })
+                    : t({ en: "Model upgrade" });
   const where = isSsh
     ? (item.target_name ?? item.target_host ?? item.target_id)
     : isProposal
@@ -76,9 +78,11 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
   const heading =
     isProposal || item.kind === "listing_publish" || item.kind === "code_push"
       ? item.title
-      : item.kind === "record_change"
-        ? item.summary
-        : item.task_title;
+      : item.kind === "shop_change"
+        ? (item.title ?? t({ en: "Shop setup" }))
+        : item.kind === "record_change"
+          ? item.summary
+          : item.task_title;
 
   return (
     <li className="flex items-start gap-3 px-5 py-3.5" style={{ borderBottom: "1px solid var(--th-border)" }}>
@@ -220,6 +224,44 @@ export default function ApprovalRow({ item, onDecide, onOpenHomelab }: ApprovalR
             <p className="mt-1 text-xs" style={{ color: "var(--th-text-muted)" }}>
               {t({
                 en: `Pushes with ${item.account_label ?? "the project's GitHub account"}${item.account_login ? ` (${item.account_login})` : ""} and opens a pull request to main. Nothing is merged.`,
+              })}
+            </p>
+          </div>
+        ) : item.kind === "shop_change" ? (
+          <div className="mt-2 space-y-2 text-sm" style={{ color: "var(--th-text-primary)" }}>
+            {(
+              [
+                ["Announcement", item.announcement],
+                ["About story (you paste this on Etsy)", item.about],
+                ["Message with digital orders", item.digital_sale_message],
+                ["Message with orders", item.sale_message],
+                ["Additional policies", item.policy_additional],
+              ] as Array<[string, string | null]>
+            )
+              .filter(([, value]) => value)
+              .map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
+                    {label}
+                  </p>
+                  <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words">{value}</p>
+                </div>
+              ))}
+            {item.sections.length > 0 && (
+              <p className="break-words text-xs" style={{ color: "var(--th-text-secondary)" }}>
+                Sections: {item.sections.join(" · ")}
+              </p>
+            )}
+            {(item.logo_path || item.banner_path) && (
+              <p className="break-words text-xs" style={{ color: "var(--th-text-secondary)" }}>
+                {[item.logo_path && `Logo: ${item.logo_path}`, item.banner_path && `Banner: ${item.banner_path}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+            <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
+              {t({
+                en: "Approving updates the shop's title, announcement, messages and sections on Etsy. The logo, banner and story are yours to upload (Etsy's API cannot); they appear under Settings > Businesses > Etsy.",
               })}
             </p>
           </div>

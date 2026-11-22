@@ -7,6 +7,7 @@ import { appendAutonomyLedger } from "./autonomy-store.ts";
 import { isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { markOpportunityLaunched, recordOpportunityMetric } from "./experiments.ts";
 import { upsertProviderLedgerEntry } from "./finance-store.ts";
+import { applyApprovedShopChanges, canChangeShop, ensureEtsyShopSchema, refreshShopProfile } from "./etsy-shop.ts";
 import {
   applyRevisionLocally,
   ensureListingSchema,
@@ -44,7 +45,8 @@ type Row = Record<string, unknown>;
 export const ETSY_API = "https://api.etsy.com/v3/application";
 export const ETSY_AUTHORIZE_URL = "https://www.etsy.com/oauth/connect";
 export const ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token";
-export const ETSY_SCOPES = ["listings_r", "listings_w", "shops_r", "transactions_r"] as const;
+/** shops_w (2026-11-22) lets approved shop changes set the title, announcement, messages and sections. */
+export const ETSY_SCOPES = ["listings_r", "listings_w", "shops_r", "shops_w", "transactions_r"] as const;
 export const ETSY_SYNC_INTERVAL_MS = 30 * 60_000;
 const AUTH_TTL_MS = 15 * 60_000;
 const REFRESH_EARLY_MS = 2 * 60_000;
@@ -108,6 +110,10 @@ export function ensureEtsySchema(db: Db): void {
   const have = new Set(
     (db.prepare("PRAGMA table_info(etsy_connection)").all() as Array<{ name: string }>).map((c) => c.name),
   );
+  const mirror = new Set(
+    (db.prepare("PRAGMA table_info(etsy_shop_listings)").all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  if (!mirror.has("views")) db.exec("ALTER TABLE etsy_shop_listings ADD COLUMN views INTEGER");
   for (const column of ["rate_limit_per_day", "rate_remaining_today", "rate_seen_at"])
     if (!have.has(column)) db.exec(`ALTER TABLE etsy_connection ADD COLUMN ${column} INTEGER`);
   ensureListingSchema(db);
@@ -144,6 +150,8 @@ export function etsySettings(db: Db) {
     rate_remaining_today: (r.rate_remaining_today as number | null) ?? null,
     rate_seen_at: (r.rate_seen_at as number | null) ?? null,
     quota_low: etsyQuotaLow(db),
+    // Connected before shops_w was asked for: the owner reconnects once so agents' shop changes can be applied.
+    can_change_shop: canChangeShop(db),
     shop_listings: Number(
       (db.prepare("SELECT COUNT(*) AS n FROM etsy_shop_listings WHERE state<>'removed'").get() as { n: number }).n,
     ),
@@ -319,9 +327,10 @@ export async function completeEtsyConnect(db: Db, pasted: unknown, deps: EtsyDep
     deps,
   );
   saveTokens(db, body, now);
+  ensureEtsyShopSchema(db);
   db.prepare(
-    "UPDATE etsy_connection SET auth_state=NULL, auth_verifier_enc=NULL, auth_started_at=NULL WHERE id=1",
-  ).run();
+    "UPDATE etsy_connection SET auth_state=NULL, auth_verifier_enc=NULL, auth_started_at=NULL, granted_scopes=? WHERE id=1",
+  ).run(ETSY_SCOPES.join(" "));
   return testEtsyConnection(db, deps);
 }
 
@@ -968,10 +977,10 @@ async function syncShopListings(db: Db, shop: string, deps: EtsyDeps, now: numbe
   }
   const upsert = db.prepare(
     `INSERT INTO etsy_shop_listings (listing_id,state,title,description,tags,price_minor,currency,url,num_favorers,quantity,
-       taxonomy_id,who_made,when_made,last_modified,seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       taxonomy_id,who_made,when_made,last_modified,seen_at,views) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(listing_id) DO UPDATE SET state=excluded.state,title=excluded.title,description=excluded.description,
        tags=excluded.tags,price_minor=excluded.price_minor,currency=excluded.currency,url=excluded.url,
-       num_favorers=excluded.num_favorers,quantity=excluded.quantity,taxonomy_id=excluded.taxonomy_id,
+       num_favorers=excluded.num_favorers,views=excluded.views,quantity=excluded.quantity,taxonomy_id=excluded.taxonomy_id,
        who_made=excluded.who_made,when_made=excluded.when_made,last_modified=excluded.last_modified,seen_at=excluded.seen_at`,
   );
   const num = (value: unknown) => (Number.isFinite(Number(value)) && value !== null ? Number(value) : null);
@@ -993,6 +1002,7 @@ async function syncShopListings(db: Db, shop: string, deps: EtsyDeps, now: numbe
       typeof listing.when_made === "string" ? listing.when_made : null,
       num(listing.last_modified_timestamp ?? listing.updated_timestamp),
       now,
+      num(listing.views),
     );
   }
   if (complete) db.prepare("UPDATE etsy_shop_listings SET state='removed' WHERE seen_at<>?").run(now);
@@ -1067,6 +1077,7 @@ export function etsyShopListings(db: Db) {
     currency: (row.currency as string | null) ?? null,
     url: (row.url as string | null) ?? null,
     num_favorers: (row.num_favorers as number | null) ?? null,
+    views: (row.views as number | null) ?? null,
     quantity: (row.quantity as number | null) ?? null,
     seen_at: Number(row.seen_at),
     package_id: (row.package_id as string | null) ?? null,
@@ -1367,6 +1378,8 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
       },
     );
     const shopSync = await syncShopListings(db, shop, deps, now);
+    // The shop itself (title, announcement, logo and banner present, sections), for the shop setup step.
+    await refreshShopProfile(db, deps).catch(() => null);
     counts.shop_listings = shopSync.seen;
     counts.changed_on_etsy = shopSync.changed;
     for (const listing of shopSync.active) {
@@ -1379,6 +1392,7 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
           opportunity_id: opportunityId,
           listing_id: String(listing.listing_id),
           favorers: Number.isFinite(Number(listing.num_favorers)) ? Number(listing.num_favorers) : null,
+          views: Number.isFinite(Number(listing.views)) && listing.views !== null ? Number(listing.views) : null,
           sales: sales?.sales ?? 0,
           revenue_minor: sales?.revenue ?? 0,
           currency: sales?.currency ?? null,
@@ -1435,6 +1449,11 @@ export async function runEtsyTick(db: Db, deps: EtsyDeps = {}): Promise<void> {
         `listing ${String(listing.id).slice(0, 8)}: ${(error instanceof Error ? error.message : "push failed").slice(0, 250)}`,
       );
     }
+  }
+  try {
+    await applyApprovedShopChanges(db, deps);
+  } catch (error) {
+    failures.push(`shop: ${(error instanceof Error ? error.message : "failed").slice(0, 250)}`);
   }
   try {
     await deactivateStoppedListings(db, deps);

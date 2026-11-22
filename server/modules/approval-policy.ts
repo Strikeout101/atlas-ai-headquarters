@@ -3,7 +3,13 @@ import { businessPolicy, type BusinessPolicy, type GateLevel } from "./business-
 
 export const DEFAULT_DEPARTMENT_IDS = ["planning", "dev", "design", "qa", "devsecops", "operations"] as const;
 /** Actions a customer can see. They follow the business's customer_sends setting. */
-export const CUSTOMER_FACING_KINDS = ["business_email", "social_send", "customer_send", "listing_publish"];
+export const CUSTOMER_FACING_KINDS = [
+  "business_email",
+  "social_send",
+  "customer_send",
+  "listing_publish",
+  "shop_change",
+];
 export const CLIENT_TIERS = ["normal", "important", "vip"] as const;
 export type ClientTier = (typeof CLIENT_TIERS)[number];
 

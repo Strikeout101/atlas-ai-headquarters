@@ -26,7 +26,42 @@ export interface EtsySettings {
   rate_seen_at?: number | null;
   /** True when background sync is paused because the allowance is nearly used. */
   quota_low?: boolean;
+  /** False until the owner reconnects with the shops_w permission (needed to apply shop changes). */
+  can_change_shop?: boolean;
   shop_listings?: number;
+}
+
+export interface EtsyShopProfile {
+  shop_name: string;
+  title: string;
+  announcement: string;
+  digital_sale_message: string;
+  has_logo: boolean;
+  has_banner: boolean;
+  url: string;
+  active_listings: number;
+  sales: number;
+  reviews: number;
+  sections: Array<{ id: string; title: string; listings: number }>;
+}
+export interface EtsyShopChange {
+  id: string;
+  status: "ready" | "approved" | "applied" | "rejected";
+  title: string | null;
+  about: string | null;
+  logo_path: string | null;
+  banner_path: string | null;
+  project_id: string | null;
+  error: string | null;
+  owner_done_at: number | null;
+  created_at: number;
+}
+export interface EtsyShopState {
+  profile: EtsyShopProfile | null;
+  seen_at: number | null;
+  gaps: string[];
+  can_change: boolean;
+  changes: EtsyShopChange[];
 }
 
 /** One listing in the shop as ATLAS last read it, and the ATLAS package it belongs to, if any. */
@@ -40,6 +75,7 @@ export interface EtsyShopListing {
   currency: string | null;
   url: string | null;
   num_favorers: number | null;
+  views?: number | null;
   quantity: number | null;
   seen_at: number;
   package_id: string | null;
@@ -82,6 +118,11 @@ export const etsyApi = {
         opportunity_id: opportunityId,
       })
     ).item,
+  shop: async () => {
+    const { ok: _ok, ...state } = await request<{ ok: true } & EtsyShopState>("/api/etsy/shop");
+    return state as EtsyShopState;
+  },
+  shopOwnerDone: (id: string) => post(`/api/etsy/shop-changes/${encodeURIComponent(id)}/owner-done`, {}),
   disconnect: async () => (await post<{ ok: true; settings: EtsySettings }>("/api/etsy/disconnect", {})).settings,
   pushDraft: async (listingId: string) =>
     (await post<{ ok: true; item: ListingPackage }>(`/api/listings/${encodeURIComponent(listingId)}/etsy-draft`, {}))

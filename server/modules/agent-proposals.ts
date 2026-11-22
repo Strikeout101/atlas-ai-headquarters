@@ -55,6 +55,8 @@ export interface ParsedProposal {
 interface ThinkingContext {
   department: { name: string; description: string | null; prompt: string | null } | null;
   projects: Array<{ id: string; name: string; core_goal: string }>;
+  /** Projects with an active goal: run by the goal planner (strategy, ideas, playbook steps), not by free-time ideas. */
+  goalProjects?: Array<{ id: string; name: string }>;
   recentTasks: Array<{ title: string; status: string }>;
   openDepartmentTasks: Array<{ title: string; status: string }>;
   pastProposals: Array<{ title: string; status: string }>;
@@ -183,11 +185,31 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
         | ThinkingContext["department"]
         | undefined) ?? null)
     : null;
-  const projects = db
-    .prepare(
-      "SELECT id, name, core_goal FROM projects ORDER BY COALESCE(last_used_at, updated_at, created_at) DESC LIMIT 5",
-    )
-    .all() as ThinkingContext["projects"];
+  // A project with an active goal is planned by the goal planner, so free-time ideas cannot bypass its strategy,
+  // budgets and playbook (2026-11-22: a free-time product idea skipped a fresh strategy).
+  const hasGoals = Boolean(
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='business_goals'").get(),
+  );
+  const goalProjects = (
+    !hasGoals
+      ? []
+      : (db
+          .prepare(
+            `SELECT DISTINCT p.id, p.name FROM projects p JOIN business_goals g ON g.project_id = p.id
+         WHERE g.period_start <= ? AND g.period_end > ?`,
+          )
+          .all(Date.now(), Date.now()) as Array<{ id: string; name: string }>)
+  ).map((row) => ({ id: String(row.id), name: String(row.name) }));
+  const goalIds = new Set(goalProjects.map((project) => project.id));
+  const projects = (
+    db
+      .prepare(
+        "SELECT id, name, core_goal FROM projects ORDER BY COALESCE(last_used_at, updated_at, created_at) DESC LIMIT 8",
+      )
+      .all() as ThinkingContext["projects"]
+  )
+    .filter((project) => !goalIds.has(String(project.id)))
+    .slice(0, 5);
   const recentTasks = db
     .prepare("SELECT title, status FROM tasks WHERE assigned_agent_id = ? ORDER BY updated_at DESC LIMIT 8")
     .all(agent.id) as ThinkingContext["recentTasks"];
@@ -205,6 +227,7 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
   return {
     department,
     projects,
+    goalProjects,
     recentTasks,
     openDepartmentTasks,
     pastProposals,
@@ -246,6 +269,12 @@ export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, 
     "Active projects (id: name - goal):",
     ctx.projects.length ? ctx.projects.map((p) => `- ${p.id}: ${p.name} - ${p.core_goal}`).join("\n") : "- (none)",
     "",
+    ...(ctx.goalProjects?.length
+      ? [
+          `Run by the goal planner, not by suggestions: ${ctx.goalProjects.map((p) => p.name).join(", ")}. Their work comes from a researched strategy, its product ideas and their playbook steps. Do not suggest tasks, products or listings for them.`,
+          "",
+        ]
+      : []),
     "Your recent tasks:",
     list(ctx.recentTasks),
     "",
@@ -299,7 +328,7 @@ const normalizeTitle = (title: string) =>
  */
 export function parseProposalReply(
   text: string,
-  opts: { projectIds: Set<string>; existingTitles: Iterable<string> },
+  opts: { projectIds: Set<string>; existingTitles: Iterable<string>; goalProjectIds?: Set<string> },
 ): ParsedProposal[] | null {
   const parsed = extractJsonObject(text) as { proposals?: unknown } | null;
   if (!parsed || !Array.isArray(parsed.proposals)) return null;
@@ -312,6 +341,8 @@ export function parseProposalReply(
     const key = normalizeTitle(title);
     if (title.length < 4 || seen.has(key)) continue;
     seen.add(key);
+    // Goal projects are planned by the goal planner; a suggestion for one is dropped, not re-homed.
+    if (typeof item.project_id === "string" && opts.goalProjectIds?.has(item.project_id)) continue;
     const projectId =
       typeof item.project_id === "string" && opts.projectIds.has(item.project_id) ? item.project_id : null;
     result.push({
@@ -382,6 +413,7 @@ export async function runAutonomyTick(
     ? null
     : parseProposalReply(text, {
         projectIds: new Set(ctx.projects.map((p) => p.id)),
+        goalProjectIds: new Set((ctx.goalProjects ?? []).map((p) => p.id)),
         existingTitles: [...ctx.recentTasks, ...ctx.openDepartmentTasks, ...ctx.pastProposals].map((t) => t.title),
       });
   if (!proposals) {

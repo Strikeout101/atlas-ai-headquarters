@@ -14,7 +14,7 @@ const ALL_AGENTS = "*";
 
 /** Which policy setting an approval kind falls under. */
 export function rampKindFor(approvalKind: string): RampKind | null {
-  if (["business_email", "social_send", "customer_send", "listing_publish"].includes(approvalKind))
+  if (["business_email", "social_send", "customer_send", "listing_publish", "shop_change"].includes(approvalKind))
     return "customer_sends";
   if (approvalKind === "record_change") return "record_changes";
   if (approvalKind === "code_push") return "code_pushes";

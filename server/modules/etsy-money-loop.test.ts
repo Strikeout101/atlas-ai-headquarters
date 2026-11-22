@@ -2,11 +2,23 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import {
+  applyShopChange,
+  decideShopChange,
+  markShopChangeOwnerDone,
+  proposeShopChange,
+  queueShopSetupIfNeeded,
+  refreshShopProfile,
+  shopChangeApprover,
+  shopNeedsSetup,
+  shopProfile,
+} from "./etsy-shop.ts";
+import { listPendingApprovals } from "./routes/ops/approvals.ts";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { applyBaseSchema } from "./bootstrap/schema/base-schema.ts";
 import { applyTaskSchemaMigrations } from "./bootstrap/schema/task-schema-migrations.ts";
 import { ensureAutonomySchema } from "./autonomy-store.ts";
-import { ensureAgentProposalSchema } from "./agent-proposals.ts";
+import { buildProposalPrompt, ensureAgentProposalSchema, parseProposalReply } from "./agent-proposals.ts";
 import {
   ensureFinanceSchema,
   financeOverview,
@@ -178,7 +190,7 @@ describe("Etsy connection", () => {
     const url = new URL(startEtsyConnect(db, NOW).url);
     expect(url.origin + url.pathname).toBe("https://www.etsy.com/oauth/connect");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(url.searchParams.get("scope")).toBe("listings_r listings_w shops_r transactions_r");
+    expect(url.searchParams.get("scope")).toBe("listings_r listings_w shops_r shops_w transactions_r");
     expect(url.searchParams.get("client_id")).toBe("abc123");
     const { verifier, challenge } = pkcePair();
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
@@ -963,6 +975,195 @@ describe("research tools and listing checks", () => {
       NOW,
     );
     expect(getPlaybook(db, "etsy_digital")!.research.instructions).toBe("Owner's own research notes");
+  });
+});
+
+describe("Etsy shop setup", () => {
+  const shopBody = (overrides: Record<string, unknown> = {}) => ({
+    shop_id: 777,
+    shop_name: "EduardoCapitalShop",
+    title: "",
+    announcement: "",
+    digital_sale_message: "",
+    icon_url_fullxfull: null,
+    image_url_760x100: null,
+    url: "https://www.etsy.com/shop/EduardoCapitalShop?ref=x",
+    listing_active_count: 0,
+    transaction_sold_count: 0,
+    review_count: 0,
+    ...overrides,
+  });
+  const ctx = () => ({ projectId: "p1", projectPath: projectDir, agentId: "lead-d", taskId: null });
+  const goalRow = (db: DatabaseSync) => {
+    db.prepare(
+      "INSERT INTO business_goals(id,business,project_id,metric,target,period_start,period_end,created_at,updated_at) VALUES ('g1','ventures','p1','verified_revenue',2000,?,?,?,?)",
+    ).run(NOW, NOW + 30 * 86_400_000, NOW, NOW);
+    return db.prepare("SELECT * FROM business_goals WHERE id='g1'").get() as Record<string, unknown>;
+  };
+
+  it("reads the shop and lists what a new shop is missing, including what only the owner can upload", async () => {
+    const db = harness();
+    connected(db);
+    const { fetchFn } = fakeEtsy({
+      "GET /v3/application/shops/777": () => ({ body: shopBody() }),
+      "GET /v3/application/shops/777/sections": () => ({ body: { results: [] } }),
+    });
+    await refreshShopProfile(db, { fetch: fetchFn, now: () => NOW });
+    const state = shopProfile(db);
+    expect(state.profile).toMatchObject({
+      shop_name: "EduardoCapitalShop",
+      has_logo: false,
+      url: "https://www.etsy.com/shop/EduardoCapitalShop",
+    });
+    expect(state.gaps).toEqual([
+      "logo (owner uploads the file agents make)",
+      "banner (owner uploads the file agents make)",
+      "shop title (headline)",
+      "announcement",
+      "message sent with digital orders",
+      "shop sections",
+      "About story (owner pastes the text agents write)",
+    ]);
+    expect(state.can_change).toBe(false);
+    expect(shopNeedsSetup(db)).toBe(true);
+  });
+
+  it("queues one shop setup task once the goal has a strategy, and not again while it is open", async () => {
+    const db = harness();
+    connected(db);
+    const { fetchFn } = fakeEtsy({
+      "GET /v3/application/shops/777": () => ({ body: shopBody() }),
+      "GET /v3/application/shops/777/sections": () => ({ body: { results: [] } }),
+    });
+    await refreshShopProfile(db, { fetch: fetchFn, now: () => NOW });
+    const goal = goalRow(db);
+    const workId = queueShopSetupIfNeeded(db, goal, "Sell event-rental trackers and wedding workbooks.", NOW);
+    expect(workId).toBeTruthy();
+    const proposal = db
+      .prepare(
+        "SELECT p.department_id, p.title, p.description, w.purpose, w.goal_id FROM autonomy_work w JOIN agent_task_proposals p ON p.id=w.proposal_id",
+      )
+      .get() as Record<string, string>;
+    expect(proposal).toMatchObject({ department_id: "design", purpose: "shop_setup", goal_id: "g1" });
+    expect(proposal.description).toContain("etsy.shop_propose");
+    expect(proposal.description).toContain("Sell event-rental trackers");
+    expect(queueShopSetupIfNeeded(db, goal, "", NOW + 1000)).toBeNull();
+  });
+
+  it("validates a proposed setup, has the VPs approve it, applies text and new sections, and leaves files to the owner", async () => {
+    const db = harness();
+    connected(db);
+    expect(() => proposeShopChange(db, { title: "x".repeat(56) }, ctx(), NOW)).toThrow("invalid_title");
+    expect(() => proposeShopChange(db, { sections: ["x".repeat(25)] }, ctx(), NOW)).toThrow("invalid_sections");
+    expect(() => proposeShopChange(db, { logo: "../outside.png" }, ctx(), NOW)).toThrow("invalid_logo");
+    expect(() => proposeShopChange(db, {}, ctx(), NOW)).toThrow("shop_change_empty");
+    const change = proposeShopChange(
+      db,
+      {
+        title: "Practical planners for event pros",
+        announcement: "Instant downloads.",
+        about: "We make tools for small event businesses.",
+        digital_sale_message: "Download your files from Purchases.",
+        sections: ["Event rentals", "Weddings"],
+        logo: "products/page.png",
+        banner: "products/page.png",
+      },
+      ctx(),
+      NOW,
+    );
+    expect(change.status).toBe("ready");
+    expect(() => proposeShopChange(db, { title: "Another" }, ctx(), NOW)).toThrow("shop_change_open");
+    expect(listPendingApprovals(db, 100, "all").find((item) => item.kind === "shop_change")).toMatchObject({
+      title: "Practical planners for event pros",
+      sections: ["Event rentals", "Weddings"],
+      logo_path: "products/page.png",
+    });
+    expect(shopChangeApprover("ventures")).toBe("vp");
+    expect(() => decideShopChange(db, change.id, true, "someone", "", NOW)).toThrow("shop_change_decider_forbidden");
+    decideShopChange(db, change.id, true, "vp:a,b", "", NOW);
+
+    const { fetchFn, calls } = fakeEtsy({
+      "PUT /v3/application/shops/777": () => ({ body: {} }),
+      "GET /v3/application/shops/777/sections": () => ({
+        body: { results: [{ shop_section_id: 1, title: "Weddings" }] },
+      }),
+      "POST /v3/application/shops/777/sections": () => ({ body: {} }),
+      "GET /v3/application/shops/777": () => ({ body: shopBody({ title: "Practical planners for event pros" }) }),
+    });
+    // Connected before shops_w was asked for: nothing is sent, and the owner is told to reconnect.
+    const waiting = await applyShopChange(db, change.id, { fetch: fetchFn, now: () => NOW });
+    expect(waiting).toMatchObject({ status: "approved", error: expect.stringContaining("Reconnect Etsy") });
+    expect(calls).toHaveLength(0);
+    db.prepare("UPDATE etsy_connection SET granted_scopes=? WHERE id=1").run(
+      "listings_r listings_w shops_r shops_w transactions_r",
+    );
+    const applied = await applyShopChange(db, change.id, { fetch: fetchFn, now: () => NOW });
+    expect(applied.status).toBe("applied");
+    const put = calls.find((call) => call.method === "PUT")!;
+    expect(Object.fromEntries(new URLSearchParams(String(put.init.body)))).toEqual({
+      title: "Practical planners for event pros",
+      announcement: "Instant downloads.",
+      digital_sale_message: "Download your files from Purchases.",
+    });
+    const created = calls
+      .filter((call) => call.method === "POST")
+      .map((call) => new URLSearchParams(String(call.init.body)).get("title"));
+    expect(created).toEqual(["Event rentals"]);
+    expect(markShopChangeOwnerDone(db, change.id, NOW).owner_done_at).toBe(NOW);
+  });
+
+  it("records listing views from Etsy and measures them per variant", async () => {
+    const db = harness();
+    connected(db);
+    publishedEtsyListing(db);
+    let views = 40;
+    const { fetchFn } = fakeEtsy({
+      "GET /v3/application/shops/777/receipts": () => ({ body: { results: [] } }),
+      "GET /v3/application/shops/777/payment-account/ledger-entries": () => ({ body: { results: [] } }),
+      "GET /v3/application/shops/777/listings": (_init, url) => ({
+        body: {
+          results: url.searchParams.get("state") === "active" ? [{ listing_id: 9001, num_favorers: 2, views }] : [],
+        },
+      }),
+      "GET /v3/application/shops/777": () => ({ body: shopBody() }),
+      "GET /v3/application/shops/777/sections": () => ({ body: { results: [] } }),
+    });
+    startVariant(db, { opportunity_id: "o1", variable: "title", value: "New title" }, {}, NOW - 1);
+    await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
+    views = 100;
+    await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 30 * 60_000 });
+    expect(etsyShopListings(db)[0]).toMatchObject({ listing_id: "9001", views: 100 });
+    expect(variantResults(db, "o1", NOW + 30 * 60_000)[0]).toMatchObject({ variable: "title", views_gained: 60 });
+    expect(db.prepare("SELECT views FROM opportunity_metrics ORDER BY recorded_at").all()).toEqual([
+      { views: 40 },
+      { views: 100 },
+    ]);
+  });
+
+  it("keeps free-time suggestions away from projects that have a goal", () => {
+    const prompt = buildProposalPrompt(
+      { id: "a1", name: "Iris", role: "team_leader", department_id: "design" } as never,
+      {
+        department: { name: "Design", description: null, prompt: null },
+        projects: [],
+        goalProjects: [{ id: "p1", name: "Etsy Shop" }],
+        recentTasks: [],
+        openDepartmentTasks: [],
+        pastProposals: [],
+        businesses: [],
+      },
+    );
+    expect(prompt).toContain("Run by the goal planner, not by suggestions: Etsy Shop");
+    const parsed = parseProposalReply(
+      JSON.stringify({
+        proposals: [
+          { title: "Design a baby shower bundle", description: "x", reason: "y", project_id: "p1" },
+          { title: "Tidy the design system", description: "x", reason: "y", project_id: null },
+        ],
+      }),
+      { projectIds: new Set(), existingTitles: [], goalProjectIds: new Set(["p1"]) },
+    );
+    expect(parsed?.map((item) => item.title)).toEqual(["Tidy the design system"]);
   });
 });
 

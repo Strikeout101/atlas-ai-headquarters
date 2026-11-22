@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAutonomy, type Opportunity } from "../../api/autonomy";
-import { etsyApi, type EtsySettings as Settings, type EtsyShopListing } from "../../api/etsy";
+import { etsyApi, type EtsySettings as Settings, type EtsyShopListing, type EtsyShopState } from "../../api/etsy";
 
 const field =
   "w-full rounded-lg border border-[var(--th-input-border)] bg-[var(--th-input-bg)] px-3 py-2 text-sm text-[var(--th-text-primary)]";
@@ -30,6 +30,69 @@ function describe(cause: unknown): string {
 const when = (at: number | null) => (at ? new Date(at).toLocaleString() : "never");
 const money = (minor: number | null, currency: string | null) =>
   minor === null ? "" : `${(minor / 100).toFixed(2)} ${currency ?? "USD"}`;
+
+/**
+ * The shop itself: what is missing, and the owner's part of an applied shop setup (Etsy's API cannot upload the
+ * logo or banner or set the About story, so agents make them and the owner uploads them).
+ */
+function ShopSetup() {
+  const [state, setState] = useState<EtsyShopState | null>(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => {
+    etsyApi
+      .shop()
+      .then(setState)
+      .catch((cause) => setError(describe(cause)));
+  }, []);
+  useEffect(load, [load]);
+  if (!state && !error) return null;
+  const waiting = (state?.changes ?? []).filter(
+    (change) =>
+      change.status === "applied" && !change.owner_done_at && (change.logo_path || change.banner_path || change.about),
+  );
+  return (
+    <div className="space-y-2 rounded-lg bg-[var(--th-bg-surface)] p-3 text-sm" aria-label="Shop setup">
+      <p className="font-medium">Shop setup</p>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {state && !state.can_change && (
+        <p className="text-xs text-amber-600">
+          Reconnect Etsy (Connect, approve, paste the address) so approved shop changes can be applied: ATLAS now also
+          asks to edit the shop.
+        </p>
+      )}
+      {state?.profile && (
+        <p className="text-xs text-[var(--th-text-secondary)]">
+          {state.gaps.length
+            ? `Missing: ${state.gaps.join("; ")}.`
+            : "Logo, banner, title, announcement and sections are set."}{" "}
+          Agents make the shop setup and propose it for approval.
+        </p>
+      )}
+      {waiting.map((change) => (
+        <div key={change.id} className="space-y-1 border-t border-[var(--th-border)] pt-2 text-xs">
+          <p>Your part: upload on Etsy (Shop Manager &gt; your shop &gt; Edit shop), then tick it off.</p>
+          {change.logo_path && <p className="break-all">Logo: project folder / {change.logo_path}</p>}
+          {change.banner_path && <p className="break-all">Banner: project folder / {change.banner_path}</p>}
+          {change.about && (
+            <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words">About story: {change.about}</p>
+          )}
+          <button
+            type="button"
+            className={button}
+            onClick={() =>
+              void etsyApi
+                .shopOwnerDone(change.id)
+                .then(load)
+                .catch((cause) => setError(describe(cause)))
+            }
+          >
+            Uploaded on Etsy
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Every listing in the shop as last synced, including ones ATLAS did not create. The owner can bring one into
@@ -81,6 +144,7 @@ function ShopListings({ business, count }: { business: Settings["business"]; cou
                   {item.state.replace("_", " ")}
                   {item.price_minor !== null ? ` · ${money(item.price_minor, item.currency)}` : ""}
                   {item.num_favorers !== null ? ` · ${item.num_favorers} favorites` : ""}
+                  {typeof item.views === "number" ? ` · ${item.views} views` : ""}
                 </span>
               </div>
               {item.package_id ? (
@@ -383,6 +447,7 @@ export default function EtsySettings() {
               Re-read history
             </button>
           </form>
+          <ShopSetup />
           <ShopListings business={settings.business} count={settings.shop_listings ?? 0} />
         </div>
       )}

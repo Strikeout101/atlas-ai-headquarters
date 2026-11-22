@@ -3,6 +3,7 @@ import { decideProposal, type DecideDeps } from "./agent-proposals.ts";
 import { decideModelUpgrade } from "./model-routing.ts";
 import { decideOrgRequest } from "./org-requests.ts";
 import { decideListing } from "./listings.ts";
+import { decideShopChange } from "./etsy-shop.ts";
 import { decideRecordChange } from "./record-changes.ts";
 import { decideCodePush } from "./code-pushes.ts";
 import { decideSpendRequestAsVp } from "./spend-budgets.ts";
@@ -51,6 +52,10 @@ export async function executeVpApproval(
     // Within the owner's spending budget only; re-checked against this month's total when recorded. No money moves.
     decideSpendRequestAsVp(db, item.id, approve, decidedBy);
     deps.broadcast?.("finance_changed", {});
+  } else if (item.kind === "shop_change") {
+    // Recorded now; the Etsy tick applies what the API allows, and the owner uploads the logo, banner and story.
+    decideShopChange(db, item.id, approve, decidedBy, reason);
+    deps.broadcast?.("etsy_changed", {});
   } else if (item.kind === "listing_publish") {
     // Re-checks the business and the month's fee budget in the same transaction that records the decision.
     decideListing(db, item.id, approve, decidedBy, reason);

@@ -1,4 +1,11 @@
 import type { Express, Request, Response } from "express";
+import {
+  applyShopChange,
+  decideShopChange,
+  listShopChanges,
+  markShopChangeOwnerDone,
+  shopProfile,
+} from "../../etsy-shop.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../security/auth.ts";
 import {
@@ -90,6 +97,27 @@ export function registerEtsyRoutes(
     }),
   );
   app.get("/api/etsy/listings", (_req, res) => res.json({ ok: true, items: etsyShopListings(db) }));
+  app.get("/api/etsy/shop", (_req, res) => res.json({ ok: true, ...shopProfile(db), changes: listShopChanges(db) }));
+  app.post(
+    "/api/etsy/shop-changes/:id/decide",
+    handle((req) => ({
+      item: decideShopChange(
+        db,
+        String(req.params.id),
+        body(req).approve === true,
+        "owner",
+        typeof body(req).reason === "string" ? String(body(req).reason) : "",
+      ),
+    })),
+  );
+  app.post(
+    "/api/etsy/shop-changes/:id/apply",
+    handle(async (req) => ({ item: await applyShopChange(db, String(req.params.id)) })),
+  );
+  app.post(
+    "/api/etsy/shop-changes/:id/owner-done",
+    handle((req) => ({ item: markShopChangeOwnerDone(db, String(req.params.id)) })),
+  );
   app.post(
     "/api/etsy/listings/:id/adopt",
     handle((req) => {

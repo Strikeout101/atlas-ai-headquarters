@@ -7,7 +7,7 @@ How the first income stream (Ventures Etsy digital products) runs, and what the 
 1. **Etsy shop.** Create or confirm the Ventures shop on Etsy (shop name, billing, payout account).
 2. **Developer app.** At etsy.com/developers, create an app. Etsy reviews it; until then nothing below works.
    - Register a redirect address. It must be **https** and match exactly. Suggested: `https://localhost/atlas-etsy`. That address does not need to load; ATLAS reads the code from it.
-   - ATLAS asks for these permissions: `listings_r listings_w shops_r transactions_r`.
+   - ATLAS asks for these permissions: `listings_r listings_w shops_r shops_w transactions_r`.
 3. **In ATLAS: Settings > Businesses > Etsy.**
    - Enter the app's keystring, shared secret and the same redirect address, then **Save app details**.
    - Press **Connect**, approve on Etsy, then copy the whole address the browser lands on (it shows an error page) and paste it under **Finish connecting**. It must be done within 15 minutes of pressing Connect.
@@ -46,6 +46,16 @@ Every step is ordinary autonomy work, so the daily start cap, usage limits, VP a
 - **Changes made on Etsy.** If you edit a listing's title, description, tags or price on Etsy, ATLAS's copy follows it (unless an approved revision is still waiting). An approved draft you publish on Etsy becomes published in ATLAS. A listing deleted on Etsy is marked removed.
 - **Request limits.** The app allows 10 requests a second and 10,000 a day (confirmed 2026-11-21). ATLAS spaces its calls at least 125 ms apart (8 a second) and waits when Etsy answers 429. Etsy reports the daily allowance on every call; the Etsy card shows what is left, and background sync pauses when less than 2% (200 requests) remains and resumes as it refills. Your own button presses still go through. A normal sync uses about 7 requests, so 48 syncs a day use about 350.
 - **Half-pushed drafts.** If pushing a draft fails part way, pressing it again uploads only the images and files that are still missing.
+
+## The shop itself (added 2026-11-22)
+
+Etsy's API can change the shop title (headline), announcement, sale messages (including the one sent with digital orders), additional policy text and sections. It cannot upload the logo or banner, set the About story, rename the shop or edit FAQs. ATLAS reads the shop on every sync, including whether a logo and banner exist.
+
+- Once a goal has a strategy, a new or unfinished shop gets one **shop setup** task (design team, VP-approved). The agent makes the logo and banner, writes the title, announcement, About story, digital-order message and sections to match the strategy, and proposes it with `etsy.shop_propose`.
+- The proposal is approved like a listing (the VPs for Ventures; Today shows it as "Etsy shop setup"). ATLAS then applies the text and sections on Etsy.
+- The logo, banner and story appear under Settings > Businesses > Etsy > Shop setup as your part: upload them on Etsy (Shop Manager > Edit shop), then press **Uploaded on Etsy**.
+- Applying changes needs the `shops_w` permission: reconnect Etsy once (Connect, approve, paste the address).
+- Listing views: every sync records each listing's lifetime views with its favorites, so agents can compare views, favorites and sales per product and per experiment.
 
 ## How orders and payment records are read (fixed 2026-11-21)
 

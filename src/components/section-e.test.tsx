@@ -23,6 +23,8 @@ vi.mock("../api/etsy", () => ({
     publish: vi.fn(),
     shopListings: vi.fn(),
     adopt: vi.fn(),
+    shop: vi.fn(),
+    shopOwnerDone: vi.fn(),
   },
 }));
 vi.mock("../api/studio", () => ({
@@ -82,6 +84,63 @@ beforeEach(() => {
 });
 
 describe("Etsy card", () => {
+  beforeEach(() => {
+    vi.mocked(etsyApi.shop).mockResolvedValue({
+      profile: null,
+      seen_at: null,
+      gaps: [],
+      can_change: true,
+      changes: [],
+    });
+  });
+  it("shows what the shop is missing and the owner's upload step after a shop setup is applied", async () => {
+    const user = userEvent.setup();
+    vi.mocked(etsyApi.get).mockResolvedValue({ ...etsy, connected: true, shop_id: "777", shop_name: "Ventures" });
+    vi.mocked(etsyApi.shopListings).mockResolvedValue([]);
+    vi.mocked(etsyApi.shopOwnerDone).mockResolvedValue({} as never);
+    vi.mocked(etsyApi.shop).mockResolvedValue({
+      profile: {
+        shop_name: "Ventures",
+        title: "",
+        announcement: "",
+        digital_sale_message: "",
+        has_logo: false,
+        has_banner: false,
+        url: "https://www.etsy.com/shop/Ventures",
+        active_listings: 0,
+        sales: 0,
+        reviews: 0,
+        sections: [],
+      },
+      seen_at: 1,
+      gaps: ["logo (owner uploads the file agents make)", "shop sections"],
+      can_change: false,
+      changes: [
+        {
+          id: "c1",
+          status: "applied",
+          title: "Planners",
+          about: "We make tools for event pros.",
+          logo_path: "atlas-media/brand/logo.png",
+          banner_path: "atlas-media/brand/banner.png",
+          project_id: "p1",
+          error: null,
+          owner_done_at: null,
+          created_at: 1,
+        },
+      ],
+    });
+    render(<EtsySettings />);
+    const setup = await screen.findByLabelText("Shop setup");
+    expect(within(setup).getByText(/Reconnect Etsy/)).toBeVisible();
+    expect(
+      within(setup).getByText(/Missing: logo \(owner uploads the file agents make\); shop sections/),
+    ).toBeVisible();
+    expect(within(setup).getByText(/atlas-media\/brand\/logo.png/)).toBeVisible();
+    await user.click(within(setup).getByRole("button", { name: "Uploaded on Etsy" }));
+    expect(etsyApi.shopOwnerDone).toHaveBeenCalledWith("c1");
+  });
+
   it("shows the requests left today and lets the owner bring an existing shop listing into ATLAS", async () => {
     const user = userEvent.setup();
     vi.mocked(etsyApi.get).mockResolvedValue({

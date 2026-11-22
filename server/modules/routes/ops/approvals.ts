@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { listShopChanges } from "../../etsy-shop.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret } from "../../../oauth/helpers.ts";
 import { isBusinessKey, type BusinessKey } from "../../businesses.ts";
@@ -51,6 +52,27 @@ export type PendingApproval = (
       payload: Record<string, unknown>;
       /** The record as it is now, for an update or delete. */
       current: Record<string, unknown> | null;
+      decide_path: string;
+    }
+  | {
+      /** An Etsy shop setup or change an agent proposed: text and sections ATLAS applies, files the owner uploads. */
+      kind: "shop_change";
+      id: string;
+      created_at: number;
+      task_id: string | null;
+      task_title: string | null;
+      agent_id: string;
+      agent_name: string | null;
+      business: BusinessKey;
+      title: string | null;
+      announcement: string | null;
+      about: string | null;
+      sale_message: string | null;
+      digital_sale_message: string | null;
+      policy_additional: string | null;
+      sections: string[];
+      logo_path: string | null;
+      banner_path: string | null;
       decide_path: string;
     }
   | {
@@ -476,6 +498,39 @@ export function listPendingApprovals(
         current,
         decide_path: `/api/record-changes/${encodeURIComponent(request.id)}/decide`,
         ...factFields(recordChangeFacts(db, request)),
+      });
+    }
+  }
+  if (tableExists(db, "etsy_shop_changes")) {
+    for (const change of listShopChanges(db, limit).filter((item) => item.status === "ready")) {
+      const task =
+        change.task_id && hasTasks
+          ? (db.prepare("SELECT title FROM tasks WHERE id=?").get(String(change.task_id)) as { title?: string } | undefined)
+          : undefined;
+      const agent =
+        change.agent_id && hasAgents
+          ? (db.prepare("SELECT name FROM agents WHERE id=?").get(String(change.agent_id)) as { name?: string } | undefined)
+          : undefined;
+      const text = (value: unknown) => (typeof value === "string" && value ? value : null);
+      items.push({
+        kind: "shop_change",
+        id: change.id,
+        created_at: Number(change.created_at),
+        task_id: (change.task_id as string | null) ?? null,
+        task_title: task?.title ?? null,
+        agent_id: String(change.agent_id ?? "owner"),
+        agent_name: agent?.name ?? null,
+        business: change.business,
+        title: text(change.title),
+        announcement: text(change.announcement),
+        about: text(change.about),
+        sale_message: text(change.sale_message),
+        digital_sale_message: text(change.digital_sale_message),
+        policy_additional: text(change.policy_additional),
+        sections: change.sections,
+        logo_path: text(change.logo_path),
+        banner_path: text(change.banner_path),
+        decide_path: `/api/etsy/shop-changes/${encodeURIComponent(change.id)}/decide`,
       });
     }
   }
