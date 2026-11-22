@@ -4,16 +4,25 @@ import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret, encryptSecret } from "../oauth/helpers.ts";
 import { isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { upsertProviderLedgerEntry } from "./finance-store.ts";
-import { saveMediaAsset, studioSpendThisMonth, type MediaAsset } from "./media-library.ts";
+import {
+  ensureMediaSchema,
+  getMediaAsset,
+  saveMediaAsset,
+  studioSpendThisMonth,
+  type MediaAsset,
+} from "./media-library.ts";
 
 /**
- * The image studio. Two ways to make images:
+ * The image studio:
  *
  *   1. The mockup renderer (free, no AI): built-in HTML templates filled with a title, colors and up to four images
- *      from the project, rendered to PNG with headless Chrome. Good for product covers, page previews and printables.
- *   2. An image API (off until the owner configures it): any service that speaks the OpenAI-compatible
- *      `POST /images/generations` (paid services, or a model on the homelab). Each image's cost is recorded and the
- *      month's total may not pass the owner's cap; past it the agent must ask with finance.request_spend.
+ *      from the project, rendered to PNG with headless Chrome. Previews built from the real product files, which an
+ *      image generator cannot reproduce faithfully.
+ *   2. Images agents make with their own tools (Codex has built-in image generation on the owner's subscription):
+ *      the agent saves the file in the project and records it with `media.register`. Free.
+ *   3. Optional image API (off unless the owner configures it), for agents on providers without image generation
+ *      (local models): any OpenAI-compatible `POST /images/generations`. Each image's cost is recorded and the month's
+ *      total may not pass the owner's cap; past it the agent must ask with finance.request_spend.
  *
  * Outputs are saved in the project's `atlas-media/` folder (so listing packages can reference them) and recorded in
  * the media library with their source, prompt, license note and cost.
@@ -287,6 +296,75 @@ function slug(text: string): string {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 40) || "image"
+  );
+}
+
+function pngSize(file: string): { width: number | null; height: number | null } {
+  try {
+    const head = Buffer.alloc(24);
+    const fd = fs.openSync(file, "r");
+    fs.readSync(fd, head, 0, 24, 0);
+    fs.closeSync(fd);
+    if (head.toString("ascii", 1, 4) !== "PNG") return { width: null, height: null };
+    return { width: head.readUInt32BE(16), height: head.readUInt32BE(20) };
+  } catch {
+    return { width: null, height: null };
+  }
+}
+
+/**
+ * `media.register`: an image an agent made with its own tools (Codex image generation, a design export) goes into
+ * the media library, so listings and later tasks can find it. The file must be inside the project; one outside
+ * atlas-media/ is copied there. Registering the same file twice returns the existing record. Free.
+ */
+export function registerImage(db: Db, input: Row, ctx: StudioContext, now = Date.now()): MediaAsset {
+  ensureMediaSchema(db);
+  const root = projectRoot(ctx) ?? fail("studio_needs_project_for_images");
+  if (typeof input.path !== "string" || !input.path.trim()) fail("invalid_path");
+  const full = path.resolve(root, input.path.trim());
+  if (!full.startsWith(root + path.sep)) fail("studio_image_outside_project: copy the image into the project first");
+  const ext = path.extname(full).toLowerCase();
+  if (!IMAGE_TYPES[ext] || ext === ".svg") fail(`studio_image_type_not_supported: ${input.path}`);
+  if (!fs.existsSync(full) || !fs.statSync(full).isFile()) fail(`studio_image_missing: ${input.path}`);
+  if (fs.statSync(full).size > MAX_IMAGE_BYTES) fail(`studio_image_too_large: ${input.path}`);
+  let relative = path.relative(root, full).split(path.sep).join("/");
+  let stored = full;
+  if (!relative.startsWith(`${MEDIA_FOLDER}/`)) {
+    const out = outputPath(db, ctx, `${slug(path.basename(full, ext))}-${now}${ext}`);
+    fs.copyFileSync(full, out.full);
+    relative = out.relative;
+    stored = out.full;
+  }
+  const existing = db
+    .prepare("SELECT id FROM media_assets WHERE project_id IS ? AND path=? LIMIT 1")
+    .get(ctx.projectId, relative) as Row | undefined;
+  if (existing) return getMediaAsset(db, String(existing.id))!;
+  const source =
+    typeof input.source === "string" && input.source.trim()
+      ? input.source.trim().slice(0, 100)
+      : "codex image generation";
+  const size = ext === ".png" ? pngSize(stored) : { width: null, height: null };
+  return saveMediaAsset(
+    db,
+    {
+      business: ctx.business,
+      project_id: ctx.projectId,
+      opportunity_id: ctx.opportunityId ?? null,
+      listing_id: ctx.listingId ?? null,
+      kind: "generated",
+      path: relative,
+      source,
+      prompt: typeof input.prompt === "string" ? input.prompt.trim().slice(0, 4000) : "",
+      license: `AI-generated by ${source}. Check the provider's terms before commercial use.`,
+      tags: input.tags,
+      width: size.width,
+      height: size.height,
+      cost_minor: 0,
+      currency: "USD",
+      agent_id: ctx.agentId ?? null,
+      task_id: ctx.taskId ?? null,
+    },
+    now,
   );
 }
 

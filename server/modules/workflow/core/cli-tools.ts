@@ -60,6 +60,8 @@ export function createCliTools(deps: CreateCliToolsDeps) {
         if (model) args.push("-m", model);
         if (reasoningLevel) args.push("-c", `model_reasoning_effort="${reasoningLevel}"`);
         if (!noTools) args.push("--yolo");
+        // Codex's built-in web search (on the owner's subscription) is off unless asked for.
+        if (!noTools) args.push("--search");
         args.push("exec", "--json");
         if (noTools) args.push("--sandbox", "read-only");
         return args;

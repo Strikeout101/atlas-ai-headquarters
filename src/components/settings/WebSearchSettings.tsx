@@ -29,8 +29,8 @@ function describe(cause: unknown): string {
 }
 
 /**
- * The search service agents use for web.search (ideas, strategies, best sellers, trends). Search engines refuse
- * unkeyed automated searches after a few queries, so real research needs a key; the monthly cap prevents surprise bills.
+ * Optional search service for ATLAS's own web.search. Claude and Codex agents search with their built-in web search
+ * on the owner's subscription; this serves agents without one (local models) and searches ATLAS screens and logs.
  */
 export default function WebSearchSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -79,8 +79,9 @@ export default function WebSearchSettings() {
         )}
       </div>
       <p className="text-xs text-[var(--th-text-secondary)]">
-        Agents search the web for ideas, strategies, best sellers and trends. Search engines refuse unkeyed automated
-        searches after a few queries, so real research needs a search service with a key.
+        Optional. Claude and Codex agents already search the web with their own built-in search, on your subscription. A
+        key here makes ATLAS&apos;s own web search reliable, for agents without built-in search (local models); without
+        one it falls back to a limited DuckDuckGo search.
       </p>
       {error && (
         <p role="alert" className="break-words text-sm text-red-500">

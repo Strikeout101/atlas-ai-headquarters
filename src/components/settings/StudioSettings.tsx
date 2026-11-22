@@ -15,8 +15,8 @@ function describe(cause: unknown): string {
 }
 
 /**
- * The image studio. The free mockup renderer always works when Chrome or Edge is installed. AI image generation stays
- * off until the owner sets a service (paid, or a model on the homelab) and a monthly cap.
+ * The image studio. The free mockup renderer always works when Chrome or Edge is installed. Codex agents generate
+ * images themselves and record them with media.register; the image API below is optional, for providers without it.
  */
 export default function StudioSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -86,6 +86,10 @@ export default function StudioSettings() {
         </p>
       )}
       {message && <p className="text-sm text-emerald-600">{message}</p>}
+      <p className="text-xs text-[var(--th-text-secondary)]">
+        Codex agents make AI images with their own image generation, on your subscription, and add them to the media
+        library. The image service below is optional: only for agents that cannot generate images (local models).
+      </p>
       <p className="text-xs text-[var(--th-text-secondary)]">
         Free mockups (covers, page grids, printables, tablet frames):{" "}
         {settings?.renderer_browser

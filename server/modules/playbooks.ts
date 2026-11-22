@@ -10,7 +10,7 @@ import { ensureExperimentSchema } from "./experiments.ts";
  *
  *   research  - a schedule: find niches with demand evidence, record each with opportunity.propose
  *   build     - make the product files in the project folder
- *   mockups   - preview images with studio.mockup (and studio.generate when the owner enabled it)
+ *   mockups   - preview images with studio.mockup, plus images the agent generates itself (media.register)
  *   listing   - an Etsy listing package (category, title, 13 tags, price), submitted for VP review
  *
  * After the listing step the package follows the existing approvals; when Etsy is connected the approved package is
@@ -48,7 +48,7 @@ export const DEFAULT_ETSY_PLAYBOOK: Omit<Playbook, "updated_at"> = {
     department_id: "planning",
     instructions: [
       "Find 3 to 5 digital-product niches the Ventures Etsy shop could win in (printables, planners, templates, spreadsheets, digital art or anything better the evidence shows).",
-      "Choose your own approach. web.search and web.read cover the whole web: trend reports, best-seller roundups, what buyers ask for, seller communities. etsy.search gives live Etsy numbers per search: how many listings compete, their prices, favorites, views and common tags. Compare niches by demand against competition, and look for gaps (few strong listings, weak titles or images, missing variants).",
+      "Choose your own approach. Search the web with your own web search or web.search / web.read: trend reports, best-seller roundups, what buyers ask for, seller communities. etsy.search gives live Etsy numbers per search: how many listings compete, their prices, favorites, views and common tags. Compare niches by demand against competition, and look for gaps (few strong listings, weak titles or images, missing variants).",
       "Etsy's own search pages refuse automated readers, its category pages do not. If a skill would help, skills.search finds one and skills.request asks for it (VP-reviewed).",
       "Avoid trademarks, licensed characters and anything the business profile rules out.",
       "Record each niche with opportunity.propose: title, description (the evidence with its numbers, and the product you would make), the five scores 0-100 and a budget in USD (usually 0-10 for listing fees and images).",
@@ -75,7 +75,7 @@ export const DEFAULT_ETSY_PLAYBOOK: Omit<Playbook, "updated_at"> = {
       instructions: [
         "Opportunity {opportunity_id}: {title}",
         "Make 5 to 8 Etsy preview images from the product files with studio.mockup (templates cover, grid, printable, device; 2000x1600).",
-        "If studio.generate is available and within its monthly cap you may add lifestyle images; otherwise do not.",
+        "You may add a few lifestyle or cover images with your own image generation (Codex can generate images): save each inside the project and record it with media.register {path, prompt}. Mockups of the real pages come first; never show content the buyer does not get.",
         "End with the list of image paths (they are saved under atlas-media/).",
       ].join("\n"),
     },

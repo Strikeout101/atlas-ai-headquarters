@@ -43,7 +43,7 @@ import {
   startEtsyConnect,
   syncEtsy,
 } from "./etsy.ts";
-import { generateImage, mockupHtml, renderMockup, saveStudioSettings, findChrome } from "./studio.ts";
+import { generateImage, mockupHtml, registerImage, renderMockup, saveStudioSettings, findChrome } from "./studio.ts";
 import { searchMedia } from "./media-library.ts";
 import {
   evaluateOpportunities,
@@ -1013,6 +1013,41 @@ describe("costs and profit", () => {
 });
 
 describe("image studio", () => {
+  it("records an image an agent generated itself, copying it into atlas-media once", () => {
+    const db = harness();
+    const ctx = {
+      business: "ventures" as const,
+      projectId: "p1",
+      projectPath: projectDir,
+      opportunityId: "o1",
+      agentId: "lead-d",
+    };
+    const asset = registerImage(
+      db,
+      { path: "products/page.png", prompt: "Planner on a desk", tags: ["Lifestyle"] },
+      ctx,
+      NOW,
+    );
+    expect(asset).toMatchObject({
+      kind: "generated",
+      source: "codex image generation",
+      path: `atlas-media/page-${NOW}.png`,
+      prompt: "Planner on a desk",
+      width: 1,
+      height: 1,
+      cost_minor: 0,
+      opportunity_id: "o1",
+      tags: ["lifestyle"],
+    });
+    expect(fs.existsSync(path.join(projectDir, asset.path))).toBe(true);
+    expect(registerImage(db, { path: asset.path }, ctx, NOW + 1).id).toBe(asset.id);
+    expect(() => registerImage(db, { path: "../outside.png" }, ctx, NOW)).toThrow("studio_image_outside_project");
+    expect(() => registerImage(db, { path: "products/planner.pdf" }, ctx, NOW)).toThrow(
+      "studio_image_type_not_supported",
+    );
+    expect(() => registerImage(db, { path: "products/missing.png" }, ctx, NOW)).toThrow("studio_image_missing");
+  });
+
   it("renders a mockup into the project's atlas-media folder and the media library", async () => {
     const db = harness();
     const html = mockupHtml(

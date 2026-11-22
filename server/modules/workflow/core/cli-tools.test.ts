@@ -12,6 +12,16 @@ function createTools() {
 }
 
 describe("buildAgentArgs", () => {
+  it("starts Codex workers with its built-in web search, and keeps no-tools runs read-only without it", () => {
+    const tools = createTools();
+    const work = tools.buildAgentArgs("codex", "gpt-5.5");
+    expect(work).toContain("--search");
+    expect(work.indexOf("--search")).toBeLessThan(work.indexOf("exec"));
+    const review = tools.buildAgentArgs("codex", "gpt-5.5", undefined, { noTools: true });
+    expect(review).not.toContain("--search");
+    expect(review).toContain("read-only");
+  });
+
   it("uses Antigravity's headless stream protocol for Gemini agents", () => {
     vi.mocked(resolveGeminiCommand).mockReturnValue("agy");
     const tools = createTools();

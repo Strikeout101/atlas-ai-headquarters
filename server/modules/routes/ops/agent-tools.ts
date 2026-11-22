@@ -32,7 +32,7 @@ import {
   updateListing,
 } from "../../listings.ts";
 import { listSocialAccountsForAgent, listInstagramMediaForAgent } from "./business-social.ts";
-import { generateImage, renderMockup, type StudioContext } from "../../studio.ts";
+import { generateImage, registerImage, renderMockup, type StudioContext } from "../../studio.ts";
 import { searchMedia } from "../../media-library.ts";
 import { startVariant } from "../../experiments.ts";
 import { etsyShopListings, searchEtsyListings, searchEtsyTaxonomy } from "../../etsy.ts";
@@ -225,6 +225,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
       if (
         operation === "studio.mockup" ||
         operation === "studio.generate" ||
+        operation === "media.register" ||
         operation === "media.search" ||
         operation === "experiment.start" ||
         operation === "etsy.taxonomy" ||
@@ -253,6 +254,8 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
         try {
           if (operation === "studio.mockup")
             return res.status(201).json({ ok: true, item: await renderMockup(db, body, studioContext) });
+          if (operation === "media.register")
+            return res.status(201).json({ ok: true, item: registerImage(db, body, studioContext) });
           if (operation === "studio.generate")
             return res.status(201).json({ ok: true, item: await generateImage(db, body, studioContext) });
           if (operation === "media.search")
