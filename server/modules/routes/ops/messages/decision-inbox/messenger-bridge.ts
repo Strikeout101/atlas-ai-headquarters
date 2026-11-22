@@ -433,9 +433,6 @@ export function createDecisionInboxMessengerBridge(deps: DecisionBridgeDeps) {
       ...body,
       option_number: selectedOptionNumber,
     };
-    if (pendingDecision.kind === "review_round_pick" && validOptionNumbers.length > 1) {
-      replyBody.selected_option_numbers = validOptionNumbers;
-    }
     if (note) replyBody.note = note;
 
     const applied = applyDecisionReply(pendingDecision.id, replyBody);

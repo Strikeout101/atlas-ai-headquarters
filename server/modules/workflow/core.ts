@@ -8,10 +8,6 @@ import {
   readNonNegativeIntEnv,
   REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
   REVIEW_MAX_MEMO_ITEMS_PER_ROUND,
-  REVIEW_MAX_REMEDIATION_REQUESTS,
-  REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND,
-  REVIEW_MAX_REVISION_SIGNALS_PER_ROUND,
-  REVIEW_MAX_ROUNDS,
 } from "../../db/runtime.ts";
 import { BUILTIN_GOOGLE_CLIENT_ID, BUILTIN_GOOGLE_CLIENT_SECRET, encryptSecret } from "../../oauth/helpers.ts";
 import { notifyTaskStatus } from "../../gateway/client.ts";
@@ -89,7 +85,6 @@ export function initializeWorkflowPartA(ctx: RuntimeContext): WorkflowCoreExport
   const rerouteSubtasksByPlanningLeader = __ctx.rerouteSubtasksByPlanningLeader;
   const createSubtaskFromCli = __ctx.createSubtaskFromCli;
   const completeSubtaskFromCli = __ctx.completeSubtaskFromCli;
-  const seedReviewRevisionSubtasks = __ctx.seedReviewRevisionSubtasks;
   const codexThreadToSubtask = __ctx.codexThreadToSubtask;
   const parseAndCreateSubtasks = __ctx.parseAndCreateSubtasks;
   const ANTIGRAVITY_ENDPOINTS = __ctx.ANTIGRAVITY_ENDPOINTS;
@@ -132,8 +127,6 @@ export function initializeWorkflowPartA(ctx: RuntimeContext): WorkflowCoreExport
   const reviewRoundState = __ctx.reviewRoundState;
   const reviewInFlight = __ctx.reviewInFlight;
   const getTaskStatusById = __ctx.getTaskStatusById;
-  const getReviewRoundMode = __ctx.getReviewRoundMode;
-  const scheduleNextReviewRound = __ctx.scheduleNextReviewRound;
   const getLeadersByDepartmentIds = __ctx.getLeadersByDepartmentIds;
   const getAllActiveTeamLeaders = __ctx.getAllActiveTeamLeaders;
   const getTaskRelatedDepartmentIds = __ctx.getTaskRelatedDepartmentIds;

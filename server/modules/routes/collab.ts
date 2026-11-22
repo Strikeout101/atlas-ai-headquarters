@@ -737,7 +737,7 @@ export function registerRoutesPartB(ctx: RuntimeContext): RouteCollabExports {
     notifyCeo,
     sendAgentMessage,
     appendTaskLog,
-    finishReview,
+    startTaskReview: (taskId: string) => __ctx.startTaskReview(taskId),
     findTeamLeader,
     findBestSubordinate,
     nowMs,

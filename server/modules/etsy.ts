@@ -5,7 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { decryptSecret, encryptSecret } from "../oauth/helpers.ts";
 import { appendAutonomyLedger } from "./autonomy-store.ts";
 import { isBusinessKey, type BusinessKey } from "./businesses.ts";
-import { markOpportunityLaunched, recordOpportunityMetric } from "./experiments.ts";
+import { markInitiativeLaunched, recordInitiativeMetric } from "./experiments.ts";
 import { upsertProviderLedgerEntry } from "./finance-store.ts";
 import { applyApprovedShopChanges, canChangeShop, ensureEtsyShopSchema, refreshShopProfile } from "./etsy-shop.ts";
 import {
@@ -35,7 +35,7 @@ import {
  * Etsy. The mapping of payment-ledger entry types to fees and refunds is a best guess until real entries are seen.
  *
  * Also (2026-11-21): approved revisions change live listings (title, description, tags, price through inventory,
- * images, files); listings of stopped opportunities are deactivated; every shop listing is mirrored into
+ * images, files); listings of stopped initiatives are deactivated; every shop listing is mirrored into
  * `etsy_shop_listings` so ATLAS sees listings it did not create and changes made on Etsy; the daily request quota
  * Etsy reports is tracked so background work pauses before it runs out.
  */
@@ -876,8 +876,8 @@ export async function applyEtsyRevision(db: Db, revisionId: string, deps: EtsyDe
     markListingPublished(db, revision.id, target.listing_url ?? `https://www.etsy.com/listing/${etsyId}`, now, {
       recordFee: false,
     });
-    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='opportunity_variants'").get())
-      db.prepare("UPDATE opportunity_variants SET started_at=? WHERE listing_id=? AND ended_at IS NULL").run(
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='initiative_variants'").get())
+      db.prepare("UPDATE initiative_variants SET started_at=? WHERE listing_id=? AND ended_at IS NULL").run(
         now,
         revision.id,
       );
@@ -900,16 +900,16 @@ export async function applyEtsyRevision(db: Db, revisionId: string, deps: EtsyDe
 }
 
 /**
- * Takes down (state inactive) the live Etsy listings of stopped opportunities, so a stopped experiment stops
+ * Takes down (state inactive) the live Etsy listings of stopped initiatives, so a stopped experiment stops
  * renewing and showing. Only listings ATLAS created: an existing listing the owner brought in is never taken down.
- * Restarting the opportunity does not reactivate it; the owner does that on Etsy.
+ * Restarting the initiative does not reactivate it; the owner does that on Etsy.
  */
 export async function deactivateStoppedListings(db: Db, deps: EtsyDeps = {}) {
   const shop = shopId(db);
   const rows = db
     .prepare(
       `SELECT l.id, l.etsy_listing_id, l.title, l.business, o.stop_reason FROM listing_packages l
-       JOIN opportunities o ON o.id = l.opportunity_id
+       JOIN initiatives o ON o.id = l.initiative_id
        WHERE o.status='stopped' AND l.platform='etsy' AND l.status='published' AND l.revision_of IS NULL
          AND l.etsy_adopted=0 AND l.etsy_listing_id IS NOT NULL AND COALESCE(l.etsy_state,'active')='active'`,
     )
@@ -935,7 +935,7 @@ export async function deactivateStoppedListings(db: Db, deps: EtsyDeps = {}) {
         business: isBusinessKey(listing.business) ? listing.business : null,
         sourceId: String(listing.id),
         message:
-          `Took down Etsy listing "${String(listing.title).slice(0, 100)}": its opportunity stopped (${String(listing.stop_reason ?? "no reason")})`.slice(
+          `Took down Etsy listing "${String(listing.title).slice(0, 100)}": its initiative stopped (${String(listing.stop_reason ?? "no reason")})`.slice(
             0,
             300,
           ),
@@ -1060,7 +1060,7 @@ export function etsyShopListings(db: Db) {
   ensureEtsySchema(db);
   const rows = db
     .prepare(
-      `SELECT s.*, l.id AS package_id, l.opportunity_id, l.etsy_adopted FROM etsy_shop_listings s
+      `SELECT s.*, l.id AS package_id, l.initiative_id, l.etsy_adopted FROM etsy_shop_listings s
        LEFT JOIN listing_packages l ON l.etsy_listing_id = s.listing_id AND l.revision_of IS NULL
          AND l.status IN ('approved','published')
        ORDER BY CASE s.state WHEN 'active' THEN 0 WHEN 'draft' THEN 1 WHEN 'removed' THEN 9 ELSE 2 END, s.title
@@ -1081,13 +1081,13 @@ export function etsyShopListings(db: Db) {
     quantity: (row.quantity as number | null) ?? null,
     seen_at: Number(row.seen_at),
     package_id: (row.package_id as string | null) ?? null,
-    opportunity_id: (row.opportunity_id as string | null) ?? null,
+    initiative_id: (row.initiative_id as string | null) ?? null,
     adopted: Boolean(row.etsy_adopted),
   }));
 }
 
 /**
- * Owner: brings an existing shop listing into ATLAS as a published package, optionally tied to an opportunity so its
+ * Owner: brings an existing shop listing into ATLAS as a published package, optionally tied to an initiative so its
  * sales and favorites count there and agents can propose revisions of it. Its images and files stay on Etsy.
  */
 export function adoptEtsyListing(db: Db, etsyListingId: string, input: Row = {}, now = Date.now()) {
@@ -1103,15 +1103,15 @@ export function adoptEtsyListing(db: Db, etsyListingId: string, input: Row = {},
     .get(etsyListingId);
   if (existing) fail("etsy_listing_already_in_atlas");
   const business = String(row(db).business);
-  let opportunityId: string | null = null;
+  let initiativeId: string | null = null;
   let projectId: string | null = null;
-  if (input.opportunity_id !== undefined && input.opportunity_id !== null && input.opportunity_id !== "") {
-    const opportunity = db
-      .prepare("SELECT id, business, project_id FROM opportunities WHERE id=?")
-      .get(String(input.opportunity_id)) as Row | undefined;
-    if (!opportunity || opportunity.business !== business) fail("invalid_opportunity_id");
-    opportunityId = String(opportunity.id);
-    projectId = (opportunity.project_id as string | null) ?? null;
+  if (input.initiative_id !== undefined && input.initiative_id !== null && input.initiative_id !== "") {
+    const initiative = db
+      .prepare("SELECT id, business, project_id FROM initiatives WHERE id=?")
+      .get(String(input.initiative_id)) as Row | undefined;
+    if (!initiative || initiative.business !== business) fail("invalid_initiative_id");
+    initiativeId = String(initiative.id);
+    projectId = (initiative.project_id as string | null) ?? null;
   }
   const id = randomUUID();
   const whoMade = (ETSY_WHO_MADE as readonly unknown[]).includes(mirror.who_made) ? String(mirror.who_made) : "i_did";
@@ -1119,7 +1119,7 @@ export function adoptEtsyListing(db: Db, etsyListingId: string, input: Row = {},
     ? String(mirror.when_made)
     : "made_to_order";
   db.prepare(
-    `INSERT INTO listing_packages (id,business,platform,project_id,opportunity_id,title,description,tags,price_minor,currency,
+    `INSERT INTO listing_packages (id,business,platform,project_id,initiative_id,title,description,tags,price_minor,currency,
       files,mockups,notes,fee_minor,fee_currency,status,listing_url,decided_by,decision_reason,submitted_at,decided_at,
       published_at,created_at,updated_at,taxonomy_id,who_made,when_made,etsy_listing_id,etsy_state,etsy_adopted)
      VALUES (?,?,'etsy',?,?,?,?,?,?,?,'[]','[]','',0,'USD','published',?,'owner','Brought in from the Etsy shop',?,?,?,?,?,?,?,?,?,?,1)`,
@@ -1127,7 +1127,7 @@ export function adoptEtsyListing(db: Db, etsyListingId: string, input: Row = {},
     id,
     business,
     projectId,
-    opportunityId,
+    initiativeId,
     String(mirror.title) || `Etsy listing ${etsyListingId}`,
     String(mirror.description),
     String(mirror.tags ?? "[]"),
@@ -1145,7 +1145,7 @@ export function adoptEtsyListing(db: Db, etsyListingId: string, input: Row = {},
     etsyListingId,
     String(mirror.state),
   );
-  if (opportunityId && mirror.state === "active") markOpportunityLaunched(db, opportunityId, now);
+  if (initiativeId && mirror.state === "active") markInitiativeLaunched(db, initiativeId, now);
   return getListing(db, id)!;
 }
 
@@ -1161,14 +1161,12 @@ function moneyMinor(value: unknown): { minor: number; currency: string } | null 
   return { minor: Math.round((amount / divisor) * 100), currency };
 }
 
-function opportunityForEtsyListing(db: Db, etsyListingId: unknown): string | null {
+function initiativeForEtsyListing(db: Db, etsyListingId: unknown): string | null {
   if (etsyListingId === undefined || etsyListingId === null) return null;
   const found = db
-    .prepare(
-      "SELECT opportunity_id FROM listing_packages WHERE etsy_listing_id=? AND opportunity_id IS NOT NULL LIMIT 1",
-    )
+    .prepare("SELECT initiative_id FROM listing_packages WHERE etsy_listing_id=? AND initiative_id IS NOT NULL LIMIT 1")
     .get(String(etsyListingId)) as Row | undefined;
-  return (found?.opportunity_id as string | undefined) ?? null;
+  return (found?.initiative_id as string | undefined) ?? null;
 }
 
 /** Payment-ledger entries: which ones are costs. Payouts and sale credits are skipped (sales come from receipts). */
@@ -1279,7 +1277,7 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
       .run(end, now);
   try {
     const seenReceipts = new Set<string>();
-    const salesByOpportunity = new Map<string, { sales: number; revenue: number; currency: string; listing: string }>();
+    const salesByInitiative = new Map<string, { sales: number; revenue: number; currency: string; listing: string }>();
     await forEachWindow(
       db,
       `/shops/${shop}/receipts`,
@@ -1298,8 +1296,8 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
           const canceled = String(receipt.status ?? "").toLowerCase() === "canceled";
           const paid = receipt.is_paid === true && !canceled;
           const transactions = Array.isArray(receipt.transactions) ? (receipt.transactions as Row[]) : [];
-          const opportunityId =
-            transactions.map((t) => opportunityForEtsyListing(db, t.listing_id)).find(Boolean) ?? null;
+          const initiativeId =
+            transactions.map((t) => initiativeForEtsyListing(db, t.listing_id)).find(Boolean) ?? null;
           upsertProviderLedgerEntry(
             db,
             {
@@ -1315,13 +1313,13 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
                   .map((t) => String(t.title ?? ""))
                   .join(", ")}`.slice(0, 300),
               occurred_at: Number(receipt.created_timestamp ?? nowS) * 1000,
-              opportunity_id: opportunityId,
+              initiative_id: initiativeId,
             },
             now,
           );
           counts.receipts++;
-          if (opportunityId && paid) {
-            const entry = salesByOpportunity.get(opportunityId) ?? {
+          if (initiativeId && paid) {
+            const entry = salesByInitiative.get(initiativeId) ?? {
               sales: 0,
               revenue: 0,
               currency: subtotal.currency,
@@ -1329,7 +1327,7 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
             };
             entry.sales += transactions.reduce((sum, t) => sum + Number(t.quantity ?? 1), 0) || 1;
             entry.revenue += subtotal.minor;
-            salesByOpportunity.set(opportunityId, entry);
+            salesByInitiative.set(initiativeId, entry);
           }
         }
         saveCheckpoint("receipts_after", windowEnd);
@@ -1351,10 +1349,10 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
           seenEntries.add(entryId);
           const type = classifyLedgerEntry(entry);
           if (!type) continue;
-          const opportunityId = String(entry.reference_type ?? "")
+          const initiativeId = String(entry.reference_type ?? "")
             .toLowerCase()
             .includes("listing")
-            ? opportunityForEtsyListing(db, entry.reference_id)
+            ? initiativeForEtsyListing(db, entry.reference_id)
             : null;
           upsertProviderLedgerEntry(
             db,
@@ -1368,7 +1366,7 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
               verified: true,
               description: `Etsy ${type === "refund" ? "refund" : "fee"}: ${String(entry.description ?? entry.ledger_type ?? "").slice(0, 200)}`,
               occurred_at: Number(entry.created_timestamp ?? entry.create_date ?? nowS) * 1000,
-              opportunity_id: opportunityId,
+              initiative_id: initiativeId,
             },
             now,
           );
@@ -1383,13 +1381,13 @@ export async function syncEtsy(db: Db, deps: EtsyDeps = {}, options: EtsySyncOpt
     counts.shop_listings = shopSync.seen;
     counts.changed_on_etsy = shopSync.changed;
     for (const listing of shopSync.active) {
-      const opportunityId = opportunityForEtsyListing(db, listing.listing_id);
-      if (!opportunityId) continue;
-      const sales = salesByOpportunity.get(opportunityId);
-      recordOpportunityMetric(
+      const initiativeId = initiativeForEtsyListing(db, listing.listing_id);
+      if (!initiativeId) continue;
+      const sales = salesByInitiative.get(initiativeId);
+      recordInitiativeMetric(
         db,
         {
-          opportunity_id: opportunityId,
+          initiative_id: initiativeId,
           listing_id: String(listing.listing_id),
           favorers: Number.isFinite(Number(listing.num_favorers)) ? Number(listing.num_favorers) : null,
           views: Number.isFinite(Number(listing.views)) && listing.views !== null ? Number(listing.views) : null,
@@ -1429,11 +1427,11 @@ export async function runEtsyTick(db: Db, deps: EtsyDeps = {}): Promise<void> {
     );
     return;
   }
-  // Nothing new goes out for an opportunity that has been stopped.
+  // Nothing new goes out for an initiative that has been stopped.
   const approved = db
     .prepare(
       `SELECT l.id, l.etsy_listing_id, l.revision_of FROM listing_packages l
-       LEFT JOIN opportunities o ON o.id = l.opportunity_id
+       LEFT JOIN initiatives o ON o.id = l.initiative_id
        WHERE l.platform='etsy' AND l.status='approved' AND COALESCE(o.status,'') <> 'stopped' ORDER BY l.decided_at`,
     )
     .all() as Row[];

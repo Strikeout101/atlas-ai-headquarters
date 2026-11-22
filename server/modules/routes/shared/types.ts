@@ -20,6 +20,8 @@ export interface AgentRow {
 }
 
 export type DelegationOptions = {
+  /** A `$` CEO directive: the only work that gets a team-lead meeting (plan section 4.2). */
+  directive?: boolean;
   skipPlannedMeeting?: boolean;
   skipPlanSubtasks?: boolean;
   projectId?: string | null;

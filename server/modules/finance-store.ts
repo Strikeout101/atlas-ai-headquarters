@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
-import { listRecurringCosts, opportunityMoney, profitLines, profitSettings, recurringShareMinor } from "./profit.ts";
+import { listRecurringCosts, initiativeMoney, profitLines, profitSettings, recurringShareMinor } from "./profit.ts";
 
 type Row = Record<string, unknown>;
 /** Spending categories for agent spend requests and the owner's budgets (spend-budgets.ts). */
@@ -22,7 +22,7 @@ const LEDGER_SOURCE_SQL = LEDGER_SOURCES.map((source) => `'${source}'`).join(","
 export function ensureFinanceSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS deals (
     id TEXT PRIMARY KEY,business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
-    contact_id TEXT REFERENCES business_contacts(id) ON DELETE SET NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,opportunity_id TEXT REFERENCES opportunities(id),
+    contact_id TEXT REFERENCES business_contacts(id) ON DELETE SET NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,initiative_id TEXT REFERENCES initiatives(id),
     title TEXT NOT NULL,stage TEXT NOT NULL DEFAULT 'lead' CHECK(stage IN ('lead','qualified','proposal','won','paid','lost')),
     expected_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK(typeof(expected_amount_minor)='integer' AND expected_amount_minor BETWEEN 0 AND 9007199254740991),
     currency TEXT NOT NULL DEFAULT 'USD',notes TEXT NOT NULL DEFAULT '',generated_at INTEGER,published_at INTEGER,ordered_at INTEGER,
@@ -32,18 +32,18 @@ export function ensureFinanceSchema(db: DatabaseSync): void {
     id TEXT PRIMARY KEY,business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),kind TEXT NOT NULL CHECK(kind IN ('revenue','expense')),
     amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor)='integer' AND amount_minor BETWEEN 0 AND 9007199254740991),currency TEXT NOT NULL,
     source TEXT NOT NULL CHECK(source IN (${LEDGER_SOURCE_SQL})),external_id TEXT,verified INTEGER NOT NULL DEFAULT 0 CHECK(verified IN (0,1)),
-    deal_id TEXT REFERENCES deals(id),opportunity_id TEXT REFERENCES opportunities(id),description TEXT NOT NULL DEFAULT '',occurred_at INTEGER NOT NULL,
+    deal_id TEXT REFERENCES deals(id),initiative_id TEXT REFERENCES initiatives(id),description TEXT NOT NULL DEFAULT '',occurred_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(source,external_id)
   );
   CREATE TABLE IF NOT EXISTS spend_requests (
     id TEXT PRIMARY KEY,business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
-    opportunity_id TEXT REFERENCES opportunities(id),amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor)='integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
+    initiative_id TEXT REFERENCES initiatives(id),amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor)='integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
     currency TEXT NOT NULL,purpose TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','denied')),
     decided_by TEXT,created_at INTEGER NOT NULL,decided_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_ledger_business_time ON ledger_entries(business,currency,occurred_at);
   CREATE INDEX IF NOT EXISTS idx_ledger_deal ON ledger_entries(deal_id);
-  CREATE INDEX IF NOT EXISTS idx_ledger_opportunity ON ledger_entries(opportunity_id);
+  CREATE INDEX IF NOT EXISTS idx_ledger_initiative ON ledger_entries(initiative_id);
   CREATE INDEX IF NOT EXISTS idx_spend_pending ON spend_requests(status,created_at);`);
   migrateNullableFinancialReferences(db);
   migrateLedgerSources(db);
@@ -179,17 +179,17 @@ function atomic<T>(db: DatabaseSync, fn: () => T): T {
     throw error;
   }
 }
-function opportunity(db: DatabaseSync, id: string | null, businessKey: string): Row | undefined {
+function initiative(db: DatabaseSync, id: string | null, businessKey: string): Row | undefined {
   if (!id) return;
-  const row = db.prepare("SELECT * FROM opportunities WHERE id=? AND business=?").get(id, businessKey);
-  if (!row) return fail("opportunity_business_mismatch");
+  const row = db.prepare("SELECT * FROM initiatives WHERE id=? AND business=?").get(id, businessKey);
+  if (!row) return fail("initiative_business_mismatch");
   return row;
 }
 const DEAL_FIELDS = [
   "business",
   "contact_id",
   "project_id",
-  "opportunity_id",
+  "initiative_id",
   "title",
   "stage",
   "expected_amount_minor",
@@ -206,7 +206,7 @@ function dealValues(db: DatabaseSync, row: Row): Row {
   row.notes = string(row.notes, "notes", 12000, true);
   row.contact_id = optionalId(row.contact_id, "contact_id");
   row.project_id = optionalId(row.project_id, "project_id");
-  row.opportunity_id = optionalId(row.opportunity_id, "opportunity_id");
+  row.initiative_id = optionalId(row.initiative_id, "initiative_id");
   if (
     row.contact_id &&
     !db
@@ -216,8 +216,8 @@ function dealValues(db: DatabaseSync, row: Row): Row {
     fail("contact_business_mismatch");
   if (row.project_id && !db.prepare("SELECT 1 FROM projects WHERE id=?").get(String(row.project_id)))
     fail("project_not_found");
-  const linked = opportunity(db, row.opportunity_id as string | null, String(row.business));
-  if (linked && row.project_id && row.project_id !== linked.project_id) fail("opportunity_project_mismatch");
+  const linked = initiative(db, row.initiative_id as string | null, String(row.business));
+  if (linked && row.project_id && row.project_id !== linked.project_id) fail("initiative_project_mismatch");
   if (linked && !row.project_id) row.project_id = linked.project_id;
   row.expected_amount_minor = minorAmount(row.expected_amount_minor);
   if (!DEAL_STAGES.includes(row.stage as (typeof DEAL_STAGES)[number])) fail("invalid_deal_stage");
@@ -257,7 +257,7 @@ export function createDeal(db: DatabaseSync, input: Row): Row {
   const row = dealValues(db, {
     contact_id: null,
     project_id: null,
-    opportunity_id: null,
+    initiative_id: null,
     stage: "lead",
     expected_amount_minor: 0,
     currency: "USD",
@@ -284,7 +284,7 @@ export function updateDeal(db: DatabaseSync, id: string, input: Row): Row {
   if (!Object.keys(input).length) fail("no_fields");
   const row = dealValues(db, { ...existing, ...input });
   if (
-    ["business", "currency", "opportunity_id"].some((field) => row[field] !== existing[field]) &&
+    ["business", "currency", "initiative_id"].some((field) => row[field] !== existing[field]) &&
     db.prepare("SELECT 1 FROM ledger_entries WHERE deal_id=? LIMIT 1").get(id)
   )
     fail("deal_has_linked_entries");
@@ -301,16 +301,16 @@ export function updateDeal(db: DatabaseSync, id: string, input: Row): Row {
 }
 function ledgerLinks(db: DatabaseSync, row: Row): void {
   row.deal_id = optionalId(row.deal_id, "deal_id");
-  row.opportunity_id = optionalId(row.opportunity_id, "opportunity_id");
+  row.initiative_id = optionalId(row.initiative_id, "initiative_id");
   if (row.deal_id) {
     const deal = db.prepare("SELECT * FROM deals WHERE id=?").get(String(row.deal_id));
     if (!deal || deal.business !== row.business || deal.currency !== row.currency)
       fail("deal_business_or_currency_mismatch");
-    if (row.opportunity_id && deal.opportunity_id && row.opportunity_id !== deal.opportunity_id)
-      fail("deal_opportunity_mismatch");
-    if (!row.opportunity_id) row.opportunity_id = deal.opportunity_id;
+    if (row.initiative_id && deal.initiative_id && row.initiative_id !== deal.initiative_id)
+      fail("deal_initiative_mismatch");
+    if (!row.initiative_id) row.initiative_id = deal.initiative_id;
   }
-  opportunity(db, row.opportunity_id as string | null, String(row.business));
+  initiative(db, row.initiative_id as string | null, String(row.business));
 }
 /** A note typed by a person is useful context, but never verified payment evidence. */
 export function createManualLedgerEntry(db: DatabaseSync, input: Row): Row {
@@ -321,7 +321,7 @@ export function createManualLedgerEntry(db: DatabaseSync, input: Row): Row {
     "amount_minor",
     "currency",
     "deal_id",
-    "opportunity_id",
+    "initiative_id",
     "description",
     "occurred_at",
   ]);
@@ -338,7 +338,7 @@ export function createManualLedgerEntry(db: DatabaseSync, input: Row): Row {
   if (!["revenue", "expense"].includes(String(row.kind))) fail("invalid_ledger_kind");
   ledgerLinks(db, row);
   db.prepare(
-    "INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,deal_id,opportunity_id,description,occurred_at,created_at,updated_at) VALUES (?,?,?,?,?,'manual',NULL,0,?,?,?,?,?,?)",
+    "INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,deal_id,initiative_id,description,occurred_at,created_at,updated_at) VALUES (?,?,?,?,?,'manual',NULL,0,?,?,?,?,?,?)",
   ).run(
     id,
     String(row.business),
@@ -346,7 +346,7 @@ export function createManualLedgerEntry(db: DatabaseSync, input: Row): Row {
     Number(row.amount_minor),
     String(row.currency),
     row.deal_id as SQLInputValue,
-    row.opportunity_id as SQLInputValue,
+    row.initiative_id as SQLInputValue,
     String(row.description),
     Number(row.occurred_at),
     now,
@@ -356,7 +356,7 @@ export function createManualLedgerEntry(db: DatabaseSync, input: Row): Row {
 }
 export function linkLedgerEntry(db: DatabaseSync, id: string, input: Row): Row {
   ensureFinanceSchema(db);
-  only(input, ["deal_id", "opportunity_id"]);
+  only(input, ["deal_id", "initiative_id"]);
   if (!Object.keys(input).length) fail("no_fields");
   const existing = db.prepare("SELECT * FROM ledger_entries WHERE id=?").get(id);
   if (!existing) return fail("ledger_entry_not_found");
@@ -368,10 +368,10 @@ export function linkLedgerEntry(db: DatabaseSync, id: string, input: Row): Row {
         ? row.external_id
         : null;
     db.prepare(
-      "UPDATE ledger_entries SET deal_id=?,opportunity_id=?,updated_at=? WHERE id=? OR (external_id=? AND business=? AND currency=? AND source IN ('square_payment','square_fee'))",
+      "UPDATE ledger_entries SET deal_id=?,initiative_id=?,updated_at=? WHERE id=? OR (external_id=? AND business=? AND currency=? AND source IN ('square_payment','square_fee'))",
     ).run(
       row.deal_id as SQLInputValue,
-      row.opportunity_id as SQLInputValue,
+      row.initiative_id as SQLInputValue,
       Date.now(),
       id,
       pairedReceipt,
@@ -384,7 +384,7 @@ export function linkLedgerEntry(db: DatabaseSync, id: string, input: Row): Row {
 }
 export function createSpendRequest(db: DatabaseSync, input: Row): Row {
   ensureFinanceSchema(db);
-  only(input, ["business", "agent_id", "task_id", "opportunity_id", "amount_minor", "currency", "purpose", "category"]);
+  only(input, ["business", "agent_id", "task_id", "initiative_id", "amount_minor", "currency", "purpose", "category"]);
   const category = input.category ?? "other";
   if (!(SPEND_CATEGORIES as readonly unknown[]).includes(category)) fail("invalid_category");
   const businessKey = business(input.business),
@@ -393,8 +393,8 @@ export function createSpendRequest(db: DatabaseSync, input: Row): Row {
     purpose = string(input.purpose, "purpose", 4000);
   const agentId = optionalId(input.agent_id, "agent_id"),
     taskId = optionalId(input.task_id, "task_id"),
-    opportunityId = optionalId(input.opportunity_id, "opportunity_id");
-  opportunity(db, opportunityId, businessKey);
+    initiativeId = optionalId(input.initiative_id, "initiative_id");
+  initiative(db, initiativeId, businessKey);
   if (agentId && !db.prepare("SELECT 1 FROM agents WHERE id=?").get(agentId)) fail("agent_not_found");
   if (taskId) {
     const task = db.prepare("SELECT assigned_agent_id FROM tasks WHERE id=?").get(taskId);
@@ -403,15 +403,15 @@ export function createSpendRequest(db: DatabaseSync, input: Row): Row {
   if (taskId && agentId) {
     const pending = db
       .prepare(
-        "SELECT * FROM spend_requests WHERE task_id=? AND agent_id=? AND business=? AND opportunity_id IS ? AND amount_minor=? AND currency=? AND purpose=? AND category=? AND status='pending' ORDER BY created_at,id LIMIT 1",
+        "SELECT * FROM spend_requests WHERE task_id=? AND agent_id=? AND business=? AND initiative_id IS ? AND amount_minor=? AND currency=? AND purpose=? AND category=? AND status='pending' ORDER BY created_at,id LIMIT 1",
       )
-      .get(taskId, agentId, businessKey, opportunityId, amount, code, purpose, category as string);
+      .get(taskId, agentId, businessKey, initiativeId, amount, code, purpose, category as string);
     if (pending) return pending;
   }
   const id = randomUUID();
   db.prepare(
-    "INSERT INTO spend_requests(id,business,agent_id,task_id,opportunity_id,amount_minor,currency,purpose,category,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,'pending',?)",
-  ).run(id, businessKey, agentId, taskId, opportunityId, amount, code, purpose, category as string, Date.now());
+    "INSERT INTO spend_requests(id,business,agent_id,task_id,initiative_id,amount_minor,currency,purpose,category,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,'pending',?)",
+  ).run(id, businessKey, agentId, taskId, initiativeId, amount, code, purpose, category as string, Date.now());
   return db.prepare("SELECT * FROM spend_requests WHERE id=?").get(id)!;
 }
 /** Records an owner decision only. This module has no charge, transfer, refund or purchase operation. */
@@ -537,12 +537,12 @@ export function financeOverview(db: DatabaseSync, filters: { business?: string; 
     .all(...scopeParams)
     .filter((goal) => ["revenue", "profit", "verified_revenue", "verified_profit"].includes(String(goal.metric)))
     .map((goal) => ({ ...goal, ...getFinancialGoalProgress(db, goal) }));
-  const opportunities = db
-    .prepare(`SELECT * FROM opportunities ${scope} ORDER BY updated_at DESC`)
+  const initiatives = db
+    .prepare(`SELECT * FROM initiatives ${scope} ORDER BY updated_at DESC`)
     .all(...scopeParams)
-    .map((opportunity): Row & { currencies: Totals[] } => ({
-      ...opportunity,
-      currencies: totalsFor(rows.filter((row) => row.opportunity_id === opportunity.id)),
+    .map((initiative): Row & { currencies: Totals[] } => ({
+      ...initiative,
+      currencies: totalsFor(rows.filter((row) => row.initiative_id === initiative.id)),
     }));
   const now = Date.now();
   const from = filters.from ?? Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
@@ -555,9 +555,9 @@ export function financeOverview(db: DatabaseSync, filters: { business?: string; 
     spend_requests: spendRequests,
     totals: totalsFor(rows),
     goals,
-    opportunities: opportunities.map((opportunity): Row & { currencies: Totals[]; spent_minor: number } => ({
-      ...opportunity,
-      ...opportunityMoney(db, String(opportunity.id)),
+    initiatives: initiatives.map((initiative): Row & { currencies: Totals[]; spent_minor: number } => ({
+      ...initiative,
+      ...initiativeMoney(db, String(initiative.id)),
     })),
     profit: {
       from,
@@ -579,30 +579,30 @@ export interface ProviderLedgerRow {
   verified: boolean;
   description: string;
   occurred_at: number;
-  opportunity_id?: string | null;
+  initiative_id?: string | null;
 }
 
 /**
  * Insert or update one ledger row that comes from a provider or a tool (Etsy, image studio), keyed by its source and
- * external id so a repeated sync never counts it twice. An existing link to an opportunity is kept.
+ * external id so a repeated sync never counts it twice. An existing link to an initiative is kept.
  */
 export function upsertProviderLedgerEntry(db: DatabaseSync, row: ProviderLedgerRow, now = Date.now()): void {
   ensureFinanceSchema(db);
   if (!isBusinessKey(row.business)) fail("invalid_business");
   if (!Number.isSafeInteger(row.amount_minor) || row.amount_minor < 0) fail("invalid_amount_minor");
   const existing = db
-    .prepare("SELECT id, opportunity_id FROM ledger_entries WHERE source=? AND external_id=?")
+    .prepare("SELECT id, initiative_id FROM ledger_entries WHERE source=? AND external_id=?")
     .get(row.source, row.external_id) as Row | undefined;
-  const opportunityId =
-    (existing?.opportunity_id as string | null | undefined) ??
-    (row.opportunity_id &&
-    db.prepare("SELECT 1 FROM opportunities WHERE id=? AND business=?").get(row.opportunity_id, row.business)
-      ? row.opportunity_id
+  const initiativeId =
+    (existing?.initiative_id as string | null | undefined) ??
+    (row.initiative_id &&
+    db.prepare("SELECT 1 FROM initiatives WHERE id=? AND business=?").get(row.initiative_id, row.business)
+      ? row.initiative_id
       : null);
   db.prepare(
-    `INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,opportunity_id,description,occurred_at,created_at,updated_at)
+    `INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,initiative_id,description,occurred_at,created_at,updated_at)
      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source,external_id) DO UPDATE SET amount_minor=excluded.amount_minor,
-     verified=excluded.verified,opportunity_id=COALESCE(ledger_entries.opportunity_id, excluded.opportunity_id),
+     verified=excluded.verified,initiative_id=COALESCE(ledger_entries.initiative_id, excluded.initiative_id),
      description=excluded.description,occurred_at=excluded.occurred_at,updated_at=excluded.updated_at`,
   ).run(
     (existing?.id as string | undefined) ?? randomUUID(),
@@ -613,7 +613,7 @@ export function upsertProviderLedgerEntry(db: DatabaseSync, row: ProviderLedgerR
     row.source,
     row.external_id,
     row.verified ? 1 : 0,
-    opportunityId,
+    initiativeId,
     row.description.slice(0, 500),
     row.occurred_at,
     now,

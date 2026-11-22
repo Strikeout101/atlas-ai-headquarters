@@ -175,16 +175,16 @@ export function profitLines(db: Db, ledger: Row[], from: number, to: number, onl
   return lines.sort((a, b) => a.business.localeCompare(b.business) || a.currency.localeCompare(b.currency));
 }
 
-/** Revenue minus linked expenses for one opportunity (recurring costs are not assigned to opportunities). */
-export function opportunityMoney(db: Db, opportunityId: string): { spent_minor: number; earned_minor: number } {
+/** Revenue minus linked expenses for one initiative (recurring costs are not assigned to initiatives). */
+export function initiativeMoney(db: Db, initiativeId: string): { spent_minor: number; earned_minor: number } {
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get();
   if (!exists) return { spent_minor: 0, earned_minor: 0 };
   const row = db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN kind='expense' THEN amount_minor END),0) AS spent,
               COALESCE(SUM(CASE WHEN kind='revenue' AND verified=1 THEN amount_minor END),0) AS earned
-       FROM ledger_entries WHERE opportunity_id=?`,
+       FROM ledger_entries WHERE initiative_id=?`,
     )
-    .get(opportunityId) as { spent: number; earned: number };
+    .get(initiativeId) as { spent: number; earned: number };
   return { spent_minor: Number(row.spent), earned_minor: Number(row.earned) };
 }

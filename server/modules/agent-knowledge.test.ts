@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { applyBaseSchema } from "./bootstrap/schema/base-schema.ts";
 import { applyTaskSchemaMigrations } from "./bootstrap/schema/task-schema-migrations.ts";
+import { applyWorkModelMigration } from "./bootstrap/schema/work-model-migration.ts";
 import { SESSION_COOKIE_NAME } from "../config/runtime.ts";
 import { getCsrfToken } from "../security/auth.ts";
 import { createAgentTaskToken } from "../security/agent-task-token.ts";
@@ -59,6 +60,7 @@ function harness() {
   databases.push(db);
   applyBaseSchema(db);
   applyTaskSchemaMigrations(db);
+  applyWorkModelMigration(db);
   ensureBusinessProfilesSchema(db);
   ensureAutonomySchema(db);
   ensureAgentMemorySchema(db);
@@ -77,8 +79,7 @@ function harness() {
              ('t-auto','Etsy planner listing','Prepare a printable planner','in_progress','worker',NULL,1,1);
     INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,source_task_id,created_at,updated_at)
       VALUES ('t-child','Design hero image','in_progress','other',NULL,'t-rental',1,1);
-    INSERT INTO autonomy_work (id,business,project_id,task_id,status,created_at,updated_at)
-      VALUES ('w1','ventures','p-none','t-auto','running',1,1);`);
+    UPDATE tasks SET business='ventures' WHERE id='t-auto';`);
   return db;
 }
 
@@ -187,7 +188,7 @@ describe("memory store", () => {
 });
 
 describe("knowledge block", () => {
-  it("finds the business from autonomy work, then the project, then the parent task", () => {
+  it("finds the business from the task, then the project, then the parent task", () => {
     const db = harness();
     expect(resolveTaskContext(db, "t-auto")?.business).toBe("ventures");
     expect(resolveTaskContext(db, "t-rental")).toMatchObject({

@@ -225,7 +225,7 @@ describe("who approves a listing", () => {
 describe("publishing and withdrawing", () => {
   it("records the live address and the fee as an unverified cost, once", () => {
     const { db, ready } = harness();
-    const listing = ready({ opportunity_id: null });
+    const listing = ready({ initiative_id: null });
     expect(() => markListingPublished(db, listing.id, "https://www.etsy.com/listing/1", NOW)).toThrow(
       "listing_not_approved",
     );

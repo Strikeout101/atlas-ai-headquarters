@@ -367,13 +367,6 @@ export function useAppActions({
               return;
             }
             payload = { note, ...(item.taskId ? { target_task_id: item.taskId } : {}) };
-          } else if (item.kind === "review_round_pick") {
-            const selectedOptionNumbers = payloadInput?.selected_option_numbers;
-            const note = payloadInput?.note?.trim() ?? "";
-            payload = {
-              ...(note ? { note } : {}),
-              ...(Array.isArray(selectedOptionNumbers) ? { selected_option_numbers: selectedOptionNumbers } : {}),
-            };
           }
           const replyResult = await api.replyDecisionInbox(item.id, optionNumber, payload);
           if (replyResult.action === "start_project_review_blocked") {

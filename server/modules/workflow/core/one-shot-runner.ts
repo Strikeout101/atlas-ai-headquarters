@@ -23,7 +23,12 @@ type CreateOneShotRunnerDeps = {
   normalizeStreamChunk: (raw: Buffer | string, opts?: { dropCliNoise?: boolean }) => string;
   hasStructuredJsonLines: (raw: string) => boolean;
   normalizeConversationReply: (raw: string, maxChars?: number, opts?: { maxSentences?: number }) => string;
-  buildAgentArgs: (provider: string, model?: string, reasoningLevel?: string, opts?: { noTools?: boolean }) => string[];
+  buildAgentArgs: (
+    provider: string,
+    model?: string,
+    reasoningLevel?: string,
+    opts?: { noTools?: boolean; readOnly?: boolean },
+  ) => string[];
   withCliPathFallback: (pathValue: string | undefined) => string;
 };
 
@@ -219,7 +224,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
           provider === "codex"
             ? agent.cli_reasoning_level || modelConfig[provider]?.reasoningLevel || undefined
             : modelConfig[provider]?.reasoningLevel || undefined;
-        const args = buildAgentArgs(provider, model, reasoningLevel, { noTools });
+        const args = buildAgentArgs(provider, model, reasoningLevel, { noTools, readOnly: opts.readOnly === true });
 
         await new Promise<void>((resolve, reject) => {
           const cleanEnv = agentEnvironment();

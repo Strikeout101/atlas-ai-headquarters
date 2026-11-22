@@ -111,7 +111,7 @@ export type PendingApproval = (
       amount_minor: number;
       currency: string;
       purpose: string;
-      opportunity_id: string | null;
+      initiative_id: string | null;
       category: string;
       decide_path: string;
     }
@@ -420,7 +420,7 @@ export function listPendingApprovals(
         amount_minor: Number(row.amount_minor),
         currency: String(row.currency),
         purpose: String(row.purpose),
-        opportunity_id: row.opportunity_id as string | null,
+        initiative_id: row.initiative_id as string | null,
         category: String(row.category ?? "other"),
         decide_path: `/api/finance/spend-requests/${encodeURIComponent(String(row.id))}/decide`,
         within_spend_budget: spendFitsBudget(db, row),
@@ -505,11 +505,15 @@ export function listPendingApprovals(
     for (const change of listShopChanges(db, limit).filter((item) => item.status === "ready")) {
       const task =
         change.task_id && hasTasks
-          ? (db.prepare("SELECT title FROM tasks WHERE id=?").get(String(change.task_id)) as { title?: string } | undefined)
+          ? (db.prepare("SELECT title FROM tasks WHERE id=?").get(String(change.task_id)) as
+              | { title?: string }
+              | undefined)
           : undefined;
       const agent =
         change.agent_id && hasAgents
-          ? (db.prepare("SELECT name FROM agents WHERE id=?").get(String(change.agent_id)) as { name?: string } | undefined)
+          ? (db.prepare("SELECT name FROM agents WHERE id=?").get(String(change.agent_id)) as
+              | { name?: string }
+              | undefined)
           : undefined;
       const text = (value: unknown) => (typeof value === "string" && value ? value : null);
       items.push({

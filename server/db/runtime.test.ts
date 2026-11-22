@@ -31,15 +31,13 @@ describe("db runtime", () => {
     expect(runtime.readNonNegativeIntEnv("TEST_NON_NEGATIVE_INT", 9)).toBe(9);
   });
 
-  it("SQLITE/REVIEW guardrail constants are clamped to their bounds", async () => {
+  it("SQLite and meeting-minutes guardrail constants are clamped to their bounds", async () => {
     process.env.SQLITE_BUSY_RETRY_MAX_ATTEMPTS = "999";
-    process.env.REVIEW_MAX_ROUNDS = "1";
-    process.env.REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND = "99";
+    process.env.REVIEW_MAX_MEMO_ITEMS_PER_DEPT = "99";
 
     const runtime = await importRuntimeModule();
     expect(runtime.SQLITE_BUSY_RETRY_MAX_ATTEMPTS).toBe(20);
-    expect(runtime.REVIEW_MAX_ROUNDS).toBe(3);
-    expect(runtime.REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND).toBe(10);
+    expect(runtime.REVIEW_MAX_MEMO_ITEMS_PER_DEPT).toBe(8);
   });
 
   it("initializeDatabaseRuntime sets up the DB and log folders", async () => {

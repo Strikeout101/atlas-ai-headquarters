@@ -326,12 +326,14 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
         hardTimer = null;
       }
     };
+    // Research reads many sources and pauses between them: it gets twice the idle allowance (plan section 8).
+    const idleTimeoutMs = researchIdleTimeout(db, taskId, TASK_RUN_IDLE_TIMEOUT_MS);
     const triggerTimeout = (kind: "idle" | "hard") => {
       if (finished) return;
       timedOut = true;
       finished = true;
       clearRunTimers();
-      const timeoutMs = kind === "idle" ? TASK_RUN_IDLE_TIMEOUT_MS : TASK_RUN_HARD_TIMEOUT_MS;
+      const timeoutMs = kind === "idle" ? idleTimeoutMs : TASK_RUN_HARD_TIMEOUT_MS;
       const reason =
         kind === "idle"
           ? `no output for ${Math.round(timeoutMs / 1000)}s`
@@ -350,9 +352,9 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
       }
     };
     const touchIdleTimer = () => {
-      if (finished || TASK_RUN_IDLE_TIMEOUT_MS <= 0) return;
+      if (finished || idleTimeoutMs <= 0) return;
       if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => triggerTimeout("idle"), TASK_RUN_IDLE_TIMEOUT_MS);
+      idleTimer = setTimeout(() => triggerTimeout("idle"), idleTimeoutMs);
     };
 
     touchIdleTimer();
@@ -435,4 +437,17 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
     codexThreadToSubtask,
     spawnCliAgent,
   };
+}
+
+/** The idle timeout for one task's run: doubled for research work. */
+export function researchIdleTimeout(db: { prepare: (sql: string) => any }, taskId: string, base: number): number {
+  if (base <= 0) return base;
+  try {
+    const row = db.prepare("SELECT work_type FROM tasks WHERE id = ?").get(taskId) as
+      | { work_type?: string }
+      | undefined;
+    return row?.work_type === "research" ? base * 2 : base;
+  } catch {
+    return base; // older schema without work types
+  }
 }

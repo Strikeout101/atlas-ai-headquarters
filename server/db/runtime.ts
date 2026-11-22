@@ -19,19 +19,7 @@ export const SQLITE_BUSY_RETRY_MAX_DELAY_MS = Math.max(
   readNonNegativeIntEnv("SQLITE_BUSY_RETRY_MAX_DELAY_MS", 400),
 );
 export const SQLITE_BUSY_RETRY_JITTER_MS = readNonNegativeIntEnv("SQLITE_BUSY_RETRY_JITTER_MS", 20);
-export const REVIEW_FINAL_DECISION_ROUND = 3;
-export const REVIEW_MAX_ROUNDS = Math.max(
-  REVIEW_FINAL_DECISION_ROUND,
-  Math.min(readNonNegativeIntEnv("REVIEW_MAX_ROUNDS", REVIEW_FINAL_DECISION_ROUND), 6),
-);
-export const REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND = Math.max(
-  1,
-  Math.min(readNonNegativeIntEnv("REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND", 2), 10),
-);
-export const REVIEW_MAX_REVISION_SIGNALS_PER_ROUND = Math.max(
-  REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND,
-  Math.min(readNonNegativeIntEnv("REVIEW_MAX_REVISION_SIGNALS_PER_ROUND", 6), 30),
-);
+// Meeting minutes keep at most this many action items (the `$` directive kickoff meeting).
 export const REVIEW_MAX_MEMO_ITEMS_PER_DEPT = Math.max(
   1,
   Math.min(readNonNegativeIntEnv("REVIEW_MAX_MEMO_ITEMS_PER_DEPT", 2), 8),
@@ -40,7 +28,6 @@ export const REVIEW_MAX_MEMO_ITEMS_PER_ROUND = Math.max(
   REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
   Math.min(readNonNegativeIntEnv("REVIEW_MAX_MEMO_ITEMS_PER_ROUND", 8), 24),
 );
-export const REVIEW_MAX_REMEDIATION_REQUESTS = 1;
 export const IN_PROGRESS_ORPHAN_GRACE_MS = Math.max(
   30_000,
   readNonNegativeIntEnv("IN_PROGRESS_ORPHAN_GRACE_MS", 600_000),
@@ -79,15 +66,6 @@ export function initializeDatabaseRuntime(): {
       `retries=${SQLITE_BUSY_RETRY_MAX_ATTEMPTS}, ` +
       `backoff=${SQLITE_BUSY_RETRY_BASE_DELAY_MS}-${SQLITE_BUSY_RETRY_MAX_DELAY_MS}ms, ` +
       `jitter<=${SQLITE_BUSY_RETRY_JITTER_MS}ms`,
-  );
-  console.log(
-    `[ATLAS] Review guardrails: max_rounds=${REVIEW_MAX_ROUNDS}, ` +
-      `final_round=${REVIEW_FINAL_DECISION_ROUND}, ` +
-      `remediation_requests=${REVIEW_MAX_REMEDIATION_REQUESTS}/task, ` +
-      `hold_cap=${REVIEW_MAX_REVISION_SIGNALS_PER_ROUND}/round, ` +
-      `hold_cap_per_dept=${REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND}, ` +
-      `memo_cap=${REVIEW_MAX_MEMO_ITEMS_PER_ROUND}/round, ` +
-      `memo_cap_per_dept=${REVIEW_MAX_MEMO_ITEMS_PER_DEPT}`,
   );
   console.log(
     `[ATLAS] In-progress watchdog: grace=${IN_PROGRESS_ORPHAN_GRACE_MS}ms, ` + `sweep=${IN_PROGRESS_ORPHAN_SWEEP_MS}ms`,

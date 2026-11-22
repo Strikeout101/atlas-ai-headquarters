@@ -1,20 +1,22 @@
-# Phase 4: goals, opportunities and scheduled work
+# Phase 4: goals, initiatives and scheduled work
 
-The Autonomy workspace at /autonomy manages business goals, estimated opportunities, recurring routines, operating limits and a durable activity ledger. Installing phase 4 creates no goals or enabled routines and starts no new business work by itself. Existing phase 2/3 changes are preserved.
+The Autonomy workspace at /autonomy manages business goals, estimated initiatives, recurring routines, operating limits and a durable activity ledger. Installing phase 4 creates no goals or enabled routines and starts no new business work by itself. Existing phase 2/3 changes are preserved.
 
 ## Setup and operating limits
 
-Choose an existing project with an explicit absolute path for every goal, opportunity and routine. No project directories are guessed or created. Goals define a business, metric, target and date window. Actual progress is counted from project completed tasks or business contacts/drafts; the displayed scope distinguishes these. Financial/custom metrics remain unavailable until their evidence source exists. A completed task is never inferred to be a launched product, delivery, paid order or verified income.
+Choose an existing project with an explicit absolute path for every goal, initiative and routine. No project directories are guessed or created. Goals define a business, metric, target and date window. Actual progress is counted from project completed tasks or business contacts/drafts; the displayed scope distinguishes these. Financial/custom metrics remain unavailable until their evidence source exists. A completed task is never inferred to be a launched product, delivery, paid order or verified income.
 
 Defaults are six new autonomous task starts per America/New_York calendar day, subscription usage below 80% in every Codex and Claude window, schedule pause after three consecutive genuine run failures, and a six-hour planning interval per goal. The owner can change the limits in Autonomy. Owner authentication and the emergency controls remain required; limits never relax approval floors. Usage data must be valid, available and no older than ten minutes. Unknown usage fails closed.
 
 ## Planning and approval
 
-The bounded VP planning beat compares one active unmet goal with observed results and the opportunity queue. Its no-tools reply can estimate up to three opportunities and suggest up to two tasks for existing team leaders. Demand and revenue scores are favorable when high; cost, difficulty and time-to-launch scores are unfavorable when high. Scores and budgets are estimates. A budget is never authority to spend.
+Since the work restructure (phase 3, 2026-11-22; see `docs/work-restructure-plan.md` section 12b), the work engine (`work-engine.ts`) runs goals on its own: a research phase, a strategy the owner approves, ideas the owner picks, then each idea's playbook steps as tasks with hand-offs, retries and escalation. The sections below about proposals and per-task VP approval describe the earlier flow; the caps, headroom and emergency rules still apply.
+
+The bounded VP planning beat handles one blocked initiative (retry once with notes, skip the step, stop, or pass it to the owner), or else one goal with an approved strategy: it re-scores the ideas and may add up to two tasks for launched initiatives (variants). Demand and revenue scores are favorable when high; cost, difficulty and time-to-launch scores are unfavorable when high. Scores and budgets are estimates. A budget is never authority to spend.
 
 Planning advances its durable per-goal timestamp before invoking the model to prevent repeated calls after failures/restarts. Edited goals, stopped autonomy, revoked security readiness and changed headroom discard late results. Duplicate tasks and out-of-scope projects/departments are rejected. Invalid replies queue no work.
 
-A goal is enough to start (2026-11-21, `goal-strategy.ts`): when a goal has no strategy, or its strategy is over 14 days old (3 days once no ideas are left), the planning beat queues one strategy task instead of asking a VP to plan from nothing. That agent decides how to research, saves the plan with `strategy.save` and proposes ideas tied to the goal; later VP planning beats receive the saved strategy. The strategy is shown under the goal in Autonomy.
+A goal is enough to start (`goal-strategy.ts`): when a goal has no approved strategy, its strategy is over 14 days old (3 days once no ideas are left) or the owner asked for a redo, the work engine runs a research phase: five angle tasks split between Codex and Claude, then a synthesis that saves the strategy as a proposal (`strategy.save`) with 6 to 10 ideas. The strategy is shown under the goal in Autonomy.
 
 Generated work enters the existing proposal feed for independent VP reviews. Only an attributed approved proposal can produce an eligible planned task. The engine checks the reviewed content, project, team-leader assignment and source again before admitting a start, and again after model routing awaits. Only linked work created by this engine is automatically picked up; arbitrary owner tasks and older suggestions are not swept into the planner.
 
@@ -26,7 +28,7 @@ A due routine atomically advances to now plus its interval before queueing work.
 
 The daily cap is reserved in the same transaction as admission, before launch. Ambiguous launches and pending recovery are held rather than automatically replayed. Owner pauses and intentional context continuation do not count as failures. Genuine failed runs count once. The third consecutive failure pauses the routine; a completed task resets the streak. Explicitly re-enabling a paused routine resets its streak and records the owner's retry. Failed tasks and their worktrees remain available for manual recovery.
 
-Disabling/changing a routine, stopping an opportunity, changing a reviewed proposal or reassigning its task blocks the pending automatic start. Resuming the global control mode does not replay held running work. Autonomous origin propagates to delegated child tasks so emergency and usage guards continue down the delegation chain; new child task starts also share the daily cap. Context continuation of the same task reuses its admission.
+Disabling/changing a routine, stopping an initiative, changing a reviewed proposal or reassigning its task blocks the pending automatic start. Resuming the global control mode does not replay held running work. Autonomous origin propagates to delegated child tasks so emergency and usage guards continue down the delegation chain; new child task starts also share the daily cap. Context continuation of the same task reuses its admission.
 
 ## Lead routines and Today
 

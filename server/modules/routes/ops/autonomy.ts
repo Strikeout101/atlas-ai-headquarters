@@ -2,16 +2,18 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Express } from "express";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { INITIATIVE_STATUSES } from "../../bootstrap/schema/work-model-migration.ts";
 import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../security/auth.ts";
 import { appendAutonomyLedger, autonomyConfig, autonomyOverview, ensureAutonomySchema } from "../../autonomy-store.ts";
 import { isBusinessKey } from "../../businesses.ts";
 import { currencyMinorDigits } from "../../finance-store.ts";
-import { experimentRules, restartOpportunity, saveExperimentRules } from "../../experiments.ts";
+import { experimentRules, restartInitiative, saveExperimentRules } from "../../experiments.ts";
 import { ensurePlaybookSchema, getPlaybook, listPlaybooks, resetPlaybook, savePlaybook } from "../../playbooks.ts";
 import { nextCronRun, validTimeZone } from "../../schedule-time.ts";
 import { addMilestone, deleteMilestone, listMilestones, setMilestoneDone } from "../../goal-milestones.ts";
 import { streamOverview } from "../../streams.ts";
-import { latestStrategies } from "../../goal-strategy.ts";
+import { decideStrategy, ensureGoalStrategySchema, latestStrategies } from "../../goal-strategy.ts";
+import { approveInitiative, resolveEscalation, type EscalationAction } from "../../work-engine.ts";
 
 type Body = Record<string, unknown>;
 const SCORE_FIELDS = ["demand_score", "revenue_score", "cost_score", "difficulty_score", "time_to_launch_score"];
@@ -21,9 +23,9 @@ const RESOURCES = {
     singular: "goal",
     fields: ["business", "project_id", "metric", "target", "currency", "period_start", "period_end"],
   },
-  opportunities: {
-    table: "opportunities",
-    singular: "opportunity",
+  initiatives: {
+    table: "initiatives",
+    singular: "initiative",
     fields: [
       "business",
       "project_id",
@@ -99,22 +101,22 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
     if (
       row.id &&
       db
-        .prepare("SELECT 1 FROM opportunities WHERE goal_id=? AND (business!=? OR project_id!=?) LIMIT 1")
+        .prepare("SELECT 1 FROM initiatives WHERE goal_id=? AND (business!=? OR project_id!=?) LIMIT 1")
         .get(String(row.id), String(row.business), projectId)
     )
-      fail("goal_has_linked_opportunities");
+      fail("goal_has_linked_initiatives");
     return;
   }
   row.title = boundedText(row.title, "title", 200);
   row.description = boundedText(row.description, "description", 12000, true);
-  if (resource === "opportunities") {
+  if (resource === "initiatives") {
     for (const field of SCORE_FIELDS) numeric(row[field], field, 0, 100);
     numeric(row.budget, "budget", 0, 1e12);
     numeric(row.task_limit, "task_limit", 1, 200, true);
     numeric(row.time_limit_days, "time_limit_days", 1, 365, true);
-    if (!["idea", "researching", "approved", "building", "launched", "stopped"].includes(String(row.status)))
-      fail("invalid_status");
-    if (row.goal_id !== null) {
+    if (!(INITIATIVE_STATUSES as readonly string[]).includes(String(row.status))) fail("invalid_status");
+    if (row.goal_id === null || row.goal_id === undefined) fail("initiative_needs_goal");
+    {
       const goal = db
         .prepare("SELECT business,project_id FROM business_goals WHERE id=?")
         .get(boundedText(row.goal_id, "goal_id", 128)) as Body | undefined;
@@ -151,7 +153,7 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
 
 function defaults(resource: Resource, now: number): Body {
   if (resource === "goals") return { currency: "USD" };
-  if (resource === "opportunities")
+  if (resource === "initiatives")
     return {
       goal_id: null,
       description: "",
@@ -161,7 +163,7 @@ function defaults(resource: Resource, now: number): Body {
       difficulty_score: 0,
       time_to_launch_score: 0,
       budget: 0,
-      status: "idea",
+      status: "proposed",
       task_limit: 10,
       time_limit_days: 30,
     };
@@ -185,6 +187,7 @@ export function registerAutonomyRoutes(
 ): void {
   ensureAutonomySchema(db);
   ensurePlaybookSchema(db);
+  ensureGoalStrategySchema(db);
   app.get("/api/autonomy", (_req, res) =>
     res.json({
       ok: true,
@@ -212,14 +215,41 @@ export function registerAutonomyRoutes(
     };
   const bodyOf = (req: import("express").Request): Body =>
     req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Body) : {};
-  // Experiments: the owner's stop rules, and bringing a stopped opportunity back.
+  // Experiments: the owner's stop rules, and bringing a stopped initiative back.
   app.patch(
     "/api/autonomy/experiment-rules",
     ownerJson((req) => ({ rules: saveExperimentRules(db, bodyOf(req)) })),
   );
   app.post(
-    "/api/autonomy/opportunities/:id/restart",
-    ownerJson((req) => ({ item: restartOpportunity(db, String(req.params.id)) })),
+    "/api/autonomy/initiatives/:id/restart",
+    ownerJson((req) => ({ item: restartInitiative(db, String(req.params.id)) })),
+  );
+  // The owner's calls in the goal flow (plan section 12b): the strategy, which ideas to build, and stuck steps.
+  app.post(
+    "/api/autonomy/strategies/:id/decision",
+    ownerJson((req) => ({ item: decideStrategy(db, String(req.params.id), bodyOf(req)) })),
+  );
+  app.post(
+    "/api/autonomy/initiatives/:id/approve",
+    ownerJson((req) => ({ item: approveInitiative(db, String(req.params.id)) })),
+  );
+  app.post(
+    "/api/autonomy/initiatives/:id/unblock",
+    ownerJson((req) => {
+      const body = bodyOf(req);
+      return {
+        item: resolveEscalation(
+          db,
+          String(req.params.id),
+          {
+            action: String(body.action) as EscalationAction,
+            notes: typeof body.notes === "string" ? body.notes : undefined,
+            agent_id: typeof body.agent_id === "string" ? body.agent_id : null,
+          },
+          "owner",
+        ),
+      };
+    }),
   );
   // One income stream (business) on one page.
   app.get("/api/streams", (req, res) => {
@@ -325,6 +355,10 @@ export function registerAutonomyRoutes(
         if (isUpdate && !existing) return res.status(404).json({ error: "not_found" });
         const now = Date.now();
         const row: Body = { ...defaults(resource, now), ...existing, ...body, id };
+        // Approving an idea runs the VPs' plan check (playbook, caps); the status changes only through it.
+        const approving =
+          resource === "initiatives" && row.status === "approved" && (existing?.status ?? "proposed") === "proposed";
+        if (approving) row.status = "proposed";
         if (
           !isUpdate &&
           resource === "schedules" &&
@@ -366,10 +400,11 @@ export function registerAutonomyRoutes(
                 event: `${singular}_${isUpdate ? "updated" : "created"}`,
                 business: row.business as "tech" | "rental" | "ventures",
                 sourceId: id,
-                message: `Owner ${isUpdate ? "updated" : "created"} ${singular}${row.title ? `: ${row.title}` : `: ${row.metric}`}.${resource === "opportunities" ? " Budget is a planning estimate, not spending authorization." : ""}`,
+                message: `Owner ${isUpdate ? "updated" : "created"} ${singular}${row.title ? `: ${row.title}` : `: ${row.metric}`}.${resource === "initiatives" ? " Budget is a planning estimate, not spending authorization." : ""}`,
               },
               now,
             );
+            if (approving) approveInitiative(db, id, "owner", now);
             db.exec("RELEASE autonomy_owner_mutation");
           } catch (error) {
             db.exec("ROLLBACK TO autonomy_owner_mutation; RELEASE autonomy_owner_mutation");

@@ -5,7 +5,8 @@ import { applyTaskSchemaMigrations } from "./bootstrap/schema/task-schema-migrat
 import { ensureAutonomySchema } from "./autonomy-store.ts";
 import { ensureAgentProposalSchema } from "./agent-proposals.ts";
 import { ensureFinanceSchema } from "./finance-store.ts";
-import { ensureAutonomyEngineSchema, nextScheduleRun, queueAutonomyWork } from "./autonomy-engine.ts";
+import { ensureAutonomyEngineSchema, nextScheduleRun } from "./autonomy-engine.ts";
+import { createWorkTask } from "./work-engine.ts";
 import { guardText, guardValue, recordUntrustedContent, taskReadFlaggedContent } from "./content-guard.ts";
 import { approvalRoute } from "./approval-review-state.ts";
 import { describeCron, nextCronRun, parseCron } from "./schedule-time.ts";
@@ -111,26 +112,34 @@ describe("goal milestones", () => {
 describe("income stream page", () => {
   it("shows a business's goals, ideas with money, queued work and this month's profit", () => {
     const db = harness();
-    db.exec(`INSERT INTO opportunities (id,business,project_id,title,status,budget,created_at,updated_at)
-      VALUES ('o1','ventures','p1','Planner','building',5,1,1),('o2','tech','p1','Websites','idea',0,1,1)`);
-    queueAutonomyWork(
+    db.exec(`INSERT INTO business_goals (id,business,metric,target,period_start,period_end,created_at,updated_at)
+      VALUES ('gv','ventures','revenue',1,0,1,1,1),('gt','tech','revenue',1,0,1,1,1);
+      INSERT INTO initiatives (id,business,project_id,goal_id,title,status,budget,created_at,updated_at)
+      VALUES ('o1','ventures','p1','gv','Planner','in_progress',5,1,1),('o2','tech','p1','gt','Websites','proposed',0,1,1)`);
+    createWorkTask(
       db,
       {
         business: "ventures",
         project_id: "p1",
         department_id: "planning",
+        agent_id: "lead",
         title: "Make the planner",
         description: "x",
-        reason: "y",
-        opportunity_id: "o1",
+        initiative_id: "o1",
+        goal_id: "gv",
+        work_type: "product",
+        importance: "important",
+        playbook_step: "build",
       },
       NOW,
     );
     const stream = streamOverview(db, "ventures", NOW);
-    expect(stream.opportunities.map((o) => o.id)).toEqual(["o1"]);
-    expect(stream.opportunities[0].results).toMatchObject({ spent_usd: 0, budget_usd: 5 });
-    expect(stream.pipeline.building).toBe(1);
-    expect(stream.next).toEqual([expect.objectContaining({ title: "Make the planner", status: "pending" })]);
+    expect(stream.initiatives.map((o) => o.id)).toEqual(["o1"]);
+    expect(stream.initiatives[0].results).toMatchObject({ spent_usd: 0, budget_usd: 5 });
+    expect(stream.pipeline.in_progress).toBe(1);
+    expect(stream.next).toEqual([
+      expect.objectContaining({ title: "Make the planner", status: "planned", playbook_step: "build" }),
+    ]);
     expect(streamOverview(db, "nonsense", NOW).business).toBe("ventures");
   });
 });

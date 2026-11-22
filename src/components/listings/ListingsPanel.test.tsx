@@ -28,7 +28,7 @@ const base: ListingPackage = {
   business: "ventures",
   platform: "etsy",
   project_id: null,
-  opportunity_id: null,
+  initiative_id: null,
   title: "Minimal budget planner",
   description: "A one-page monthly budget planner.",
   tags: ["planner", "budget"],

@@ -34,6 +34,8 @@ export interface OneShotRunOptions {
   streamTaskId?: string | null;
   rawOutput?: boolean;
   noTools?: boolean;
+  /** Tools to read and search only (reviews): Codex runs in a read-only sandbox, Claude gets Read/Grep/Glob/web. */
+  readOnly?: boolean;
 }
 
 export interface OneShotRunResult {

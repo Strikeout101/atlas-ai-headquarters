@@ -1,6 +1,5 @@
 import type { Lang } from "../../../types/lang.ts";
 import type { AgentRow } from "./direct-chat.ts";
-import { readYoloModeEnabled } from "../../routes/ops/messages/decision-inbox/yolo-mode.ts";
 import { createSubtaskDelegationBatch } from "./subtask-delegation-batch.ts";
 import { createSubtaskDelegationPromptBuilder } from "./subtask-delegation-prompt.ts";
 import { initializeSubtaskSummary, type SubtaskRow } from "./subtask-summary.ts";
@@ -33,11 +32,8 @@ interface SubtaskDelegationDeps {
     taskId?: string | null,
   ) => void;
   appendTaskLog: (taskId: string, source: string, message: string) => void;
-  finishReview: (
-    taskId: string,
-    taskTitle: string,
-    options?: { bypassProjectDecisionGate?: boolean; trigger?: string },
-  ) => void;
+  /** Starts (or resumes) a task's review; it waits by itself while helper tasks are open. */
+  startTaskReview: (taskId: string) => void;
   findTeamLeader: (deptId: string | null, candidateAgentIds?: string[] | null) => AgentRow | null;
   findBestSubordinate: (deptId: string, excludeId: string, candidateAgentIds?: string[] | null) => AgentRow | null;
   nowMs: () => number;
@@ -122,7 +118,7 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
     notifyCeo,
     sendAgentMessage,
     appendTaskLog,
-    finishReview,
+    startTaskReview,
     findTeamLeader,
     findBestSubordinate,
     nowMs,
@@ -324,17 +320,8 @@ export function initializeSubtaskDelegation(deps: SubtaskDelegationDeps) {
       ),
       parentTaskId,
     );
-    if (parentTask.status === "review") {
-      const yolo = readYoloModeEnabled(db);
-      setTimeout(
-        () =>
-          finishReview(parentTaskId, parentTask.title, {
-            bypassProjectDecisionGate: yolo,
-            trigger: "subtask_completion",
-          }),
-        1200,
-      );
-    }
+    // The parent's review waits for its helper tasks; this starts it if it was waiting.
+    if (parentTask.status === "review") setTimeout(() => startTaskReview(parentTaskId), 1200);
   }
 
   function finalizeDelegatedSubtasks(delegatedTaskId: string, subtaskIds: string[], exitCode: number): void {

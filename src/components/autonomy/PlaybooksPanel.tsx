@@ -31,7 +31,7 @@ function StepEditor({
       <legend className="px-1 text-xs font-semibold">{label}</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs">
-          Task title ({"{title}"} is the opportunity)
+          Task title ({"{title}"} is the initiative)
           <input
             className={inputClass}
             style={inputStyle}
@@ -59,7 +59,7 @@ function StepEditor({
         </label>
       </div>
       <label className="block text-xs">
-        Instructions ({"{title}"}, {"{description}"}, {"{opportunity_id}"} and {"{slug}"} are filled in)
+        Instructions ({"{title}"}, {"{description}"}, {"{initiative_id}"} and {"{slug}"} are filled in)
         <textarea
           className={inputClass}
           style={inputStyle}
@@ -74,7 +74,7 @@ function StepEditor({
 
 /**
  * Playbooks: the steps an income stream repeats. The research step runs as a schedule (created switched off);
- * each later step is queued for an opportunity when the one before it finishes, through the usual approvals.
+ * each later step is queued for an initiative when the one before it finishes, through the usual approvals.
  */
 export default function PlaybooksPanel({
   playbooks,

@@ -1,16 +1,8 @@
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
-import {
-  REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
-  REVIEW_MAX_MEMO_ITEMS_PER_ROUND,
-  REVIEW_MAX_REMEDIATION_REQUESTS,
-  REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND,
-  REVIEW_MAX_REVISION_SIGNALS_PER_ROUND,
-  REVIEW_MAX_ROUNDS,
-} from "../../../db/runtime.ts";
+import { REVIEW_MAX_MEMO_ITEMS_PER_DEPT, REVIEW_MAX_MEMO_ITEMS_PER_ROUND } from "../../../db/runtime.ts";
 import { createMeetingLeaderSelectionTools } from "./meetings/leader-selection.ts";
 import { createMeetingMinutesTools } from "./meetings/minutes.ts";
 import { createMeetingPresenceTools } from "./meetings/presence.ts";
-import { createReviewConsensusTools } from "./meetings/review-consensus.ts";
 
 export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
   const __ctx: RuntimeContext = ctx;
@@ -36,8 +28,6 @@ export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
   const reviewRoundState = __ctx.reviewRoundState;
   const reviewInFlight = __ctx.reviewInFlight;
   const getTaskStatusById = __ctx.getTaskStatusById;
-  const getReviewRoundMode = __ctx.getReviewRoundMode;
-  const scheduleNextReviewRound = __ctx.scheduleNextReviewRound;
   const notifyCeo = __ctx.notifyCeo;
   const runAgentOneShot = __ctx.runAgentOneShot;
   const resolveProjectPath = __ctx.resolveProjectPath;
@@ -46,9 +36,6 @@ export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
   const sendAgentMessage = __ctx.sendAgentMessage;
   const randomDelay = __ctx.randomDelay;
   const sleepMs = __ctx.sleepMs;
-  const wantsReviewRevision = __ctx.wantsReviewRevision;
-  const findLatestTranscriptContentByAgent = __ctx.findLatestTranscriptContentByAgent;
-  const isDeferrableReviewHold = __ctx.isDeferrableReviewHold;
   const clearTaskWorkflowState = __ctx.clearTaskWorkflowState;
   const isTaskWorkflowInterrupted = __ctx.isTaskWorkflowInterrupted;
   const buildMeetingPrompt = __ctx.buildMeetingPrompt;
@@ -66,12 +53,9 @@ export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
     appendMeetingMinuteEntry,
     finishMeetingMinutes,
     normalizeRevisionMemoNote,
-    reserveReviewRevisionMemoItems,
-    loadRecentReviewRevisionMemoItems,
     collectRevisionMemoItems,
     collectPlannedActionItems,
     appendTaskProjectMemo,
-    appendTaskReviewFinalMemo,
   } = createMeetingMinutesTools({
     db,
     nowMs,
@@ -106,56 +90,6 @@ export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
     classifyMeetingReviewDecision,
   });
 
-  const { startReviewConsensusMeeting } = createReviewConsensusTools({
-    db,
-    reviewInFlight,
-    reviewRoundState,
-    getTaskReviewLeaders,
-    getTaskStatusById,
-    getReviewRoundMode,
-    scheduleNextReviewRound,
-    resolveProjectPath,
-    resolveLang,
-    runAgentOneShot,
-    chooseSafeReply,
-    appendTaskLog,
-    notifyCeo,
-    pickL,
-    l,
-    sendAgentMessage,
-    emitMeetingSpeech,
-    getAgentDisplayName,
-    getDeptName,
-    getRoleLabel,
-    appendMeetingMinuteEntry,
-    beginMeetingMinutes,
-    finishMeetingMinutes,
-    callLeadersToCeoOffice,
-    dismissLeadersFromCeoOffice,
-    wantsReviewRevision,
-    meetingReviewDecisionByAgent,
-    findLatestTranscriptContentByAgent,
-    isDeferrableReviewHold,
-    summarizeForMeetingBubble,
-    appendTaskProjectMemo,
-    appendTaskReviewFinalMemo,
-    collectRevisionMemoItems,
-    reserveReviewRevisionMemoItems,
-    loadRecentReviewRevisionMemoItems,
-    clearTaskWorkflowState,
-    isTaskWorkflowInterrupted,
-    randomDelay,
-    sleepMs,
-    buildMeetingPrompt,
-    reviewMeetingOneShotTimeoutMs,
-    REVIEW_MAX_ROUNDS,
-    REVIEW_MAX_MEMO_ITEMS_PER_ROUND,
-    REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
-    REVIEW_MAX_REMEDIATION_REQUESTS,
-    REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND,
-    REVIEW_MAX_REVISION_SIGNALS_PER_ROUND,
-  });
-
   return {
     getLeadersByDepartmentIds,
     getAllActiveTeamLeaders,
@@ -165,17 +99,13 @@ export function initializeWorkflowMeetingTools(ctx: RuntimeContext): any {
     appendMeetingMinuteEntry,
     finishMeetingMinutes,
     normalizeRevisionMemoNote,
-    reserveReviewRevisionMemoItems,
-    loadRecentReviewRevisionMemoItems,
     collectRevisionMemoItems,
     collectPlannedActionItems,
     appendTaskProjectMemo,
-    appendTaskReviewFinalMemo,
     markAgentInMeeting,
     isAgentInMeeting,
     callLeadersToCeoOffice,
     dismissLeadersFromCeoOffice,
     emitMeetingSpeech,
-    startReviewConsensusMeeting,
   };
 }

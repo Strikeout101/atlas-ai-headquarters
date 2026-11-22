@@ -13,7 +13,7 @@ vi.mock("../../api/finance", () => ({
   createSpendRequest: vi.fn(),
   decideSpendRequest: vi.fn(),
 }));
-const empty: FinanceOverview = { deals: [], ledger: [], spend_requests: [], totals: [], goals: [], opportunities: [] };
+const empty: FinanceOverview = { deals: [], ledger: [], spend_requests: [], totals: [], goals: [], initiatives: [] };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(getFinance).mockResolvedValue(empty);

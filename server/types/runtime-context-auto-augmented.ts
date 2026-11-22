@@ -78,7 +78,6 @@ export interface RuntimeContextAutoAugmented {
   getLeadersByDepartmentIds: any;
   getOAuthAccountDisplayName: any;
   getOAuthAutoSwapEnabled: any;
-  getReviewRoundMode: any;
   getSubtaskDeptExecutionPriority: any;
   getTaskRelatedDepartmentIds: any;
   getTaskReviewLeaders: any;
@@ -142,7 +141,6 @@ export interface RuntimeContextAutoAugmented {
   reviewInFlight: any;
   reviewRoundState: any;
   rotateOAuthAccounts: any;
-  scheduleNextReviewRound: any;
   shouldTreatDirectChatAsTask: any;
   startCrossDeptCooperation: any;
   startGitHubOAuth: any;

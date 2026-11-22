@@ -88,7 +88,7 @@ export type PendingApproval =
       amount_minor: number;
       currency: string;
       purpose: string;
-      opportunity_id: string | null;
+      initiative_id: string | null;
       category?: string;
     })
   | (PendingApprovalBase & {

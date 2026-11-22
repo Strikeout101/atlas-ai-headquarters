@@ -7,19 +7,9 @@ function baseWorkflowDecisionItem(item: DecisionInboxRouteItem): Omit<DecisionIn
     id: item.id,
     kind: item.kind,
     agentId: item.agent_id ?? null,
-    agentName:
-      item.agent_name ||
-      (item.kind === "project_review_ready"
-        ? item.project_name || item.project_id || "Planning Lead"
-        : item.task_title || item.task_id || "Task"),
-    agentNameKo:
-      item.agent_name ||
-      item.agent_name_ko ||
-      (item.kind === "project_review_ready"
-        ? item.project_name || item.project_id || "Planning Lead"
-        : item.task_title || item.task_id || "Task"),
-    agentAvatar:
-      item.agent_avatar ?? (item.kind === "project_review_ready" || item.kind === "review_round_pick" ? "🧑‍💼" : null),
+    agentName: item.agent_name || item.task_title || item.task_id || "Task",
+    agentNameKo: item.agent_name || item.agent_name_ko || item.task_title || item.task_id || "Task",
+    agentAvatar: item.agent_avatar ?? (item.kind === "review_owner" ? "🧾" : null),
     requestContent: item.summary,
     createdAt: item.created_at,
     taskId: item.task_id,
@@ -34,23 +24,6 @@ function localizedOptionLabel(
   number: number,
   language: UiLanguage,
 ): string {
-  if (kind === "project_review_ready") {
-    if (action === "start_project_review") {
-      return pickLang(language, {
-        en: "Start Team-Lead Meeting",
-      });
-    }
-    if (action === "keep_waiting") {
-      return pickLang(language, {
-        en: "Keep Waiting",
-      });
-    }
-    if (action === "add_followup_request") {
-      return pickLang(language, {
-        en: "Add Follow-up Request",
-      });
-    }
-  }
   if (kind === "task_timeout_resume") {
     if (action === "resume_timeout_task") {
       return pickLang(language, {
@@ -63,10 +36,10 @@ function localizedOptionLabel(
       });
     }
   }
-  if (kind === "review_round_pick" && action === "skip_to_next_round") {
-    return pickLang(language, {
-      en: "Skip to Next Round",
-    });
+  if (kind === "review_owner") {
+    if (action === "review_retry") return pickLang(language, { en: "One more go with the review's list" });
+    if (action === "review_accept") return pickLang(language, { en: "Accept it as is" });
+    if (action === "review_drop") return pickLang(language, { en: "Drop the task" });
   }
   return `${number}. ${action}`;
 }

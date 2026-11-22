@@ -37,7 +37,6 @@ function setup({ github = false, delegated = false, worktree = true } = {}) {
     appendTaskLog: vi.fn(),
     notifyCeo: vi.fn(),
     broadcast: vi.fn(),
-    projectReviewGateNotifiedAt: new Map(),
     taskWorktrees: new Map(worktree ? [["task", { projectPath: "/repo", branchName: "climpire/task" }]] : []),
     mergeWorktree: vi.fn(() => ({ success: true, message: "Merged" })),
     mergeToDevAndCreatePR: vi.fn(() => ({ success: true, message: "Merged to dev" })),
@@ -56,15 +55,15 @@ function setup({ github = false, delegated = false, worktree = true } = {}) {
     crossDeptNextCallbacks: new Map([["task", next]]),
     recoverCrossDeptQueueAfterMissingCallback: vi.fn(),
     subtaskDelegationCallbacks: new Map([["task", subtaskNext]]),
-    startReviewConsensusMeeting: vi.fn((_id: string, _title: string, _dept: string, approve: () => void) => approve()),
+    helperTaskFinished: vi.fn(),
   };
   const tools = createReviewFinalizeTools(deps);
-  const finish = () => tools.finishReview("task", "Website fix", { bypassProjectDecisionGate: true });
+  const finish = () => tools.finishReview("task", "Website fix");
   const task = () => db.prepare("SELECT status, completed_at FROM tasks WHERE id = 'task'").get();
   return { db, deps, finish, task, next, subtaskNext };
 }
 
-describe("review finalization integration gate", () => {
+describe("finishing approved work", () => {
   it.each([false, true])("holds a failed merge and can retry successfully (GitHub=%s)", (github) => {
     const { deps, finish, task, next, subtaskNext } = setup({ github });
     const merge = github ? deps.mergeToDevAndCreatePR : deps.mergeWorktree;
@@ -115,20 +114,8 @@ describe("review finalization integration gate", () => {
     } as ReturnType<typeof deps.mergeWorktree>);
     finish();
     expect(task()).toEqual({ status: "review", completed_at: null });
-    expect(deps.startReviewConsensusMeeting).not.toHaveBeenCalled();
     expect(deps.notifyCeo).toHaveBeenCalledWith(expect.stringContaining("Conflicting files: src/app.ts"), "task");
     expect(deps.cleanupWorktree).not.toHaveBeenCalled();
-  });
-
-  it("does not finalize collaboration children when the parent merge fails", () => {
-    const { db, deps, finish, task } = setup();
-    db.exec(`INSERT INTO tasks VALUES ('child', 'Child fix', 'review', 'dev', 'task', 'project', '/repo', NULL, 0, 1)`);
-    deps.mergeWorktree.mockReturnValueOnce({ success: false, message: "Merge conflict" });
-    finish();
-    expect(task()).toEqual({ status: "review", completed_at: null });
-    expect(db.prepare("SELECT status FROM tasks WHERE id = 'child'").get()).toEqual({ status: "review" });
-    expect(deps.mergeWorktree).toHaveBeenCalledOnce();
-    expect(deps.archivePlanningConsolidatedReport).not.toHaveBeenCalled();
   });
 
   it("still completes tasks without a worktree", () => {
@@ -141,26 +128,25 @@ describe("review finalization integration gate", () => {
     expect(deps.emitTaskReportEvent).toHaveBeenCalledOnce();
   });
 
-  it("holds a parent whose merge succeeded until a child merge succeeds", () => {
+  it("completes approved work at once: no gate, no meeting, no waiting on helper tasks", () => {
     const { db, deps, finish, task, next } = setup();
     db.exec(`INSERT INTO tasks VALUES ('child', 'Child fix', 'review', 'dev', 'task', 'project', '/repo', NULL, 0, 1)`);
-    deps.taskWorktrees.set("child", { projectPath: "/repo", branchName: "climpire/child" });
-    deps.mergeWorktree.mockReturnValueOnce({ success: true, message: "Parent merged" });
-    deps.mergeWorktree.mockReturnValueOnce({ success: false, message: "Child conflict" });
-    finish();
-    expect(task()).toEqual({ status: "review", completed_at: null });
-    expect(db.prepare("SELECT status FROM tasks WHERE id='child'").get()).toEqual({ status: "review" });
-    expect(deps.cleanupWorktree).not.toHaveBeenCalled();
-    expect(deps.setTaskCreationAuditCompletion).not.toHaveBeenCalled();
-    expect(deps.archivePlanningConsolidatedReport).not.toHaveBeenCalled();
-    expect(deps.emitTaskReportEvent).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
-
+    db.exec("INSERT INTO subtasks VALUES ('s1','task','pending',NULL,NULL,NULL)");
     finish();
     expect(task()).toEqual({ status: "done", completed_at: 1000 });
-    expect(db.prepare("SELECT status FROM tasks WHERE id='child'").get()).toEqual({ status: "done" });
-    expect(deps.cleanupWorktree).toHaveBeenCalledTimes(2);
-    expect(deps.archivePlanningConsolidatedReport).toHaveBeenCalledOnce();
+    // Helper tasks finish on their own and subtasks are left to the agent: nothing here touches them.
+    expect(db.prepare("SELECT status FROM tasks WHERE id='child'").get()).toEqual({ status: "review" });
+    expect(db.prepare("SELECT status FROM subtasks WHERE id='s1'").get()).toEqual({ status: "pending" });
+    expect(deps.mergeWorktree).toHaveBeenCalledOnce();
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("tells the parent's review when a delegated helper finishes", () => {
+    const { db, deps } = setup();
+    db.exec("INSERT INTO subtasks VALUES ('s2','parent','in_progress',NULL,NULL,'task')");
+    const tools = createReviewFinalizeTools(deps as never);
+    tools.reconcileDelegatedSubtasksAfterRun("task", 0);
+    expect(db.prepare("SELECT status FROM subtasks WHERE id='s2'").get()).toEqual({ status: "done" });
+    expect(deps.helperTaskFinished).toHaveBeenCalledWith("task", "parent");
   });
 });

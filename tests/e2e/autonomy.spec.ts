@@ -39,7 +39,7 @@ async function openOwner(page: Page, url: string) {
   await expect(page.locator("main header h1").first()).toBeVisible();
 }
 
-test("goals, opportunity edits and paused lead research persist on desktop and phone", async ({ page }) => {
+test("goals, initiative edits and paused lead research persist on desktop and phone", async ({ page }) => {
   await openOwner(page, "/autonomy");
   await expect(page.getByRole("heading", { name: "Autonomy" }).last()).toBeVisible();
   await page.getByRole("button", { name: "Add goals" }).click();
@@ -49,9 +49,9 @@ test("goals, opportunity edits and paused lead research persist on desktop and p
   await form.getByLabel("Target", { exact: true }).fill("7");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("completed tasks · 0 / 7")).toBeVisible();
-  await page.getByRole("tab", { name: /Opportunities/ }).click();
-  await page.getByRole("button", { name: "Add opportunities" }).click();
-  form = page.getByRole("form", { name: "Add opportunities" });
+  await page.getByRole("tab", { name: /Initiatives/ }).click();
+  await page.getByRole("button", { name: "Add initiatives" }).click();
+  form = page.getByRole("form", { name: "Add initiatives" });
   await form.getByLabel("Project", { exact: true }).selectOption("e2e-autonomy-project");
   await form.getByLabel("Title", { exact: true }).fill("Inspect demand for event dashboards");
   await form
@@ -60,7 +60,7 @@ test("goals, opportunity edits and paused lead research persist on desktop and p
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Inspect demand for event dashboards", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  form = page.getByRole("form", { name: "Edit opportunities" });
+  form = page.getByRole("form", { name: "Edit initiatives" });
   await form.getByLabel("Title", { exact: true }).fill("Inspect event dashboard demand");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Inspect event dashboard demand", { exact: true })).toBeVisible();

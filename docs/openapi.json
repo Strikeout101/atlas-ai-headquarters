@@ -13681,7 +13681,9 @@
                 "description": "Add OpenAPI validation and sync gate in CI",
                 "priority": 2,
                 "status": "inbox",
-                "task_type": "general"
+                "task_type": "general",
+                "work_type": "code",
+                "importance": "important"
               }
             }
           }
@@ -18362,7 +18364,7 @@
       "get": {
         "tags": ["agents"],
         "summary": "Read autonomous business workspace",
-        "description": "Goals with observed progress, estimated opportunities, recurring schedules, operating limits and recent ledger. Revenue remains unknown until verified payment evidence exists.",
+        "description": "Goals with observed progress, estimated initiatives, recurring schedules, operating limits and recent ledger. Revenue remains unknown until verified payment evidence exists.",
         "security": [
           {
             "bearerAuth": []
@@ -18951,7 +18953,7 @@
         ]
       }
     },
-    "/api/autonomy/opportunities": {
+    "/api/autonomy/initiatives": {
       "post": {
         "tags": ["agents"],
         "summary": "Create opportunitie",
@@ -19113,7 +19115,7 @@
         }
       }
     },
-    "/api/autonomy/opportunities/{id}": {
+    "/api/autonomy/initiatives/{id}": {
       "patch": {
         "tags": ["agents"],
         "summary": "Update opportunitie",
@@ -19818,7 +19820,7 @@
       "get": {
         "tags": ["finance"],
         "summary": "Read pipeline and financial evidence",
-        "description": "Deals, immutable-provenance ledger, owner spending requests, currency-separated totals, financial goal windows and per-opportunity attribution. Verified net receipts subtract recorded refunds. Surplus subtracts verified costs only; costs and profit are incomplete.",
+        "description": "Deals, immutable-provenance ledger, owner spending requests, currency-separated totals, financial goal windows and per-initiative attribution. Verified net receipts subtract recorded refunds. Surplus subtracts verified costs only; costs and profit are incomplete.",
         "security": [
           {
             "bearerAuth": []
@@ -20483,7 +20485,7 @@
                     "type": "string",
                     "nullable": true
                   },
-                  "opportunity_id": {
+                  "initiative_id": {
                     "type": "string",
                     "nullable": true
                   }
@@ -20505,7 +20507,7 @@
       "patch": {
         "tags": ["finance"],
         "summary": "Attribute existing evidence",
-        "description": "Owner session and CSRF required. Links an existing entry to a same-business/currency deal or opportunity without editing amount/provenance. Paired Square payment and fee attribution stays consistent. Paid deals reconcile against net verified evidence.",
+        "description": "Owner session and CSRF required. Links an existing entry to a same-business/currency deal or initiative without editing amount/provenance. Paired Square payment and fee attribution stays consistent. Paid deals reconcile against net verified evidence.",
         "security": [
           {
             "ownerSession": []
@@ -20668,7 +20670,7 @@
                     "type": "string",
                     "nullable": true
                   },
-                  "opportunity_id": {
+                  "initiative_id": {
                     "type": "string",
                     "nullable": true
                   }
@@ -20677,7 +20679,7 @@
               },
               "example": {
                 "deal_id": "string_id",
-                "opportunity_id": "string_id"
+                "initiative_id": "string_id"
               }
             }
           }
@@ -20853,7 +20855,7 @@
                   "purpose": {
                     "type": "string"
                   },
-                  "opportunity_id": {
+                  "initiative_id": {
                     "type": "string",
                     "nullable": true
                   },
@@ -30252,7 +30254,7 @@
       "post": {
         "tags": ["businesses"],
         "summary": "Bring an existing Etsy listing into ATLAS",
-        "description": "Creates a published package for a shop listing ATLAS did not create, optionally tied to an opportunity (body: opportunity_id). Agents can then propose revisions of it; it is never taken down automatically. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "description": "Creates a published package for a shop listing ATLAS did not create, optionally tied to an initiative (body: initiative_id). Agents can then propose revisions of it; it is never taken down automatically. Owner password session required (and CSRF for changes); agent task tokens are refused.",
         "responses": {
           "200": {
             "description": "Result",
@@ -30413,7 +30415,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "opportunity_id": {
+                  "initiative_id": {
                     "type": "string",
                     "nullable": true
                   }
@@ -30421,7 +30423,7 @@
                 "additionalProperties": false
               },
               "example": {
-                "opportunity_id": "string_id"
+                "initiative_id": "string_id"
               }
             }
           }
@@ -32298,7 +32300,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "Media library",
-        "description": "Images the studio made, newest first; query q, business, opportunity_id. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "description": "Images the studio made, newest first; query q, business, initiative_id. Owner password session required (and CSRF for changes); agent task tokens are refused.",
         "responses": {
           "200": {
             "description": "Result",
@@ -33360,10 +33362,10 @@
         ]
       }
     },
-    "/api/autonomy/opportunities/{id}/restart": {
+    "/api/autonomy/initiatives/{id}/restart": {
       "post": {
         "tags": ["autonomy"],
-        "summary": "Restart a stopped opportunity",
+        "summary": "Restart a stopped initiative",
         "description": "Brings it back with a fresh window for its time and task limits. Owner password session required (and CSRF for changes); agent task tokens are refused.",
         "responses": {
           "200": {
@@ -34790,6 +34792,921 @@
             }
           }
         ]
+      }
+    },
+    "/api/autonomy/strategies/{id}/decision": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Approve a proposed strategy, or ask for a redo",
+        "description": "The owner decides on the strategy a research phase proposed. approve: it becomes the goal's strategy and the previous one is superseded. redo: research runs again with the note (5+ characters). Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused (for example strategy_not_approved, goal_slots_full, initiative_not_blocked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "goal_slots_full"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "decision": "redo",
+                "note": "Look at teacher planners too"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autonomy/initiatives/{id}/approve": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Approve an idea to build",
+        "description": "Starts a proposed initiative under its goal's approved strategy, within the goal's slots. The VPs' plan check sets its playbook, daily task cap and budget once; its playbook steps then run on their own. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused (for example strategy_not_approved, goal_slots_full, initiative_not_blocked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "goal_slots_full"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/autonomy/initiatives/{id}/unblock": {
+      "post": {
+        "tags": ["autonomy"],
+        "summary": "Decide on a blocked initiative",
+        "description": "For a step that failed after every retry: retry (with notes, optionally another agent_id), skip the step, stop the initiative, or owner (VPs only). Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused (for example strategy_not_approved, goal_slots_full, initiative_not_blocked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "goal_slots_full"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "action": "skip",
+                "notes": "Use the template files"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/reviews": {
+      "get": {
+        "tags": ["tasks"],
+        "summary": "A task's reviews",
+        "description": "Review history: each round's reviewer, model, same-model flag, verdict (approved or changes with the list), plus VP and owner decisions, and the task's review_state (waiting_helpers, reviewing, changes, vp, owner). Owner password session required.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "review_state": null,
+                  "reviews": [
+                    {
+                      "round": 1,
+                      "status": "approved",
+                      "reviewer_agent_id": "qa-senior",
+                      "reviewer_provider": "claude",
+                      "same_model": false,
+                      "summary": "Looks right",
+                      "items": []
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/tasks/{id}/review-decision": {
+      "post": {
+        "tags": ["tasks"],
+        "summary": "Decide a review the VPs passed on",
+        "description": "For a task whose review needs the owner (review_state owner): accept it as is, retry (one more go with the review's list and your notes), reassign (optionally to agent_id), or drop. Owner password session required (and CSRF for changes); agent task tokens are refused.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refused (review_not_waiting_for_owner, invalid_action)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "review_not_waiting_for_owner"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "conflict",
+                  "message": "The request conflicts with current server state."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "action": "retry",
+                "notes": "A4 only is fine"
+              }
+            }
+          }
+        }
       }
     }
   }

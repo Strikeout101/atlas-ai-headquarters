@@ -41,6 +41,12 @@ import { ensureVpAgents } from "./modules/bootstrap/schema/vp-agents.ts";
 import { applyBaseSchema } from "./modules/bootstrap/schema/base-schema.ts";
 import { initializeOAuthRuntime } from "./modules/bootstrap/schema/oauth-runtime.ts";
 import { applyTaskSchemaMigrations } from "./modules/bootstrap/schema/task-schema-migrations.ts";
+import {
+  applyWorkModelMigration,
+  archiveLegacyWork,
+  dropRetiredWorkTables,
+} from "./modules/bootstrap/schema/work-model-migration.ts";
+import { ensureReviewSchema } from "./modules/task-review.ts";
 import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-packs.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
@@ -73,6 +79,22 @@ applyBaseSchema(db);
 configureLoginStore(db);
 const oauthRuntime = initializeOAuthRuntime({ db, nowMs, runInTransaction });
 applyTaskSchemaMigrations(db);
+// Work restructure (docs/work-restructure-plan.md): initiatives become initiatives, goals own them. Runs before any module schema.
+applyWorkModelMigration(db);
+{
+  // Old tasks, meetings and proposals from the previous flow move to archive_20261122_* tables, once.
+  const legacy = archiveLegacyWork(db);
+  if (!legacy.skipped && Object.keys(legacy.archived).length)
+    console.log(
+      `[ATLAS] Archived old work: ${Object.entries(legacy.archived)
+        .map(([t, n]) => `${t} ${n}`)
+        .join(", ")}`,
+    );
+  // The old per-task autonomy queue (replaced by the work engine's step tasks).
+  const dropped = dropRetiredWorkTables(db);
+  if (dropped.length) console.log(`[ATLAS] Removed old work queue tables: ${dropped.join(", ")}`);
+}
+ensureReviewSchema(db);
 ensureModelRoutingSchema(db);
 ensureAgentPerformanceSchema(db);
 ensureControlStateSchema(db);

@@ -7,6 +7,7 @@ import { ensureBusinessSchema } from "./business.ts";
 import { registerAutonomyRoutes } from "./autonomy.ts";
 import { SESSION_COOKIE_NAME } from "../../../config/runtime.ts";
 import { createSessionToken } from "../../../security/login-sessions.ts";
+import { getCsrfToken } from "../../../security/auth.ts";
 import { appendAutonomyLedger, autonomyConfig, autonomyOverview } from "../../autonomy-store.ts";
 
 const databases: DatabaseSync[] = [];
@@ -46,16 +47,16 @@ describe("autonomy owner API", () => {
     expect(result.body).toMatchObject({
       ok: true,
       goals: [],
-      opportunities: [],
+      initiatives: [],
       schedules: [],
       ledger: [],
       config: { daily_start_cap: 6, usage_threshold: 0.8, failure_limit: 3, planning_interval_minutes: 360 },
     });
-    expect(db.prepare("SELECT * FROM autonomy_work").all()).toEqual([]);
+    expect(db.prepare("SELECT 1 FROM sqlite_master WHERE name='autonomy_work'").get()).toBeUndefined();
   });
   it("requires signed owner sessions on all writes, including when agent headers hide behind a cookie", async () => {
     const { app } = harness();
-    for (const resource of ["goals", "opportunities", "schedules"]) {
+    for (const resource of ["goals", "initiatives", "schedules"]) {
       await request(app).post(`/api/autonomy/${resource}`).send(goal).expect(403);
       await request(app)
         .patch(`/api/autonomy/${resource}/missing`)
@@ -82,26 +83,26 @@ describe("autonomy owner API", () => {
   it("validates scores and linked goals and records budget without authorizing a spend", async () => {
     const { create, patch, db } = harness();
     const result = await create("goals", goal).expect(201);
-    const opportunity = {
+    const initiative = {
       business: "ventures",
       project_id: "project",
       goal_id: result.body.item.id,
       title: "Research dashboard",
       budget: 150,
     };
-    await create("opportunities", { ...opportunity, demand_score: 101 }).expect(400);
-    await create("opportunities", { ...opportunity, business: "tech" }).expect(400);
-    const created = await create("opportunities", {
-      ...opportunity,
+    await create("initiatives", { ...initiative, demand_score: 101 }).expect(400);
+    await create("initiatives", { ...initiative, business: "tech" }).expect(400);
+    const created = await create("initiatives", {
+      ...initiative,
       demand_score: 72,
       revenue_score: 61,
-      status: "idea",
+      status: "proposed",
     }).expect(201);
-    expect(created.body.item).toMatchObject({ budget: 150, status: "idea", demand_score: 72 });
+    expect(created.body.item).toMatchObject({ budget: 150, status: "proposed", demand_score: 72 });
     await patch(`goals/${result.body.item.id}`, { business: "tech" }).expect(400);
-    const updated = await patch(`opportunities/${created.body.item.id}`, { status: "stopped" }).expect(200);
+    const updated = await patch(`initiatives/${created.body.item.id}`, { status: "stopped" }).expect(200);
     expect(updated.body.item.status).toBe("stopped");
-    expect(db.prepare("SELECT message FROM autonomy_ledger WHERE event='opportunity_created'").get()).toMatchObject({
+    expect(db.prepare("SELECT message FROM autonomy_ledger WHERE event='initiative_created'").get()).toMatchObject({
       message: expect.stringContaining("not spending authorization"),
     });
   });
@@ -197,5 +198,49 @@ describe("autonomy owner API", () => {
       progress_scope: null,
     });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("lets the owner approve a strategy, approve an idea through the VPs' plan check, and unblock a step", async () => {
+    const { app, db, create, patch } = harness();
+    const cookie = `${SESSION_COOKIE_NAME}=${createSessionToken("password")}`;
+    db.exec(`INSERT INTO departments(id,name,name_ko,icon,color) VALUES ('planning','Planning','','','#1'),('design','Design','','','#2');
+      INSERT INTO agents(id,name,role,department_id,cli_provider) VALUES ('p','Charlotte','team_leader','planning','codex'),('d','Iris','team_leader','design','codex');`);
+    const goalId = (await create("goals", goal).expect(201)).body.item.id;
+    db.prepare(
+      "INSERT INTO goal_strategies(id,goal_id,business,project_id,summary,created_at,version,status) VALUES ('s1',?,'ventures','project','Plan',1,1,'proposed')",
+    ).run(goalId);
+    const idea = (
+      await create("initiatives", {
+        business: "ventures",
+        project_id: "project",
+        goal_id: goalId,
+        title: "Wedding planner",
+      }).expect(201)
+    ).body.item;
+    const post = (path: string, body: Record<string, unknown> = {}) =>
+      request(app).post(`/api/autonomy/${path}`).set("Cookie", cookie).set("x-csrf-token", getCsrfToken()).send(body);
+    await request(app).post(`/api/autonomy/initiatives/${idea.id}/approve`).expect(403);
+    expect((await post(`initiatives/${idea.id}/approve`).expect(400)).body.error).toBe("strategy_not_approved");
+    expect((await post("strategies/s1/decision", { decision: "maybe" }).expect(400)).body.error).toBe(
+      "invalid_decision",
+    );
+    await post("strategies/missing/decision", { decision: "approve" }).expect(404);
+    expect((await post("strategies/s1/decision", { decision: "approve" }).expect(200)).body.item.status).toBe(
+      "approved",
+    );
+    // Setting the status to approved goes through the same plan check.
+    const approved = (await patch(`initiatives/${idea.id}`, { status: "approved" }).expect(200)).body.item;
+    expect(approved).toMatchObject({ status: "approved", playbook: "etsy_digital", approved_by: "owner" });
+    expect((await post(`initiatives/${idea.id}/approve`).expect(400)).body.error).toBe("initiative_not_proposed");
+    db.prepare("UPDATE initiatives SET status='blocked', escalation='owner', playbook_stage='build' WHERE id=?").run(
+      idea.id,
+    );
+    const resumed = (
+      await post(`initiatives/${idea.id}/unblock`, { action: "skip", notes: "Use the template" }).expect(200)
+    ).body.item;
+    expect(resumed).toMatchObject({ status: "in_progress", playbook_stage: "mockups", escalation: null });
+    expect((await post(`initiatives/${idea.id}/unblock`, { action: "skip" }).expect(400)).body.error).toBe(
+      "initiative_not_blocked",
+    );
   });
 });

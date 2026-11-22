@@ -11,11 +11,9 @@ export function registerApiRoutes(ctx: RuntimeContext): RouteCollabExports & Rou
   Object.assign(runtime, registerRoutesPartA(runtime));
   Object.assign(runtime, registerRoutesPartC(runtime));
 
-  const routeHelpers = Object.fromEntries(ROUTE_RUNTIME_HELPER_KEYS.map((key) => [key, runtime[key]])) as Omit<
-    RouteCollabExports,
-    "DEPT_KEYWORDS"
-  > &
-    RouteOpsExports;
+  const routeHelpers = Object.fromEntries(
+    ROUTE_RUNTIME_HELPER_KEYS.map((key) => [key, runtime[key]]),
+  ) as unknown as Omit<RouteCollabExports, "DEPT_KEYWORDS"> & RouteOpsExports;
 
   return {
     DEPT_KEYWORDS: runtime.DEPT_KEYWORDS,

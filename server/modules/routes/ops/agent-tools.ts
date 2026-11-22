@@ -40,7 +40,8 @@ import { saveStrategy, strategyContextForTask } from "../../goal-strategy.ts";
 import { webSearch } from "../../web-search.ts";
 import { listShopChanges, proposeShopChange, shopProfile } from "../../etsy-shop.ts";
 import { installedSkills, listRepoSkills, searchSkills } from "../../skill-installer.ts";
-import { proposeOpportunity } from "../../playbooks.ts";
+import { proposeInitiative } from "../../playbooks.ts";
+import { saveHandoff } from "../../work-model.ts";
 import {
   createDeal,
   updateDeal,
@@ -94,6 +95,36 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
           if (error instanceof AgentWebError) return res.status(error.status).json({ error: error.message });
           throw error;
         }
+      }
+      if (operation === "task.handoff") {
+        // The structured result the next step and the reviewer read (work restructure). The last call counts.
+        try {
+          return res.json({ ok: true, item: saveHandoff(db, claims.taskId, body) });
+        } catch (error) {
+          return res.status(400).json({ error: error instanceof Error ? error.message : "invalid_handoff" });
+        }
+      }
+      if (operation === "subtask.done") {
+        // Subtasks are done only when the agent says so (work restructure, phase 4); a clean exit no longer does it.
+        const open = db
+          .prepare(
+            "SELECT id, title FROM subtasks WHERE task_id=? AND status NOT IN ('done','cancelled') AND (target_department_id IS NULL OR target_department_id='')",
+          )
+          .all(claims.taskId) as Array<{ id: string; title: string }>;
+        const wanted =
+          typeof body.id === "string" ? body.id : typeof body.title === "string" ? body.title.trim().toLowerCase() : "";
+        const match =
+          open.find((sub) => sub.id === wanted) ?? open.find((sub) => sub.title.trim().toLowerCase() === wanted);
+        if (!match)
+          return res
+            .status(400)
+            .json({ error: "subtask_not_found", open: open.map((sub) => ({ id: sub.id, title: sub.title })) });
+        const doneAt = Date.now();
+        db.prepare("UPDATE subtasks SET status='done', completed_at=?, blocked_reason=NULL WHERE id=?").run(
+          doneAt,
+          match.id,
+        );
+        return res.json({ ok: true, item: { id: match.id, title: match.title, status: "done" } });
       }
       if (operation === "knowledge.get") {
         try {
@@ -174,7 +205,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
             ? (body.payload as Record<string, unknown>)
             : {};
         if (operation === "finance.request_spend") {
-          const allowed = ["business", "opportunity_id", "amount_minor", "currency", "purpose", "category"];
+          const allowed = ["business", "initiative_id", "amount_minor", "currency", "purpose", "category"];
           if (Object.keys(payload).some((key) => !allowed.includes(key)))
             return res.status(400).json({ error: "finance_protected_field" });
           const item = createSpendRequest(db, { ...payload, agent_id: claims.agentId, task_id: claims.taskId });
@@ -185,7 +216,7 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
             "business",
             "contact_id",
             "project_id",
-            "opportunity_id",
+            "initiative_id",
             "title",
             "stage",
             "expected_amount_minor",
@@ -235,21 +266,21 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
         operation === "etsy.shop" ||
         operation === "etsy.shop_propose" ||
         operation === "strategy.save" ||
-        operation === "opportunity.propose"
+        operation === "initiative.propose"
       ) {
         const context = resolveTaskContext(db, claims.taskId);
         const work = db
-          .prepare("SELECT opportunity_id FROM autonomy_work WHERE task_id=? AND opportunity_id IS NOT NULL LIMIT 1")
-          .get(claims.taskId) as { opportunity_id: string } | undefined;
-        const opportunityId =
-          typeof body.opportunity_id === "string" && body.opportunity_id
-            ? body.opportunity_id
-            : (work?.opportunity_id ?? null);
+          .prepare("SELECT initiative_id FROM tasks WHERE id=? AND initiative_id IS NOT NULL")
+          .get(claims.taskId) as { initiative_id: string } | undefined;
+        const initiativeId =
+          typeof body.initiative_id === "string" && body.initiative_id
+            ? body.initiative_id
+            : (work?.initiative_id ?? null);
         const studioContext: StudioContext = {
           business: context?.business ?? null,
           projectId: context?.projectId ?? null,
           projectPath: context?.projectPath ?? null,
-          opportunityId,
+          initiativeId,
           listingId: typeof body.listing_id === "string" ? body.listing_id : null,
           agentId: claims.agentId,
           taskId: claims.taskId,
@@ -268,28 +299,26 @@ export function registerAgentToolRoutes(app: Express, db: DatabaseSync, _runDire
                 query: body.query,
                 business: body.business ?? context?.business,
                 project_id: body.project_id,
-                opportunity_id: body.opportunity_id,
+                initiative_id: body.initiative_id,
                 limit: typeof body.limit === "number" ? body.limit : 20,
               }),
             });
           if (operation === "experiment.start") {
             const item = startVariant(
               db,
-              { ...body, opportunity_id: opportunityId },
+              { ...body, initiative_id: initiativeId },
               { agentId: claims.agentId, taskId: claims.taskId },
             );
             return res.status(201).json({ ok: true, item });
           }
-          if (operation === "opportunity.propose") {
+          if (operation === "initiative.propose") {
             // Research tasks from a playbook schedule record niches as ideas tied to that playbook.
             const schedule = db
-              .prepare(
-                "SELECT s.playbook FROM autonomy_work w JOIN schedules s ON s.id=w.schedule_id WHERE w.task_id=? LIMIT 1",
-              )
+              .prepare("SELECT playbook FROM schedules WHERE last_task_id=? LIMIT 1")
               .get(claims.taskId) as { playbook: string | null } | undefined;
             // A goal's strategy task ties its ideas to the goal and to the business's playbook.
             const strategy = strategyContextForTask(db, claims.taskId);
-            const item = proposeOpportunity(db, body, {
+            const item = proposeInitiative(db, body, {
               business: context?.business ?? null,
               projectId: context?.projectId ?? null,
               taskId: claims.taskId,

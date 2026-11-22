@@ -19,7 +19,10 @@ test.beforeAll(async ({ request }) => {
       "INSERT OR IGNORE INTO projects(id,name,project_path,core_goal,created_at,updated_at) VALUES(?,?,?,?,?,?)",
     ).run("e2e-revenue-project", "Revenue fixtures", runtimePath, "Inspect attributed revenue", now, now);
     db.prepare(
-      "INSERT OR IGNORE INTO opportunities(id,business,project_id,title,status,created_at,updated_at) VALUES('e2e-revenue-opportunity','ventures','e2e-revenue-project','Dashboard opportunity','launched',?,?)",
+      "INSERT OR IGNORE INTO business_goals(id,business,metric,target,period_start,period_end,created_at,updated_at) VALUES('e2e-revenue-goal','ventures','verified_revenue',100,?,?,?,?)",
+    ).run(now, now + 30 * 86_400_000, now, now);
+    db.prepare(
+      "INSERT OR IGNORE INTO initiatives(id,business,project_id,goal_id,title,status,created_at,updated_at) VALUES('e2e-revenue-initiative','ventures','e2e-revenue-project','e2e-revenue-goal','Dashboard initiative','launched',?,?)",
     ).run(now, now);
     db.prepare(
       "INSERT OR IGNORE INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,description,occurred_at,created_at,updated_at) VALUES('e2e-square-net-usd','ventures','revenue',1600,'USD','square_payment','fixture-square-usd',1,'Verified sample net receipt',?,?,?)",
@@ -57,7 +60,7 @@ test("pipeline milestones require verified receipts for paid, attribution persis
   await form.getByLabel("Expected amount", { exact: true }).fill("16.00");
   await form.getByLabel("Stage", { exact: true }).selectOption("won");
   await form.getByLabel("Product generated", { exact: true }).fill("2026-11-16T09:30");
-  await form.getByLabel("Linked opportunity", { exact: true }).selectOption("e2e-revenue-opportunity");
+  await form.getByLabel("Linked initiative", { exact: true }).selectOption("e2e-revenue-initiative");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   let deal = page.getByRole("listitem").filter({ has: page.getByText("Dashboard package fixture", { exact: true }) });
   await expect(deal.getByText("Not verified paid", { exact: true })).toBeVisible();
@@ -69,7 +72,7 @@ test("pipeline milestones require verified receipts for paid, attribution persis
   await receipt.getByRole("button", { name: "Link record" }).click();
   form = page.getByRole("form", { name: "Link record", exact: true });
   await form.getByLabel("Linked deal", { exact: true }).selectOption({ label: "Dashboard package fixture" });
-  await form.getByLabel("Linked opportunity", { exact: true }).selectOption("e2e-revenue-opportunity");
+  await form.getByLabel("Linked initiative", { exact: true }).selectOption("e2e-revenue-initiative");
   await form.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("tab", { name: "Pipeline", exact: true }).click();
   deal = page.getByRole("listitem").filter({ has: page.getByText("Dashboard package fixture", { exact: true }) });
@@ -79,7 +82,7 @@ test("pipeline milestones require verified receipts for paid, attribution persis
   await expect(page.getByText("Sufficient linked verified receipts", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Overview", exact: true }).click();
   await expect(
-    page.getByRole("region", { name: "Opportunity results" }).getByText(/USD · \$16.00 verified net receipts/),
+    page.getByRole("region", { name: "Initiative results" }).getByText(/USD · \$16.00 verified net receipts/),
   ).toBeVisible();
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });

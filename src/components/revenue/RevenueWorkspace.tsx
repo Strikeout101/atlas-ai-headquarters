@@ -19,7 +19,7 @@ import {
   type FinanceOverview,
   type Deal,
   type FinanceEntry,
-  type RevenueOpportunity,
+  type RevenueInitiative,
 } from "../../api/finance";
 import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/business";
 import { isApiRequestError } from "../../api/core";
@@ -44,13 +44,13 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     </div>
   );
 }
-function OpportunitySelect({
-  opportunities,
+function InitiativeSelect({
+  initiatives,
   defaultValue = "",
-  name = "opportunity_id",
+  name = "initiative_id",
   id,
 }: {
-  opportunities: RevenueOpportunity[];
+  initiatives: RevenueInitiative[];
   defaultValue?: string;
   name?: string;
   id?: string;
@@ -58,7 +58,7 @@ function OpportunitySelect({
   return (
     <select id={id} name={name} defaultValue={defaultValue}>
       <option value="">None</option>
-      {opportunities.map((item) => (
+      {initiatives.map((item) => (
         <option key={item.id} value={item.id}>
           {item.title}
         </option>
@@ -153,14 +153,14 @@ export default function RevenueWorkspace() {
         return await mutate(() =>
           linkFinanceEntry(editing.id, {
             deal_id: String(values.get("deal_id") || "") || null,
-            opportunity_id: String(values.get("opportunity_id") || "") || null,
+            initiative_id: String(values.get("initiative_id") || "") || null,
           }),
         );
       const amount = parseMoney(String(values.get("amount")), formCurrency);
       const base = {
         business: formBusiness,
         currency: formCurrency,
-        opportunity_id: String(values.get("opportunity_id") || "") || null,
+        initiative_id: String(values.get("initiative_id") || "") || null,
       };
       if (formKind === "deal")
         await mutate(() =>
@@ -205,7 +205,7 @@ export default function RevenueWorkspace() {
       spend: t({ en: "Spending request" }),
       link: t({ en: "Link record" }),
     })[kind];
-  const opportunities = data?.opportunities.filter((item) => item.business === formBusiness) ?? [];
+  const initiatives = data?.initiatives.filter((item) => item.business === formBusiness) ?? [];
   const compatibleDeals =
     data?.deals.filter((item) => item.business === formBusiness && item.currency === formCurrency) ?? [];
   const options = [...new Set([...currencyOptions, formCurrency])];
@@ -266,7 +266,7 @@ export default function RevenueWorkspace() {
       </form>
       <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
         {t({
-          en: "Date filters apply to financial records and opportunity totals. Goals use their own periods.",
+          en: "Date filters apply to financial records and initiative totals. Goals use their own periods.",
         })}
       </p>
       {error && (
@@ -423,15 +423,15 @@ export default function RevenueWorkspace() {
                     </ol>
                   )}
                 </section>
-                <section aria-label="Opportunity results">
-                  <h2 className="text-sm font-semibold">Opportunity results</h2>
-                  {!data.opportunities.length ? (
+                <section aria-label="Initiative results">
+                  <h2 className="text-sm font-semibold">Initiative results</h2>
+                  {!data.initiatives.length ? (
                     <p className="py-3 text-sm" style={{ color: "var(--th-text-muted)" }}>
-                      No opportunities yet. Add one in Autonomy.
+                      No initiatives yet. Add one in Autonomy.
                     </p>
                   ) : (
                     <ol className="divide-y" style={{ borderColor: "var(--th-border)" }}>
-                      {data.opportunities.map((item) => (
+                      {data.initiatives.map((item) => (
                         <li key={item.id} className="py-3">
                           <p className="break-words text-sm font-medium">{item.title}</p>
                           <p className="mt-1 text-xs" style={{ color: "var(--th-text-muted)" }}>
@@ -617,8 +617,8 @@ export default function RevenueWorkspace() {
                       </select>
                     </Field>
                   )}
-                  <Field label="Linked opportunity">
-                    <OpportunitySelect opportunities={opportunities} defaultValue={editing?.opportunity_id ?? ""} />
+                  <Field label="Linked initiative">
+                    <InitiativeSelect initiatives={initiatives} defaultValue={editing?.initiative_id ?? ""} />
                   </Field>
                 </div>
                 <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
@@ -707,8 +707,8 @@ export default function RevenueWorkspace() {
                           </p>
                           <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-muted)" }}>
                             Deal: {data.deals.find((item) => item.id === entry.deal_id)?.title ?? "Unassigned"} ·
-                            Opportunity:{" "}
-                            {data.opportunities.find((item) => item.id === entry.opportunity_id)?.title ?? "Unassigned"}
+                            Initiative:{" "}
+                            {data.initiatives.find((item) => item.id === entry.initiative_id)?.title ?? "Unassigned"}
                           </p>
                         </div>
                         <button type="button" className="revenue-button" onClick={() => open("link", entry)}>

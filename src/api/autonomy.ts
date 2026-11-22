@@ -5,17 +5,20 @@ import type { BusinessKind } from "./business";
 export interface BusinessGoal {
   id: string;
   business: BusinessKind;
-  project_id: string;
+  project_id: string | null;
+  title?: string;
   metric: string;
   currency?: string;
   target: number;
+  /** How many initiatives this goal runs at once (work restructure). */
+  initiative_slots?: number;
   period_start: number;
   period_end: number;
   progress: number | null;
   progress_scope?: "business" | "project" | null;
   status?: string;
 }
-export interface Opportunity {
+export interface Initiative {
   id: string;
   business: BusinessKind;
   project_id: string;
@@ -28,7 +31,7 @@ export interface Opportunity {
   difficulty_score: number;
   time_to_launch_score: number;
   budget: number;
-  status: "idea" | "researching" | "approved" | "building" | "launched" | "stopped";
+  status: "proposed" | "approved" | "in_progress" | "blocked" | "launched" | "measuring" | "stopped" | "done";
   task_limit?: number;
   time_limit_days?: number;
   launched_at?: number | null;
@@ -75,10 +78,15 @@ export interface AutonomySchedule {
   timezone?: string | null;
 }
 export interface GoalStrategy {
+  id?: string;
   goal_id: string;
   summary: string;
   created_at: number;
   task_id: string | null;
+  version?: number;
+  status?: "draft" | "proposed" | "approved" | "superseded";
+  /** The owner's note on a redo (or on approval). */
+  owner_note?: string | null;
 }
 export interface GoalMilestone {
   id: string;
@@ -108,7 +116,7 @@ export interface LedgerEvent {
 }
 export interface AutonomyOverview {
   goals: BusinessGoal[];
-  opportunities: Opportunity[];
+  initiatives: Initiative[];
   schedules: AutonomySchedule[];
   config: AutonomyConfig;
   ledger: LedgerEvent[];
@@ -124,7 +132,7 @@ export interface AutonomyDigest {
   total?: number;
   through?: number;
 }
-export type AutonomyResource = "goals" | "opportunities" | "schedules";
+export type AutonomyResource = "goals" | "initiatives" | "schedules";
 export const getAutonomy = () => request<AutonomyOverview>("/api/autonomy");
 export const getAutonomyDigest = (after: number) =>
   request<AutonomyDigest>(`/api/autonomy/digest?after=${encodeURIComponent(after)}`);
@@ -146,8 +154,15 @@ const sendJson = (url: string, method: string, data: unknown) =>
   request(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 export const saveExperimentRules = (rules: Partial<ExperimentRules>) =>
   sendJson("/api/autonomy/experiment-rules", "PATCH", rules);
-export const restartOpportunity = (id: string) =>
-  sendJson(`/api/autonomy/opportunities/${encodeURIComponent(id)}/restart`, "POST", {});
+export const restartInitiative = (id: string) =>
+  sendJson(`/api/autonomy/initiatives/${encodeURIComponent(id)}/restart`, "POST", {});
+/** The owner's calls in the goal flow: the strategy, which ideas to build, and a stuck step. */
+export const decideStrategy = (id: string, decision: "approve" | "redo", note?: string) =>
+  sendJson(`/api/autonomy/strategies/${encodeURIComponent(id)}/decision`, "POST", { decision, note });
+export const approveInitiative = (id: string) =>
+  sendJson(`/api/autonomy/initiatives/${encodeURIComponent(id)}/approve`, "POST", {});
+export const unblockInitiative = (id: string, action: "retry" | "skip" | "stop", notes?: string, agentId?: string) =>
+  sendJson(`/api/autonomy/initiatives/${encodeURIComponent(id)}/unblock`, "POST", { action, notes, agent_id: agentId });
 export const savePlaybook = (key: string, data: Partial<Pick<Playbook, "title" | "research" | "steps">>) =>
   sendJson(`/api/autonomy/playbooks/${encodeURIComponent(key)}`, "PUT", data);
 export const resetPlaybook = (key: string) =>
@@ -170,8 +185,8 @@ export interface StreamOverview {
   businesses: BusinessKind[];
   goals: Array<BusinessGoal & { milestones: GoalMilestone[] }>;
   pipeline: Record<string, number>;
-  opportunities: Array<
-    Opportunity & {
+  initiatives: Array<
+    Initiative & {
       results: {
         spent_usd: number;
         earned_usd: number;
@@ -192,14 +207,13 @@ export interface StreamOverview {
       };
     }
   >;
+  /** Autonomous tasks waiting, running or held (the work engine's step tasks). */
   next: Array<{
     id: string;
     status: string;
-    opportunity_id: string | null;
+    initiative_id: string | null;
     playbook_step: string | null;
     title: string | null;
-    proposal_status: string | null;
-    task_status: string | null;
     created_at: number;
   }>;
   listings: Record<string, number>;

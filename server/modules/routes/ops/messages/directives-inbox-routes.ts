@@ -309,6 +309,7 @@ export function registerDirectiveAndInboxRoutes(
     });
     const directiveReplyRoute = directiveSessionRoute ?? directiveFallbackRoute;
     const delegationOptions: DelegationOptions = {
+      directive: true,
       skipPlannedMeeting: explicitSkip || directivePolicy.skipPlannedMeeting,
       skipPlanSubtasks: explicitSkip || directivePolicy.skipPlanSubtasks,
       projectId: explicitProjectId,
@@ -733,6 +734,7 @@ export function registerDirectiveAndInboxRoutes(
     const shouldDelegateDirective =
       isDirective && directivePolicy ? shouldExecuteDirectiveDelegation(directivePolicy, inboxExplicitSkip) : false;
     const directiveDelegationOptions: DelegationOptions = {
+      directive: isDirective,
       skipPlannedMeeting: inboxExplicitSkip || !!directivePolicy?.skipPlannedMeeting,
       skipPlanSubtasks: inboxExplicitSkip || !!directivePolicy?.skipPlanSubtasks,
       projectId: inboxProjectId,

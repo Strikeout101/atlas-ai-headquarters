@@ -48,22 +48,21 @@ export function initializeWorkflowPartB(ctx: RuntimeContext): WorkflowAgentExpor
     notifyCeo,
   });
 
-  const { createSubtaskFromCli, completeSubtaskFromCli, seedApprovedPlanSubtasks, seedReviewRevisionSubtasks } =
-    createSubtaskSeedingTools({
-      db,
-      nowMs,
-      broadcast,
-      analyzeSubtaskDepartment,
-      rerouteSubtasksByPlanningLeader,
-      findTeamLeader,
-      getDeptName,
-      getPreferredLanguage,
-      resolveLang,
-      l,
-      pickL,
-      appendTaskLog,
-      notifyCeo,
-    });
+  const { createSubtaskFromCli, completeSubtaskFromCli, seedApprovedPlanSubtasks } = createSubtaskSeedingTools({
+    db,
+    nowMs,
+    broadcast,
+    analyzeSubtaskDepartment,
+    rerouteSubtasksByPlanningLeader,
+    findTeamLeader,
+    getDeptName,
+    getPreferredLanguage,
+    resolveLang,
+    l,
+    pickL,
+    appendTaskLog,
+    notifyCeo,
+  });
 
   const { codexThreadToSubtask, spawnCliAgent } = createCliRuntimeTools({
     db,
@@ -130,7 +129,6 @@ export function initializeWorkflowPartB(ctx: RuntimeContext): WorkflowAgentExpor
   return {
     analyzeSubtaskDepartment,
     seedApprovedPlanSubtasks,
-    seedReviewRevisionSubtasks,
     codexThreadToSubtask,
     spawnCliAgent,
     httpAgentCounter,

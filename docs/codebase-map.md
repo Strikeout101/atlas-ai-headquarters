@@ -48,9 +48,11 @@ Rules of thumb:
 
 | File                            | What it does                                                                                                                                        |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `autonomy-store.ts`             | Tables: goals, opportunities, schedules, autonomy work, ledger, config                                                                              |
-| `autonomy-planner.ts`           | VP planning beat: compares goals with results, scores opportunities, proposes work                                                                  |
-| `autonomy-engine.ts`            | Runs due schedules and admitted work: daily cap, usage gate, failure auto-pause                                                                     |
+| `autonomy-store.ts`             | Tables: goals, initiatives, schedules, autonomy work, ledger, config                                                                                |
+| `autonomy-planner.ts`           | VP beat: decides escalated (blocked) steps, re-scores ideas, adds variant tasks for launched initiatives                                            |
+| `autonomy-engine.ts`            | Start admission for autonomous tasks: usage gate, daily start cap (research exempt), pause controls                                                 |
+| `task-review.ts`                | Reviews: reviewer pick (work type, other model), read-only review run, JSON verdict, auto-return, VP/owner escalation, `task_reviews`               |
+| `work-engine.ts`                | The step runner: research phase, owner approvals, playbook steps with hand-offs, retries/escalation, caps, schedules → tasks                        |
 | `autonomous-provider-budget.ts` | Caps autonomous local-provider invocations, including retries/resumes; blocks autonomous paid/unclassified APIs until an enforceable budget exists. |
 | `agent-proposals.ts`            | Think loop: idle agents suggest tasks                                                                                                               |
 | `finance-store.ts`              | Deals, ledger entries (verified money), spend requests                                                                                              |
@@ -59,15 +61,15 @@ Rules of thumb:
 | `spend-budgets.ts`              | Monthly spending budgets per category                                                                                                               |
 | `etsy.ts`                       | Etsy connection (OAuth PKCE), draft/publish/revise/deactivate listings, shop listing mirror, quota, sync orders, fees and favorites                 |
 | `studio.ts`, `media-library.ts` | Image studio (free mockup renderer, optional image API with a monthly cap) and the media library                                                    |
-| `experiments.ts`                | Opportunity budgets, variants, metrics and the owner's stop rules                                                                                   |
-| `playbooks.ts`                  | Editable playbooks (default: Etsy digital products), step advance, `opportunity.propose`                                                            |
-| `profit.ts`                     | Monthly costs and profit per business and opportunity                                                                                               |
+| `experiments.ts`                | Initiative budgets, variants, metrics and the owner's stop rules                                                                                    |
+| `playbooks.ts`                  | Editable playbooks (default: Etsy digital products; steps with work type, owner-approval stop, caps), `initiative.propose`                          |
+| `profit.ts`                     | Monthly costs and profit per business and initiative                                                                                                |
 | `schedule-time.ts`              | Time-of-day schedule rules (cron in a time zone, daylight-saving safe)                                                                              |
 | `goal-milestones.ts`            | Goal milestones: progress ones complete from measured data, manual ones by the owner                                                                |
 | `etsy-shop.ts`                  | The Etsy shop itself: profile read on each sync, missing setup, shop changes (VP-approved, applied by API), owner uploads, shop setup task          |
 | `web-search.ts`                 | `web.search` through the owner's search service (Serper/Google, Brave, Tavily; monthly cap), keyless DuckDuckGo fallback in `agent-web.ts`          |
 | `skill-installer.ts`            | Skills: recommended list installed once, `skills.search` (skills.sh), install for every agent provider, recorded in the Library                     |
-| `goal-strategy.ts`              | Goal strategy: a goal with no current strategy gets a research task; `strategy.save`; ideas tied to the goal                                        |
+| `goal-strategy.ts`              | Goal strategy: research angles and synthesis briefs, `strategy.save` (proposed), owner approve/redo, fresh research run                             |
 | `streams.ts`                    | One income stream's page data (`GET /api/streams`)                                                                                                  |
 | `content-guard.ts`              | Flags web content that tries to instruct agents; flagged tasks' approvals go to the owner                                                           |
 | `businesses.ts`                 | The business registry (`tech`, `rental`, `ventures`)                                                                                                |
@@ -104,13 +106,15 @@ Rules of thumb:
 
 **Running ATLAS**
 
-| File                                                                        | What it does                                                              |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `lifecycle.ts`, `lifecycle/`                                                | Server start, health payload, startup recovery, graceful shutdown         |
-| `db-backups.ts`                                                             | Daily restore-tested backups, off-PC copy                                 |
-| `service-status.ts`                                                         | Service panel data and update or restart requests                         |
-| `bootstrap/`                                                                | Base schema, migrations and default seeds (agents, departments, settings) |
-| `routes.ts`, `workflow.ts`, `deferred-runtime.ts`, `runtime-helper-keys.ts` | Wiring that connects routes and workflow modules at startup               |
+| File                                                                        | What it does                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lifecycle.ts`, `lifecycle/`                                                | Server start, health payload, startup recovery, graceful shutdown                                                                                                                                                       |
+| `db-backups.ts`                                                             | Daily restore-tested backups, off-PC copy                                                                                                                                                                               |
+| `service-status.ts`                                                         | Service panel data and update or restart requests                                                                                                                                                                       |
+| `bootstrap/`                                                                | Base schema, migrations and default seeds (agents, departments, settings)                                                                                                                                               |
+| `bootstrap/schema/work-model-migration.ts`                                  | Work restructure: opportunities → initiatives under goals, goal/strategy upgrades, task columns (work type, importance, goal, initiative), hand-offs table, one-time archive of old work                                |
+| `work-model.ts`                                                             | Task work types (guess + per-type instructions), importance, filling goal/initiative/business on a task, plain work folders for non-code tasks (`ATLAS_WORK_DIR`), hand-offs (`task.handoff`, auto hand-off at run end) |
+| `routes.ts`, `workflow.ts`, `deferred-runtime.ts`, `runtime-helper-keys.ts` | Wiring that connects routes and workflow modules at startup                                                                                                                                                             |
 
 ### server/modules/routes/ (HTTP API)
 
@@ -122,7 +126,7 @@ Rules of thumb:
 | `collab/`                                                                            | CEO chat, directives, delegation between departments, meetings coordination, report routing         |
 | `ops/agent-tools.ts`                                                                 | **Agent tool gateway** (`/api/agent-tools`): everything agents can call (see `docs/agent-tools.md`) |
 | `ops/approvals.ts`, `ops/approval-settings.ts`, `ops/vp-reviews.ts`                  | Approvals feed (Today), approval settings, VP decision log                                          |
-| `ops/autonomy.ts`, `ops/agent-proposals.ts`, `ops/org-requests.ts`                   | Goals, opportunities, schedules; suggested tasks; hiring requests                                   |
+| `ops/autonomy.ts`, `ops/agent-proposals.ts`, `ops/org-requests.ts`                   | Goals, initiatives, schedules; suggested tasks; hiring requests                                     |
 | `ops/business*.ts`                                                                   | Business records (contacts, tickets, quotes, drafts), email, mailboxes, profiles, social accounts   |
 | `ops/finance.ts`, `ops/square.ts`, `ops/listings.ts`                                 | Deals, ledger, spend; Square; listing packages                                                      |
 | `ops/etsy.ts`, `ops/studio.ts`                                                       | Etsy connection, listing push/publish, shop listings and adopt; image studio and media library      |
@@ -142,8 +146,8 @@ Rules of thumb:
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `orchestration/execution-start-task.ts`                        | Starts a task run: worktree, prompt, provider                                                                                                                                                        |
 | `orchestration/run-complete-handler.ts`                        | After a run ends: results, lessons, review, retries                                                                                                                                                  |
-| `orchestration/review-finalize-tools.ts`                       | Review, merge and finishing (keeps failed merges in Review)                                                                                                                                          |
-| `orchestration/planned-approval.ts`, `orchestration/meetings/` | Team lead meetings (planned and review consensus)                                                                                                                                                    |
+| `orchestration/review-finalize-tools.ts`                       | Finishing approved work: merge (keeps failed merges in Review), done, report (the review itself is `task-review.ts`)                                                                                 |
+| `orchestration/planned-approval.ts`, `orchestration/meetings/` | Team-lead kickoff meeting, for `$` directives only                                                                                                                                                   |
 | `orchestration/report-*.ts`, `planning-archive-tools.ts`       | Report and deck flows                                                                                                                                                                                |
 | `core/project-context-tools.ts`                                | Builds the task prompt (project context, knowledge block, policies)                                                                                                                                  |
 | `core/meeting-prompt-tools.ts`, `core/reply-core-tools.ts`     | Meeting and 1:1 chat prompts; reply cleanup                                                                                                                                                          |
@@ -166,7 +170,7 @@ Rules of thumb:
 | `i18n.ts`                                                                    | Text helper (`t({ en })`); English only                                                            |
 | `types/`                                                                     | Shared web types                                                                                   |
 | `components/today/`                                                          | Today page: approvals waiting, digest                                                              |
-| `components/autonomy/`                                                       | Goals (with milestones), opportunities, schedules                                                  |
+| `components/autonomy/`                                                       | Goals (with milestones), initiatives, schedules                                                    |
 | `components/revenue/`, `components/listings/`                                | Revenue, ledger, income streams; listings                                                          |
 | `components/work/`, `components/taskboard/`                                  | Work views and the task board (task drawer, create modal)                                          |
 | `components/team/`                                                           | Team area: knowledge, VP decisions, model director                                                 |

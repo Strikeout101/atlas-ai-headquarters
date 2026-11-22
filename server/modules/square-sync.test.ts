@@ -165,7 +165,7 @@ describe("Square GET-only verified imports", () => {
       verified: 1,
       external_id: "production:payment-1",
       deal_id: null,
-      opportunity_id: null,
+      initiative_id: null,
     });
     expect(h.ledger("square_fee")).toMatchObject({ kind: "expense", amount_minor: 74, verified: 1 });
     expect(h.db.prepare("SELECT COUNT(*) AS n FROM ledger_entries").get()).toMatchObject({ n: 2 });

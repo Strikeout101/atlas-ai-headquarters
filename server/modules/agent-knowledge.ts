@@ -83,19 +83,14 @@ export function resolveTaskContext(db: Db, taskId: string): TaskKnowledgeContext
   if (!tableExists(db, "tasks")) return null;
   const hasSource = columnExists(db, "tasks", "source_task_id");
   const hasProjectBusiness = tableExists(db, "projects") && columnExists(db, "projects", "business");
-  const hasWork = tableExists(db, "autonomy_work");
+  const hasBusiness = columnExists(db, "tasks", "business");
   let current = db.prepare("SELECT * FROM tasks WHERE id=?").get(taskId) as Row | undefined;
   if (!current) return null;
   const first = current;
   let projectRow: Row | undefined;
   let business: BusinessKey | null = null;
   for (let depth = 0; current && depth < 4; depth++) {
-    if (!business && hasWork) {
-      const work = db.prepare("SELECT business FROM autonomy_work WHERE task_id=? LIMIT 1").get(String(current.id)) as
-        | Row
-        | undefined;
-      if (isBusinessKey(work?.business)) business = work.business;
-    }
+    if (!business && hasBusiness && isBusinessKey(current.business)) business = current.business;
     if (!projectRow && current.project_id && tableExists(db, "projects")) {
       projectRow = db.prepare("SELECT * FROM projects WHERE id=?").get(String(current.project_id)) as Row | undefined;
     }

@@ -20,7 +20,7 @@ export interface MediaAsset {
   id: string;
   business: "tech" | "rental" | "ventures" | null;
   project_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   listing_id: string | null;
   kind: "mockup" | "generated" | "upload";
   path: string;

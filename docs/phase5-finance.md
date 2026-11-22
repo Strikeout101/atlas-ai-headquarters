@@ -27,13 +27,13 @@ The optional background sync runs every 15 minutes after the owner enables it, o
 
 Deals follow lead > qualified > proposal > won > paid, or lost. These are internal records, not email sends or customer-facing actions. Product generated, listing published and order received have separate recorded timestamps; recording one never establishes payment. The UI labels paid only after sufficient same-business/currency verified net receipts are linked. For a zero-value expected deal, positive verified evidence is still required. A complete accounting profit is never inferred from deal stage.
 
-The owner links imported receipts to a deal and/or opportunity. Scope checks prevent cross-business, cross-currency and conflicting project attribution. Matching Square fees are linked with their payment so per-opportunity costs stay consistent. Amounts, source, external IDs and verification cannot be edited through this attribution action. Nullable references preserve financial records when an existing contact, project, task or agent is removed.
+The owner links imported receipts to a deal and/or initiative. Scope checks prevent cross-business, cross-currency and conflicting project attribution. Matching Square fees are linked with their payment so per-initiative costs stay consistent. Amounts, source, external IDs and verification cannot be edited through this attribution action. Nullable references preserve financial records when an existing contact, project, task or agent is removed.
 
 ## Money, targets and reporting
 
 All money is stored as safe integer minor units, using each currency's exponent (JPY zero, USD two, KWD three). Sums use bounded integer arithmetic and fail closed on overflow. Currencies are never converted or combined. Clients cannot create verified/source-labelled evidence: manual revenue and expense entries always remain unverified, including owner-entered records.
 
-Revenue displays verified net receipts, verified costs, recorded surplus, unverified revenue and unverified costs separately. Surplus subtracts verified costs only; total costs remain incomplete and surplus is not guaranteed profit. Each opportunity has its own attributed currency groups. Date filters apply to ledger evidence; deals remain business-scoped and goals retain their own date windows.
+Revenue displays verified net receipts, verified costs, recorded surplus, unverified revenue and unverified costs separately. Surplus subtracts verified costs only; total costs remain incomplete and surplus is not guaranteed profit. Each initiative has its own attributed currency groups. Date filters apply to ledger evidence; deals remain business-scoped and goals retain their own date windows.
 
 Autonomy can now create currency-aware verified_revenue goals (revenue is an alias). Progress uses only matching business/currency verified net receipts inside the goal window, shown in major units. Profit goals remain unavailable because complete cost evidence is not established. The VP planner sees those distinctions; an artifact, listing or order does not become verified money.
 

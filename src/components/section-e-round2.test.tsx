@@ -44,7 +44,7 @@ const stream = (business: StreamOverview["business"]): StreamOverview => ({
     },
   ],
   pipeline: { building: 1 },
-  opportunities: [
+  initiatives: [
     {
       id: "o1",
       business,
@@ -58,7 +58,7 @@ const stream = (business: StreamOverview["business"]): StreamOverview => ({
       difficulty_score: 5,
       time_to_launch_score: 5,
       budget: 5,
-      status: "building",
+      status: "in_progress",
       results: {
         spent_usd: 2,
         earned_usd: 12,
@@ -75,12 +75,10 @@ const stream = (business: StreamOverview["business"]): StreamOverview => ({
   next: [
     {
       id: "w1",
-      status: "pending",
-      opportunity_id: "o1",
+      status: "planned",
+      initiative_id: "o1",
       playbook_step: "listing",
       title: "Write the listing",
-      proposal_status: "pending",
-      task_status: null,
       created_at: 1,
     },
   ],
@@ -111,7 +109,7 @@ describe("income stream page", () => {
     expect(screen.getByText(/profit \(estimate\)/)).toBeInTheDocument();
     const next = screen.getByRole("region", { name: "Next" });
     expect(within(next).getByText(/Write the listing · step listing/)).toBeInTheDocument();
-    expect(within(next).getByText("waiting for approval")).toBeInTheDocument();
+    expect(within(next).getByText("waiting to start")).toBeInTheDocument();
     expect(screen.getByText("price: 4.99")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Tech Services" }));
     expect(await screen.findByText("Website care plan")).toBeInTheDocument();
@@ -182,7 +180,7 @@ describe("approval from a task that read suspicious content", () => {
       amount_minor: 500,
       currency: "USD",
       purpose: "Font license",
-      opportunity_id: null,
+      initiative_id: null,
       untrusted_content: true,
     };
     render(

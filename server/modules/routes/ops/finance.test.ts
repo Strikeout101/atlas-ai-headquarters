@@ -39,7 +39,7 @@ describe("finance owner API", () => {
       spend_requests: [],
       totals: [],
       goals: [],
-      opportunities: [],
+      initiatives: [],
     });
   });
   it("requires a real owner session for every mutation and refuses agents even with a signed cookie", async () => {

@@ -17,7 +17,7 @@ export interface MediaAsset {
   id: string;
   business: BusinessKey | null;
   project_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   listing_id: string | null;
   kind: MediaKind;
   /** Relative to the project folder when project_id is set; otherwise relative to the ATLAS data folder. */
@@ -37,14 +37,14 @@ export interface MediaAsset {
 
 export function ensureMediaSchema(db: Db): void {
   db.exec(`CREATE TABLE IF NOT EXISTS media_assets (
-    id TEXT PRIMARY KEY, business TEXT, project_id TEXT, opportunity_id TEXT, listing_id TEXT,
+    id TEXT PRIMARY KEY, business TEXT, project_id TEXT, initiative_id TEXT, listing_id TEXT,
     kind TEXT NOT NULL CHECK(kind IN ('mockup','generated','upload')), path TEXT NOT NULL,
     source TEXT NOT NULL, prompt TEXT NOT NULL DEFAULT '', license TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '[]',
     width INTEGER, height INTEGER, cost_minor INTEGER NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD',
     agent_id TEXT, task_id TEXT, created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_media_business ON media_assets(business, created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_media_opportunity ON media_assets(opportunity_id);`);
+  CREATE INDEX IF NOT EXISTS idx_media_initiative ON media_assets(initiative_id);`);
 }
 
 function toAsset(row: Row): MediaAsset {
@@ -78,13 +78,13 @@ export function saveMediaAsset(
   ensureMediaSchema(db);
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO media_assets(id,business,project_id,opportunity_id,listing_id,kind,path,source,prompt,license,tags,width,height,
+    `INSERT INTO media_assets(id,business,project_id,initiative_id,listing_id,kind,path,source,prompt,license,tags,width,height,
        cost_minor,currency,agent_id,task_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
     input.business && isBusinessKey(input.business) ? input.business : null,
     input.project_id,
-    input.opportunity_id,
+    input.initiative_id,
     input.listing_id,
     input.kind,
     input.path,
@@ -112,7 +112,7 @@ export function getMediaAsset(db: Db, id: string): MediaAsset | null {
 /** Newest first; `query` matches tags, prompt, path and source words. */
 export function searchMedia(
   db: Db,
-  filter: { query?: unknown; business?: unknown; project_id?: unknown; opportunity_id?: unknown; limit?: number } = {},
+  filter: { query?: unknown; business?: unknown; project_id?: unknown; initiative_id?: unknown; limit?: number } = {},
 ): MediaAsset[] {
   ensureMediaSchema(db);
   const where: string[] = [];
@@ -121,7 +121,7 @@ export function searchMedia(
     where.push("business=?");
     params.push(filter.business);
   }
-  for (const key of ["project_id", "opportunity_id"] as const) {
+  for (const key of ["project_id", "initiative_id"] as const) {
     if (typeof filter[key] === "string" && filter[key]) {
       where.push(`${key}=?`);
       params.push(filter[key] as string);

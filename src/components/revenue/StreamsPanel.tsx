@@ -3,7 +3,7 @@ import { getStream, type StreamOverview } from "../../api/autonomy";
 import { BUSINESS_KINDS, BUSINESS_NAMES, type BusinessKind } from "../../api/business";
 import { formatMoney } from "./money";
 
-const STAGES = ["idea", "researching", "approved", "building", "launched", "stopped"] as const;
+const STAGES = ["proposed", "approved", "in_progress", "blocked", "launched", "measuring", "stopped", "done"] as const;
 const pretty = (value: string) => value.replaceAll("_", " ");
 const usd = (value: number, locale: string) =>
   new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(value);
@@ -130,7 +130,7 @@ export default function StreamsPanel({
             <h3 className="text-sm font-semibold">What the engine does next</h3>
             {!data.next.length ? (
               <p className="text-sm" style={{ color: "var(--th-text-muted)" }}>
-                Nothing queued. Work appears here when the planner, a schedule or a playbook step queues it.
+                Nothing queued. Work appears here when research, a playbook step or a schedule queues it.
               </p>
             ) : (
               <ol className="divide-y text-sm" style={{ borderColor: "var(--th-border)" }}>
@@ -141,11 +141,13 @@ export default function StreamsPanel({
                       {item.playbook_step ? ` · step ${item.playbook_step}` : ""}
                     </span>
                     <span className="text-xs" style={{ color: "var(--th-text-muted)" }}>
-                      {item.status === "pending"
-                        ? "waiting for approval"
-                        : item.status === "planned"
-                          ? "approved, waiting to start"
-                          : `running${item.task_status ? ` (${item.task_status})` : ""}`}
+                      {item.status === "planned"
+                        ? "waiting to start"
+                        : item.status === "in_progress"
+                          ? "running"
+                          : item.status === "review"
+                            ? "in review"
+                            : "on hold"}
                     </span>
                   </li>
                 ))}
@@ -166,7 +168,7 @@ export default function StreamsPanel({
 
           <section aria-label="Products and ideas" className="space-y-2">
             <h3 className="text-sm font-semibold">Products and ideas</h3>
-            {!data.opportunities.length ? (
+            {!data.initiatives.length ? (
               <p className="text-sm" style={{ color: "var(--th-text-muted)" }}>
                 No ideas yet. A research schedule or the planner adds them.
               </p>
@@ -183,7 +185,7 @@ export default function StreamsPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {data.opportunities.map((o) => {
+                    {data.initiatives.map((o) => {
                       const active = o.results.variants.filter((v) => v.active);
                       return (
                         <tr key={o.id} className="border-t align-top" style={{ borderColor: "var(--th-border)" }}>

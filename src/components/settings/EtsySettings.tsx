@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getAutonomy, type Opportunity } from "../../api/autonomy";
+import { getAutonomy, type Initiative } from "../../api/autonomy";
 import { etsyApi, type EtsySettings as Settings, type EtsyShopListing, type EtsyShopState } from "../../api/etsy";
 
 const field =
@@ -19,7 +19,7 @@ const ERROR_TEXT: Record<string, string> = {
   etsy_listing_removed: "That listing is no longer on Etsy.",
   etsy_listing_not_found: "Sync first: ATLAS has not read that listing yet.",
   invalid_history_days: "History must be between 1 and 1095 days.",
-  invalid_opportunity_id: "Pick an opportunity of the Etsy business, or none.",
+  invalid_initiative_id: "Pick an initiative of the Etsy business, or none.",
   owner_session_required: "Sign in with your password in Settings > Security to change Etsy settings.",
 };
 function describe(cause: unknown): string {
@@ -96,20 +96,20 @@ function ShopSetup() {
 
 /**
  * Every listing in the shop as last synced, including ones ATLAS did not create. The owner can bring one into
- * ATLAS (optionally tied to an opportunity) so its sales count there and agents can propose revisions of it.
+ * ATLAS (optionally tied to an initiative) so its sales count there and agents can propose revisions of it.
  */
 function ShopListings({ business, count }: { business: Settings["business"]; count: number }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<EtsyShopListing[] | null>(null);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     const [listings, autonomy] = await Promise.all([etsyApi.shopListings(), getAutonomy().catch(() => null)]);
     setItems(listings);
-    setOpportunities(
-      (autonomy?.opportunities ?? []).filter((item) => item.business === business && item.status !== "stopped"),
+    setInitiatives(
+      (autonomy?.initiatives ?? []).filter((item) => item.business === business && item.status !== "stopped"),
     );
   }, [business]);
   useEffect(() => {
@@ -154,15 +154,15 @@ function ShopListings({ business, count }: { business: Settings["business"]; cou
               ) : item.state !== "removed" ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <select
-                    aria-label={`Opportunity for ${item.title}`}
+                    aria-label={`Initiative for ${item.title}`}
                     className={`${field} sm:w-48`}
                     value={choice[item.listing_id] ?? ""}
                     onChange={(e) => setChoice({ ...choice, [item.listing_id]: e.target.value })}
                   >
-                    <option value="">No opportunity</option>
-                    {opportunities.map((opportunity) => (
-                      <option key={opportunity.id} value={opportunity.id}>
-                        {opportunity.title}
+                    <option value="">No initiative</option>
+                    {initiatives.map((initiative) => (
+                      <option key={initiative.id} value={initiative.id}>
+                        {initiative.title}
                       </option>
                     ))}
                   </select>
@@ -381,7 +381,7 @@ export default function EtsySettings() {
             Read orders, fees, favorites and shop listings every 30 minutes
           </label>
           <p className="text-xs text-[var(--th-text-secondary)]">
-            Approved revisions are applied to live listings, and listings of stopped opportunities are taken down (never
+            Approved revisions are applied to live listings, and listings of stopped initiatives are taken down (never
             ones you brought in).
           </p>
           <div className="flex flex-wrap gap-2">

@@ -7,6 +7,7 @@ Which documents describe ATLAS as it is now, and which are dated history. Pendin
 | Document                                                 | What it covers                                                                                                                                    |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [codebase-map.md](codebase-map.md)                       | Where each folder and module lives; start here before searching the code.                                                                         |
+| [work-restructure-plan.md](work-restructure-plan.md)     | Approved rebuild of goals, initiatives, tasks, reviews and the work board (2026-11-22). Replaces the task-flow docs once built.                   |
 | [agent-tools.md](agent-tools.md)                         | The agent tool gateway: every operation agents can call and the rules the server enforces. Agents read it with `knowledge.get {"topic":"tools"}`. |
 | [agent-task-system-guide.md](agent-task-system-guide.md) | How tasks, agents, delegation and runs work, traced from the code.                                                                                |
 | [task-flow.md](task-flow.md)                             | How a task moves through its states.                                                                                                              |
@@ -18,7 +19,7 @@ Which documents describe ATLAS as it is now, and which are dated history. Pendin
 | [models-and-workers.md](models-and-workers.md)           | Routine local routing, separate directors, worker performance, public research tools and merge completion.                                        |
 | [operations.md](operations.md)                           | Running ATLAS as a service, updates, backups and restoring.                                                                                       |
 | [phase3-vp-approvals.md](phase3-vp-approvals.md)         | The two VPs and who approves what.                                                                                                                |
-| [phase4-autonomy.md](phase4-autonomy.md)                 | Goals, opportunities, routines and the autonomy engine.                                                                                           |
+| [phase4-autonomy.md](phase4-autonomy.md)                 | Goals, initiatives, routines and the autonomy engine.                                                                                             |
 | [phase5-finance.md](phase5-finance.md)                   | Deals, ledger, spending requests and read-only Square.                                                                                            |
 | [etsy.md](etsy.md)                                       | Ventures Etsy money loop: owner setup, playbook, what counts as money.                                                                            |
 | [phase6-listings.md](phase6-listings.md)                 | Etsy and itch.io listing packages and the fee budget.                                                                                             |

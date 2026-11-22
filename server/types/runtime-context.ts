@@ -234,7 +234,6 @@ export interface WorkflowAgentExports {
   // Functions
   analyzeSubtaskDepartment: (...args: any[]) => any;
   seedApprovedPlanSubtasks: (...args: any[]) => any;
-  seedReviewRevisionSubtasks: (...args: any[]) => any;
   codexThreadToSubtask: Map<string, string>;
   spawnCliAgent: (...args: any[]) => any;
   normalizeOAuthProvider: (...args: any[]) => any;
@@ -287,7 +286,8 @@ export interface WorkflowOrchestrationExports {
   clearTaskWorkflowState: (...args: any[]) => any;
   startProgressTimer: (...args: any[]) => any;
   stopProgressTimer: (...args: any[]) => any;
-  scheduleNextReviewRound: (...args: any[]) => any;
+  startTaskReview: (...args: any[]) => any;
+  reviewDeps: any;
   notifyCeo: (...args: any[]) => any;
   archivePlanningConsolidatedReport: (...args: any[]) => any;
   isAgentInMeeting: (...args: any[]) => any;

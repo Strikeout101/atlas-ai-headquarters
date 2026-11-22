@@ -50,36 +50,6 @@ export function readYoloModeEnabled(db: Pick<DatabaseSync, "prepare">): boolean 
   return normalizeBooleanLike(row?.value) === true;
 }
 
-function extractSummarySuggestedOptionNumbers(summary: string, validNumbers: Set<number>): number[] {
-  const text = String(summary ?? "");
-  const picked: number[] = [];
-  const seen = new Set<number>();
-  const addIfValid = (value: number) => {
-    if (!validNumbers.has(value)) return;
-    if (seen.has(value)) return;
-    seen.add(value);
-    picked.push(value);
-  };
-
-  for (const match of text.matchAll(/^\s*([1-9]\d?)\s*[.)]/gm)) {
-    const value = Number.parseInt(match[1] || "", 10);
-    if (Number.isFinite(value)) addIfValid(value);
-  }
-  for (const match of text.matchAll(/(?:option|pick(?:s)?)\s*[:#-]?\s*([1-9]\d?)/gi)) {
-    const value = Number.parseInt(match[1] || "", 10);
-    if (Number.isFinite(value)) addIfValid(value);
-  }
-  for (const match of text.matchAll(/(?:recommend(?:ed)?|pick(?:s)?)\s*[:：-]\s*([^\n]+)/gi)) {
-    const block = String(match[1] || "");
-    for (const numMatch of block.matchAll(/([1-9]\d?)/g)) {
-      const value = Number.parseInt(numMatch[1] || "", 10);
-      if (Number.isFinite(value)) addIfValid(value);
-    }
-  }
-
-  return picked;
-}
-
 export function buildYoloDecisionReplyPayload(item: DecisionInboxRouteItem): YoloDecisionReplyPayload | null {
   if (!Array.isArray(item.options) || item.options.length <= 0) return null;
 
@@ -88,38 +58,7 @@ export function buildYoloDecisionReplyPayload(item: DecisionInboxRouteItem): Yol
     return resume ? { option_number: resume.number } : null;
   }
 
-  if (item.kind === "project_review_ready") {
-    const representativeOptions = item.options.filter((option) => option.action.startsWith("approve_task_review:"));
-    if (representativeOptions.length > 0) {
-      const validNumbers = new Set(representativeOptions.map((option) => option.number));
-      const suggested = extractSummarySuggestedOptionNumbers(item.summary, validNumbers);
-      const pickedNumber = suggested[0] ?? representativeOptions[0]?.number;
-      if (!pickedNumber) return null;
-      return { option_number: pickedNumber };
-    }
-
-    const startReview = item.options.find((option) => option.action === "start_project_review");
-    if (startReview) return { option_number: startReview.number };
-    return null;
-  }
-
-  if (item.kind === "review_round_pick") {
-    const pickOptions = item.options.filter((option) => option.action === "apply_review_pick");
-    if (pickOptions.length > 0) {
-      const validNumbers = new Set(pickOptions.map((option) => option.number));
-      const suggested = extractSummarySuggestedOptionNumbers(item.summary, validNumbers);
-      const selected = suggested.length > 0 ? suggested : [pickOptions[0].number];
-      return {
-        option_number: selected[0],
-        selected_option_numbers: selected,
-      };
-    }
-
-    const skip = item.options.find((option) => option.action === "skip_to_next_round");
-    if (skip) return { option_number: skip.number };
-    return null;
-  }
-
+  // A review the VPs passed to the owner is never auto-decided.
   return null;
 }
 

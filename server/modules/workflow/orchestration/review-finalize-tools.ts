@@ -1,5 +1,11 @@
-import { readYoloModeEnabled } from "../../routes/ops/messages/decision-inbox/yolo-mode.ts";
 import { areRunsAllowed } from "../../control-state.ts";
+
+/**
+ * Finishing reviewed work (work restructure, phase 4). The review itself is `task-review.ts`: one cross-model
+ * reviewer with a structured verdict. `finishReview` runs only once the work is approved: it merges a code task's
+ * worktree (the code-push approval still guards GitHub), marks the task done, archives the report and continues any
+ * queued delegation. No project gate, no team-lead meeting, no waiting on subtasks or merge rounds.
+ */
 
 type CreateReviewFinalizeToolsDeps = Record<string, any>;
 
@@ -13,8 +19,6 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     pickL,
     l,
     resolveLang,
-    getProjectReviewGateSnapshot,
-    projectReviewGateNotifiedAt,
     notifyCeo,
     taskWorktrees,
     mergeToDevAndCreatePR,
@@ -35,8 +39,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     crossDeptNextCallbacks,
     recoverCrossDeptQueueAfterMissingCallback,
     subtaskDelegationCallbacks,
-    startReviewConsensusMeeting,
-    processSubtaskDelegations,
+    helperTaskFinished,
   } = deps;
 
   function reconcileDelegatedSubtasksAfterRun(taskId: string, exitCode: number): void {
@@ -68,35 +71,8 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       }
       appendTaskLog(taskId, "system", `Delegated subtask sync: marked ${linked.length} linked subtask(s) as done`);
 
-      for (const parentTaskId of touchedParents) {
-        const parent = db.prepare("SELECT id, title, status FROM tasks WHERE id = ?").get(parentTaskId) as
-          | {
-              id: string;
-              title: string;
-              status: string;
-            }
-          | undefined;
-        if (!parent) continue;
-        const remaining = db
-          .prepare("SELECT COUNT(*) AS cnt FROM subtasks WHERE task_id = ? AND status NOT IN ('done', 'cancelled')")
-          .get(parentTaskId) as { cnt: number } | undefined;
-        if ((remaining?.cnt ?? 0) === 0 && parent.status === "review") {
-          appendTaskLog(
-            parentTaskId,
-            "system",
-            "All delegated subtasks completed after resume; retrying review completion",
-          );
-          const yolo = readYoloModeEnabled(db);
-          setTimeout(
-            () =>
-              finishReview(parentTaskId, parent.title, {
-                bypassProjectDecisionGate: yolo,
-                trigger: "delegated_subtask_completion",
-              }),
-            1200,
-          );
-        }
-      }
+      // The parent's review waits for its helpers; it starts once the last one is finished.
+      for (const parentTaskId of touchedParents) helperTaskFinished?.(taskId, parentTaskId);
       return;
     }
 
@@ -112,12 +88,8 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
     appendTaskLog(taskId, "system", `Delegated subtask sync: marked ${linked.length} linked subtask(s) as blocked`);
   }
 
-  // Move a reviewed task to 'done'
-  function finishReview(
-    taskId: string,
-    taskTitle: string,
-    options?: { bypassProjectDecisionGate?: boolean; trigger?: string },
-  ): void {
+  /** Approved work: merge (code), mark done, report. Called by the review once it approves. */
+  function finishReview(taskId: string, taskTitle: string, _options?: { trigger?: string }): void {
     // Stays in review; picked up again when the owner lets runs continue.
     if (!areRunsAllowed()) return;
     const lang = resolveLang(taskTitle);
@@ -133,125 +105,6 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
         }
       | undefined;
     if (!currentTask || currentTask.status !== "review") return; // Already moved or cancelled
-
-    if (!options?.bypassProjectDecisionGate && !currentTask.source_task_id && currentTask.project_id) {
-      const gateSnapshot = getProjectReviewGateSnapshot(currentTask.project_id);
-      appendTaskLog(
-        taskId,
-        "system",
-        `Review gate: waiting for project-level decision (${gateSnapshot.activeReview}/${gateSnapshot.activeTotal} active tasks in review)`,
-      );
-      if (gateSnapshot.ready) {
-        const now = nowMs();
-        const lastNotified = projectReviewGateNotifiedAt.get(currentTask.project_id) ?? 0;
-        if (now - lastNotified > 30_000) {
-          projectReviewGateNotifiedAt.set(currentTask.project_id, now);
-          const project = db.prepare("SELECT name FROM projects WHERE id = ?").get(currentTask.project_id) as
-            | { name: string | null }
-            | undefined;
-          const projectName = (project?.name || currentTask.project_id).trim();
-          notifyCeo(
-            pickL(
-              l([
-                `[CEO OFFICE] Project '${projectName}' now has all ${gateSnapshot.activeTotal} active tasks in Review. Approve from Decision Inbox to start team-lead review meetings.`,
-              ]),
-              lang,
-            ),
-            taskId,
-          );
-        }
-      } else {
-        projectReviewGateNotifiedAt.delete(currentTask.project_id);
-      }
-      return;
-    }
-    if (options?.bypassProjectDecisionGate && currentTask.project_id) {
-      projectReviewGateNotifiedAt.delete(currentTask.project_id);
-      appendTaskLog(taskId, "system", `Review gate bypassed (trigger=${options.trigger ?? "manual"})`);
-    }
-
-    const healed = db
-      .prepare(
-        `
-  UPDATE subtasks
-  SET status = 'done',
-      completed_at = COALESCE(completed_at, ?),
-      blocked_reason = NULL
-  WHERE task_id = ?
-    AND status = 'blocked'
-    AND delegated_task_id IS NOT NULL
-    AND delegated_task_id != ''
-    AND EXISTS (
-      SELECT 1
-      FROM tasks dt
-      WHERE dt.id = subtasks.delegated_task_id
-        AND dt.status IN ('review', 'done')
-    )
-`,
-      )
-      .run(nowMs(), taskId) as { changes?: number } | undefined;
-    if ((healed?.changes ?? 0) > 0) {
-      appendTaskLog(
-        taskId,
-        "system",
-        `Review gate auto-heal: recovered ${healed?.changes ?? 0} blocked delegated subtask(s) after successful resume`,
-      );
-    }
-
-    const remainingSubtaskCount = (
-      db
-        .prepare("SELECT COUNT(*) as cnt FROM subtasks WHERE task_id = ? AND status NOT IN ('done', 'cancelled')")
-        .get(taskId) as { cnt: number }
-    ).cnt;
-    if (remainingSubtaskCount > 0) {
-      notifyCeo(
-        pickL(
-          l([`'${taskTitle}' is waiting in Review because ${remainingSubtaskCount} subtasks are still unfinished.`]),
-          lang,
-        ),
-        taskId,
-      );
-      appendTaskLog(taskId, "system", `Review hold: waiting for ${remainingSubtaskCount} unfinished subtasks`);
-      return;
-    }
-
-    // Parent task must wait until all collaboration children reached review(done) checkpoint.
-    if (!currentTask.source_task_id) {
-      const childProgress = db
-        .prepare(
-          `
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN status = 'review' THEN 1 ELSE 0 END) AS review_cnt,
-      SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done_cnt
-    FROM tasks
-    WHERE source_task_id = ?
-  `,
-        )
-        .get(taskId) as { total: number; review_cnt: number | null; done_cnt: number | null } | undefined;
-      const childTotal = childProgress?.total ?? 0;
-      const childReview = childProgress?.review_cnt ?? 0;
-      const childDone = childProgress?.done_cnt ?? 0;
-      const childReady = childReview + childDone;
-      if (childTotal > 0 && childReady < childTotal) {
-        const waiting = childTotal - childReady;
-        notifyCeo(
-          pickL(
-            l([
-              `'${taskTitle}' is waiting for ${waiting} collaboration child task(s) to reach review before the single team-lead meeting starts.`,
-            ]),
-            lang,
-          ),
-          taskId,
-        );
-        appendTaskLog(
-          taskId,
-          "system",
-          `Review hold: waiting for collaboration children to reach review (${childReady}/${childTotal})`,
-        );
-        return;
-      }
-    }
 
     const finalizeApprovedReview = () => {
       const t = nowMs();
@@ -307,27 +160,6 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
         }
       }
 
-      // A parent cannot report completion while a collaboration child's integration failed.
-      if (!currentTask.source_task_id) {
-        const children = db
-          .prepare("SELECT id, title FROM tasks WHERE source_task_id = ? AND status = 'review' ORDER BY created_at ASC")
-          .all(taskId) as Array<{ id: string; title: string }>;
-        for (const child of children) {
-          finishReview(child.id, child.title);
-          const updatedChild = db.prepare("SELECT status FROM tasks WHERE id = ?").get(child.id) as
-            | { status: string }
-            | undefined;
-          if (updatedChild?.status !== "done") {
-            appendTaskLog(
-              taskId,
-              "system",
-              `Review hold: collaboration child ${child.id} has not completed integration`,
-            );
-            reviewInFlight.delete(taskId);
-            return;
-          }
-        }
-      }
       if (wtInfo) {
         cleanupWorktree(wtInfo.projectPath, taskId);
         appendTaskLog(taskId, "system", "Worktree cleaned up after successful merge");
@@ -336,7 +168,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       db.prepare("UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ? WHERE id = ?").run(t, t, taskId);
       setTaskCreationAuditCompletion(taskId, true);
 
-      appendTaskLog(taskId, "system", "Status → done (all leaders approved)");
+      appendTaskLog(taskId, "system", "Status → done (review approved)");
       endTaskExecutionSession(taskId, "task_done");
 
       const updatedTask = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId);
@@ -359,10 +191,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       const progressSuffix = subtaskProgressSummary
         ? `\n${pickL(l(["Remediation/Collaboration completion"]), lang)}\n${subtaskProgressSummary}`
         : "";
-      notifyCeo(
-        pickL(l([`${leaderName}: Final approval completed for '${taskTitle}'.${mergeNote}${progressSuffix}`]), lang),
-        taskId,
-      );
+      notifyCeo(pickL(l([`${leaderName}: '${taskTitle}' is done.${mergeNote}${progressSuffix}`]), lang), taskId);
 
       reviewRoundState.delete(taskId);
       reviewInFlight.delete(taskId);
@@ -388,13 +217,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
       }
     };
 
-    if (currentTask.source_task_id) {
-      appendTaskLog(taskId, "system", "Review consensus skipped for delegated collaboration task");
-      finalizeApprovedReview();
-      return;
-    }
-
-    startReviewConsensusMeeting(taskId, taskTitle, currentTask.department_id, finalizeApprovedReview);
+    finalizeApprovedReview();
   }
 
   return {

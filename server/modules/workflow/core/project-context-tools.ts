@@ -26,6 +26,12 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
     "- CRITICAL/HIGH: fix immediately",
     "- MEDIUM/LOW: warning report only, no code changes",
   ];
+  // Non-code work (research, products, design, listings, shop, outreach, ops) gets no git or code-review rules.
+  const GENERAL_CONTINUITY_POLICY_LINES = [
+    "[Execution Continuity]",
+    "- Continue from the latest state without self-introduction or kickoff narration",
+    "- Reuse what earlier steps left (their hand-offs and files) instead of redoing it",
+  ];
   const EXECUTION_CONTINUITY_POLICY_LINES = [
     "[Execution Continuity]",
     "- Continue from the latest state without self-introduction or kickoff narration",
@@ -67,7 +73,7 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
    */
   function buildTaskExecutionPrompt(
     parts: Array<string | null | undefined>,
-    opts: { allowWarningFix?: boolean; taskId?: string } = {},
+    opts: { allowWarningFix?: boolean; taskId?: string; workType?: string | null } = {},
   ): string {
     let knowledge = "";
     if (opts.taskId) {
@@ -81,8 +87,9 @@ export function createProjectContextTools(deps: CreateProjectContextToolsDeps) {
       knowledge,
       ...parts,
       opts.taskId ? buildTaskToolsLine() : "",
-      EXECUTION_CONTINUITY_POLICY_LINES.join("\n"),
-      buildMvpCodeReviewPolicyBlock(Boolean(opts.allowWarningFix)),
+      ...(opts.workType && opts.workType !== "code"
+        ? [GENERAL_CONTINUITY_POLICY_LINES.join("\n")]
+        : [EXECUTION_CONTINUITY_POLICY_LINES.join("\n"), buildMvpCodeReviewPolicyBlock(Boolean(opts.allowWarningFix))]),
     ]
       .filter(Boolean)
       .join("\n");

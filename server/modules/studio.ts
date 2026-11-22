@@ -47,7 +47,7 @@ export interface StudioContext {
   business: BusinessKey | null;
   projectId: string | null;
   projectPath: string | null;
-  opportunityId?: string | null;
+  initiativeId?: string | null;
   listingId?: string | null;
   agentId?: string | null;
   taskId?: string | null;
@@ -349,7 +349,7 @@ export function registerImage(db: Db, input: Row, ctx: StudioContext, now = Date
     {
       business: ctx.business,
       project_id: ctx.projectId,
-      opportunity_id: ctx.opportunityId ?? null,
+      initiative_id: ctx.initiativeId ?? null,
       listing_id: ctx.listingId ?? null,
       kind: "generated",
       path: relative,
@@ -403,7 +403,7 @@ export async function renderMockup(db: Db, input: Row, ctx: StudioContext, deps:
     {
       business: ctx.business,
       project_id: out.project ? ctx.projectId : null,
-      opportunity_id: ctx.opportunityId ?? null,
+      initiative_id: ctx.initiativeId ?? null,
       listing_id: ctx.listingId ?? null,
       kind: "mockup",
       path: out.relative,
@@ -462,7 +462,7 @@ export async function generateImage(
     {
       business: ctx.business,
       project_id: out.project ? ctx.projectId : null,
-      opportunity_id: ctx.opportunityId ?? null,
+      initiative_id: ctx.initiativeId ?? null,
       listing_id: ctx.listingId ?? null,
       kind: "generated",
       path: out.relative,
@@ -492,7 +492,7 @@ export async function generateImage(
         verified: false,
         description: `Image generation (${String(r.model).slice(0, 60)})`,
         occurred_at: now,
-        opportunity_id: ctx.opportunityId ?? null,
+        initiative_id: ctx.initiativeId ?? null,
       },
       now,
     );

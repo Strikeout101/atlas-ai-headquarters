@@ -496,6 +496,8 @@ test.describe("CI API ops and docs coverage", () => {
             project_id: projectId,
             project_path: repoPath,
             status: "planned",
+            // Only code tasks get a git worktree (work restructure); this one checks the worktree path.
+            work_type: "code",
           },
         }),
         "POST /api/tasks(run)",

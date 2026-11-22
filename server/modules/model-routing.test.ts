@@ -11,6 +11,7 @@ import {
   ensureModelRoutingSchema,
   getTaskModelRoute,
   routeTaskModel,
+  ensureRunnableAgent,
 } from "./model-routing.ts";
 
 const dbs: DatabaseSync[] = [];
@@ -241,5 +242,65 @@ describe("model director routing", () => {
     const request = consumeModelUpgradeMarker(db, "task-1", dir);
     expect(request?.status).toBe("pending");
     expect(fs.existsSync(marker)).toBe(false);
+  });
+});
+
+type OrgAgent = { id: string; name: string; cli_provider: string | null; department_id: string | null };
+
+describe("VPs keep every agent runnable (work restructure)", () => {
+  function org() {
+    const db = new DatabaseSync(":memory:");
+    dbs.push(db);
+    db.exec(`
+      CREATE TABLE settings (key TEXT PRIMARY KEY,value TEXT);
+      CREATE TABLE agents (id TEXT PRIMARY KEY,name TEXT,role TEXT,department_id TEXT,cli_provider TEXT,cli_model TEXT,
+        api_model TEXT,api_provider_id TEXT,cli_reasoning_level TEXT,status TEXT DEFAULT 'idle');
+      CREATE TABLE tasks (id TEXT PRIMARY KEY,title TEXT,description TEXT,assigned_agent_id TEXT,status TEXT,task_type TEXT DEFAULT 'general');
+      CREATE TABLE api_providers (id TEXT PRIMARY KEY,models_cache TEXT,type TEXT DEFAULT 'ollama',enabled INTEGER DEFAULT 1);
+      CREATE TABLE autonomy_ledger (id INTEGER PRIMARY KEY,event TEXT,business TEXT,source_id TEXT,task_id TEXT,message TEXT,created_at INTEGER);
+      INSERT INTO agents (id,name,role,department_id,cli_provider,cli_model) VALUES
+        ('vp-claude','Claude VP','vp',NULL,'claude',NULL),
+        ('lead','Iris','team_leader','design','codex','small'),
+        ('senior','Bobby','senior','design',NULL,NULL),
+        ('odd','Nova','senior','qa','made-up-cli',NULL);
+      INSERT INTO tasks VALUES ('task-1','Make mockups','Three images','lead','planned','general');
+      INSERT INTO settings VALUES ('modelRoutingCandidates','{"codex":["small","strong"]}');
+    `);
+    ensureModelRoutingSchema(db);
+    return db;
+  }
+
+  it("gives an agent with no model its department partner's provider and logs what the VPs did", () => {
+    const db = org();
+    const agent = db.prepare("SELECT * FROM agents WHERE id='senior'").get() as OrgAgent;
+    const result = ensureRunnableAgent(db, agent, 5);
+    expect(result.agent).toMatchObject({ cli_provider: "codex", cli_model: null });
+    expect(result.fixed).toBe("VPs set Bobby to codex (from the department partner); it had no model.");
+    expect(db.prepare("SELECT cli_provider FROM agents WHERE id='senior'").get()).toEqual({ cli_provider: "codex" });
+    expect(db.prepare("SELECT event, source_id, message FROM autonomy_ledger").get()).toEqual({
+      event: "vp_model_fix",
+      source_id: "senior",
+      message: result.fixed,
+    });
+  });
+
+  it("replaces a provider ATLAS cannot run with a VP's, and leaves working agents alone", () => {
+    const db = org();
+    const odd = ensureRunnableAgent(db, db.prepare("SELECT * FROM agents WHERE id='odd'").get() as OrgAgent);
+    expect(odd.agent.cli_provider).toBe("claude");
+    expect(odd.fixed).toContain("from a VP");
+    expect(odd.fixed).toContain("'made-up-cli', which can't run");
+    const lead = db.prepare("SELECT * FROM agents WHERE id='lead'").get() as OrgAgent;
+    expect(ensureRunnableAgent(db, lead)).toEqual({ agent: lead, fixed: null });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM autonomy_ledger").get()).toEqual({ n: 1 });
+  });
+
+  it("asks a VP to pick the model when no director is configured", async () => {
+    const db = org();
+    const run = vi.fn(async () => ({ text: '{"model":"strong","reason":"Images need care"}' }));
+    const route = await routeTaskModel(db, "task-1", run);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect((run.mock.calls[0] as unknown as [{ id: string }])[0].id).toBe("vp-claude");
+    expect(route).toMatchObject({ model: "strong", source: "director" });
   });
 });

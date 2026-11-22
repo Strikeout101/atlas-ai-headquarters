@@ -123,7 +123,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Target,
     section: "primary",
     label: { en: "Autonomy" },
-    keywords: "goals opportunities schedules research ledger digest limits",
+    keywords: "goals initiatives schedules research ledger digest limits",
   },
   {
     view: "tech",

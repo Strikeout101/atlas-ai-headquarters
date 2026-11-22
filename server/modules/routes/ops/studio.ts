@@ -60,7 +60,7 @@ export function registerStudioRoutes(app: Express, db: DatabaseSync): void {
       items: searchMedia(db, {
         query: req.query.q,
         business: req.query.business,
-        opportunity_id: req.query.opportunity_id,
+        initiative_id: req.query.initiative_id,
         limit: 60,
       }),
     });

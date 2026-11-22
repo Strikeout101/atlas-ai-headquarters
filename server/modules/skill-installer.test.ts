@@ -11,7 +11,8 @@ import {
   type SkillsCliRunner,
 } from "./skill-installer.ts";
 import { createOrgRequest, decideOrgRequest, ensureOrgRequestSchema } from "./org-requests.ts";
-import { ensureAutonomyEngineSchema, queueAutonomyWork } from "./autonomy-engine.ts";
+import { ensureAutonomyEngineSchema } from "./autonomy-engine.ts";
+import { createWorkTask } from "./work-engine.ts";
 
 const dbs: DatabaseSync[] = [];
 afterEach(() => dbs.splice(0).forEach((db) => db.close()));
@@ -188,25 +189,29 @@ describe("skill requests and hires", () => {
     db.prepare(
       "INSERT INTO projects (id,name,project_path,core_goal,created_at,updated_at) VALUES ('p1','Shop','C:/Projects/shop','Sell',1,1)",
     ).run();
+    const lead = db.prepare("SELECT id FROM agents WHERE department_id='design' LIMIT 1").get() as { id: string };
     const queue = (title: string) =>
-      queueAutonomyWork(db, {
+      createWorkTask(db, {
         business: "ventures",
         project_id: "p1",
         department_id: "design",
+        agent_id: lead.id,
         title,
         description: "Make it",
-        reason: "Goal",
+        work_type: "design",
+        importance: "routine",
+        playbook_step: "mockups",
       });
     for (const title of ["One", "Two", "Three"]) queue(title);
-    const quiet = db.prepare("SELECT description FROM agent_task_proposals WHERE title='Three'").get() as {
+    const quiet = db.prepare("SELECT description FROM tasks WHERE title='Three'").get() as {
       description: string;
     };
     expect(quiet.description).not.toContain("Workload:");
     queue("Four");
-    const busy = db.prepare("SELECT description FROM agent_task_proposals WHERE title='Four'").get() as {
+    const busy = db.prepare("SELECT description FROM tasks WHERE title='Four'").get() as {
       description: string;
     };
-    expect(busy.description).toContain("Workload: 3 other tasks are already waiting");
+    expect(busy.description).toContain("Workload: 3 other tasks are waiting");
     expect(busy.description).toContain("org.request_hire");
   });
 });

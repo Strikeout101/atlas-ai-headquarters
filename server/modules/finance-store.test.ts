@@ -32,7 +32,10 @@ function harness() {
     "INSERT INTO projects(id,name,project_path,core_goal) VALUES ('project','Project','C:/Projects/ventures','Research'); INSERT INTO agents(id,name,role) VALUES ('agent','Research lead','team_leader'); INSERT INTO tasks(id,title,assigned_agent_id,status) VALUES ('task','Research','agent','in_progress'); INSERT INTO business_contacts(id,business,name,created_at,updated_at) VALUES ('techcontact','tech','Tech customer',1,1)",
   );
   db.prepare(
-    "INSERT INTO opportunities(id,business,project_id,title,created_at,updated_at) VALUES ('opp','ventures','project','Venture',?,?),('other','tech','project','Tech',?,?)",
+    "INSERT INTO business_goals(id,business,metric,target,period_start,period_end,created_at,updated_at) VALUES ('gv','ventures','revenue',1,0,1,1,1),('gt','tech','revenue',1,0,1,1,1)",
+  ).run();
+  db.prepare(
+    "INSERT INTO initiatives(id,business,project_id,goal_id,title,created_at,updated_at) VALUES ('opp','ventures','project','gv','Venture',?,?),('other','tech','project','gt','Tech',?,?)",
   ).run(NOW, NOW, NOW, NOW);
   let sequence = 0;
   const receipt = (amount: number, overrides: Record<string, unknown> = {}) => {
@@ -45,12 +48,12 @@ function harness() {
       source: "square_payment",
       verified: 1,
       deal_id: null,
-      opportunity_id: null,
+      initiative_id: null,
       occurred_at: NOW,
       ...overrides,
     };
     db.prepare(
-      "INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,deal_id,opportunity_id,description,occurred_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'Test receipt',?,?,?)",
+      "INSERT INTO ledger_entries(id,business,kind,amount_minor,currency,source,external_id,verified,deal_id,initiative_id,description,occurred_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'Test receipt',?,?,?)",
     ).run(
       String(row.id),
       String(row.business),
@@ -61,7 +64,7 @@ function harness() {
       String(row.id),
       Number(row.verified),
       row.deal_id as string | null,
-      row.opportunity_id as string | null,
+      row.initiative_id as string | null,
       Number(row.occurred_at),
       NOW,
       NOW,
@@ -100,8 +103,8 @@ describe("financial evidence and pipeline", () => {
     expect(() => createDeal(db, { business: "ventures", title: "Deal", contact_id: "techcontact" })).toThrow(
       "contact_business_mismatch",
     );
-    expect(() => createDeal(db, { business: "ventures", title: "Deal", opportunity_id: "other" })).toThrow(
-      "opportunity_business_mismatch",
+    expect(() => createDeal(db, { business: "ventures", title: "Deal", initiative_id: "other" })).toThrow(
+      "initiative_business_mismatch",
     );
   });
   it("never treats manual notes or client-supplied verification as proof of payment", () => {
@@ -127,7 +130,7 @@ describe("financial evidence and pipeline", () => {
     const deal = createDeal(db, {
       business: "ventures",
       title: "Commission",
-      opportunity_id: "opp",
+      initiative_id: "opp",
       expected_amount_minor: 1000,
       stage: "won",
     });
@@ -137,14 +140,14 @@ describe("financial evidence and pipeline", () => {
     const second = receipt(400);
     linkLedgerEntry(db, second, { deal_id: deal.id });
     expect(db.prepare("SELECT stage FROM deals WHERE id=?").get(String(deal.id))).toMatchObject({ stage: "paid" });
-    expect(db.prepare("SELECT opportunity_id FROM ledger_entries WHERE id=?").get(first)).toMatchObject({
-      opportunity_id: "opp",
+    expect(db.prepare("SELECT initiative_id FROM ledger_entries WHERE id=?").get(first)).toMatchObject({
+      initiative_id: "opp",
     });
     db.prepare("UPDATE ledger_entries SET amount_minor=0 WHERE id=?").run(second);
     reconcilePaidDeals(db);
     expect(db.prepare("SELECT stage FROM deals WHERE id=?").get(String(deal.id))).toMatchObject({ stage: "won" });
     expect(() => updateDeal(db, String(deal.id), { currency: "JPY" })).toThrow("deal_has_linked_entries");
-    expect(() => linkLedgerEntry(db, first, { opportunity_id: "other" })).toThrow("deal_opportunity_mismatch");
+    expect(() => linkLedgerEntry(db, first, { initiative_id: "other" })).toThrow("deal_initiative_mismatch");
   });
   it("requires positive receipts for zero-price deals and treats sandbox evidence as unverified", () => {
     const { db, receipt } = harness();
@@ -161,8 +164,8 @@ describe("financial evidence and pipeline", () => {
   });
   it("keeps businesses and currencies separate and reports only a surplus from known costs", () => {
     const { db, receipt } = harness();
-    receipt(10000, { opportunity_id: "opp" });
-    receipt(350, { source: "square_fee", kind: "expense", opportunity_id: "opp" });
+    receipt(10000, { initiative_id: "opp" });
+    receipt(350, { source: "square_fee", kind: "expense", initiative_id: "opp" });
     receipt(500, { currency: "JPY" });
     receipt(4500, { business: "tech" });
     createManualLedgerEntry(db, { business: "ventures", kind: "expense", amount_minor: 1000, currency: "USD" });
@@ -182,7 +185,7 @@ describe("financial evidence and pipeline", () => {
         expect.objectContaining({ business: "tech", currency: "USD", revenue_minor: 4500 }),
       ]),
     );
-    expect(overview.opportunities.find((row) => row.id === "opp")?.currencies[0]).toMatchObject({
+    expect(overview.initiatives.find((row) => row.id === "opp")?.currencies[0]).toMatchObject({
       revenue_minor: 10000,
       cost_minor: 350,
     });
@@ -308,7 +311,7 @@ describe("financial audit retention and retry safety", () => {
       business: "ventures",
       agent_id: "agent",
       task_id: "task",
-      opportunity_id: "opp",
+      initiative_id: "opp",
       amount_minor: 1500,
       currency: "USD",
       purpose: "Review proposed tool subscription",
@@ -331,7 +334,7 @@ describe("financial audit retention and retry safety", () => {
     const deal = createDeal(db, {
       business: "ventures",
       title: "Commission",
-      opportunity_id: "opp",
+      initiative_id: "opp",
       expected_amount_minor: 1000,
       stage: "won",
     });
@@ -339,13 +342,13 @@ describe("financial audit retention and retry safety", () => {
       fee = receipt(25, { source: "square_fee", kind: "expense" });
     db.prepare("UPDATE ledger_entries SET external_id=? WHERE id=?").run(payment, fee);
     linkLedgerEntry(db, payment, { deal_id: deal.id });
-    expect(db.prepare("SELECT deal_id,opportunity_id FROM ledger_entries WHERE id=?").get(fee)).toMatchObject({
+    expect(db.prepare("SELECT deal_id,initiative_id FROM ledger_entries WHERE id=?").get(fee)).toMatchObject({
       deal_id: deal.id,
-      opportunity_id: "opp",
+      initiative_id: "opp",
     });
     expect(updateDeal(db, String(deal.id), { expected_amount_minor: 1200 })).toMatchObject({ stage: "won" });
     expect(updateDeal(db, String(deal.id), { expected_amount_minor: 1000 })).toMatchObject({ stage: "paid" });
-    expect(financeOverview(db).opportunities.find((row) => row.id === "opp")?.currencies[0]).toMatchObject({
+    expect(financeOverview(db).initiatives.find((row) => row.id === "opp")?.currencies[0]).toMatchObject({
       revenue_minor: 1000,
       cost_minor: 25,
     });

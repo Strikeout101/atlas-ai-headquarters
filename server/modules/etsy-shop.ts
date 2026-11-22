@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { appendAutonomyLedger } from "./autonomy-store.ts";
-import { queueAutonomyWork } from "./autonomy-engine.ts";
+import { createWorkTask, pickStepAgent, SHOP_SETUP_STEP } from "./work-engine.ts";
 import { isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
 import { etsyRequest, type EtsyDeps } from "./etsy.ts";
@@ -60,13 +60,6 @@ export function ensureEtsyShopSchema(db: Db): void {
     ["granted_scopes", "TEXT"],
   ] as const)
     if (!have.has(column)) db.exec(`ALTER TABLE etsy_connection ADD COLUMN ${column} ${type}`);
-  if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='autonomy_work'").get()) {
-    const work = new Set(
-      (db.prepare("PRAGMA table_info(autonomy_work)").all() as Array<{ name: string }>).map((c) => c.name),
-    );
-    if (!work.has("goal_id")) db.exec("ALTER TABLE autonomy_work ADD COLUMN goal_id TEXT");
-    if (!work.has("purpose")) db.exec("ALTER TABLE autonomy_work ADD COLUMN purpose TEXT");
-  }
 }
 
 function connection(db: Db): Row {
@@ -373,8 +366,8 @@ export async function applyApprovedShopChanges(db: Db, deps: EtsyDeps = {}) {
 }
 
 /**
- * A new or unfinished shop gets one setup task (design team, VP-approved like any work) once the goal has a
- * strategy, so the shop's look and words match what it will sell. Not repeated while one is open or for 3 days.
+ * A new or unfinished shop gets one setup task (design team) once the goal's strategy is approved, so the shop's look
+ * and words match what it will sell. Listing steps wait for it. Not repeated while one is open or for 3 days.
  */
 export function queueShopSetupIfNeeded(db: Db, goal: Row, strategySummary: string, now = Date.now()): string | null {
   ensureEtsyShopSchema(db);
@@ -383,20 +376,18 @@ export function queueShopSetupIfNeeded(db: Db, goal: Row, strategySummary: strin
   if (db.prepare("SELECT 1 FROM etsy_shop_changes WHERE status IN ('ready','approved') LIMIT 1").get()) return null;
   const recent = db
     .prepare(
-      "SELECT 1 FROM autonomy_work WHERE purpose='shop_setup' AND (status IN ('pending','planned','running') OR created_at>?) LIMIT 1",
+      "SELECT 1 FROM tasks WHERE business=? AND playbook_step=? AND (status NOT IN ('done','cancelled') OR created_at>?) LIMIT 1",
     )
-    .get(now - 3 * DAY_MS);
+    .get(String(goal.business), SHOP_SETUP_STEP, now - 3 * DAY_MS);
   if (recent) return null;
-  const leaders = (
-    db.prepare("SELECT department_id FROM agents WHERE role='team_leader' AND department_id IS NOT NULL").all() as Row[]
-  ).map((row) => String(row.department_id));
-  const department = ["design", "planning"].find((d) => leaders.includes(d)) ?? leaders[0];
+  const department = ["design", "planning"].find((d) => pickStepAgent(db, d, { importance: "important" }));
   if (!department) return null;
+  const agent = pickStepAgent(db, department, { importance: "important" })!;
   const { profile, gaps } = shopProfile(db);
   const description = [
     `The Etsy shop "${profile?.shop_name ?? ""}" (${profile?.url ?? ""}) is not set up yet. Missing: ${gaps.join("; ")}.`,
     "Set it up so it matches the strategy below and looks like a shop buyers trust. You decide the brand: name style, colors, voice.",
-    "Make, inside the project (for example atlas-media/brand/):",
+    "Make, in your working folder (for example brand/):",
     "- a logo (square, at least 500x500 PNG) and a banner (3360x840 PNG works for Etsy's big banner). Use your own image generation or the canvas-design skill; original work only, no trademarks. Record each with media.register.",
     `- a shop title (headline, at most ${SHOP_LIMITS.title} characters), an announcement, an About story (who we are, what we make, why; honest, no invented people or claims), the message sent with digital orders (how to download and use the files, how to get help) and shop sections for the product families in the strategy (each at most ${SHOP_LIMITS.section_title} characters).`,
     "Then propose it all at once with etsy.shop_propose {title, announcement, about, digital_sale_message, sale_message?, policy_additional?, sections[], logo, banner}. It is approved like a listing; ATLAS applies the text and sections on Etsy, and the owner uploads the logo, banner and story (Etsy's API cannot).",
@@ -405,29 +396,31 @@ export function queueShopSetupIfNeeded(db: Db, goal: Row, strategySummary: strin
   ]
     .filter(Boolean)
     .join("\n\n");
-  const workId = queueAutonomyWork(
+  const taskId = createWorkTask(
     db,
     {
-      business: String(goal.business),
-      project_id: String(goal.project_id),
-      department_id: department,
       title: "Set up the Etsy shop: brand, banner, story and sections",
-      description,
-      reason:
-        "A new shop with no logo, banner, story or sections converts poorly; buyers check the shop before buying.",
+      description: `${description}\n\nWhy: a new shop with no logo, banner, story or sections converts poorly; buyers check the shop before buying.`,
+      department_id: department,
+      agent_id: String(agent.id),
+      business: String(goal.business),
+      goal_id: String(goal.id),
+      project_id: (goal.project_id as string | null) ?? null,
+      work_type: "shop_admin",
+      importance: "important",
+      playbook_step: SHOP_SETUP_STEP,
     },
     now,
   );
-  db.prepare("UPDATE autonomy_work SET goal_id=?, purpose='shop_setup' WHERE id=?").run(String(goal.id), workId);
   appendAutonomyLedger(
     db,
     {
       event: "shop_setup_queued",
       business: isBusinessKey(goal.business) ? goal.business : null,
       sourceId: String(goal.id),
-      message: `Shop setup queued for approval (missing: ${gaps.join(", ")})`.slice(0, 300),
+      message: `Shop setup queued (missing: ${gaps.join(", ")})`.slice(0, 300),
     },
     now,
   );
-  return workId;
+  return taskId;
 }

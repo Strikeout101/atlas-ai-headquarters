@@ -8,7 +8,7 @@ export interface Deal {
   business: BusinessKind;
   contact_id: string | null;
   project_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   title: string;
   stage: DealStage;
   expected_amount_minor: number;
@@ -32,14 +32,14 @@ export interface FinanceEntry {
   verified: 0 | 1;
   occurred_at: number;
   deal_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   created_at: number;
   updated_at: number;
 }
 export interface SpendRequest {
   id: string;
   business: BusinessKind;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   amount_minor: number;
   currency: string;
   purpose: string;
@@ -72,7 +72,7 @@ export interface RevenueGoal {
   progress: number | null;
   costs_complete: false;
 }
-export interface RevenueOpportunity {
+export interface RevenueInitiative {
   id: string;
   title: string;
   business: BusinessKind;
@@ -115,7 +115,7 @@ export interface FinanceOverview {
   spend_requests: SpendRequest[];
   totals: CurrencyTotals[];
   goals: RevenueGoal[];
-  opportunities: RevenueOpportunity[];
+  initiatives: RevenueInitiative[];
   profit?: ProfitOverview;
 }
 export function getFinance(filters: { business?: BusinessKind; from?: number; to?: number } = {}) {
@@ -138,7 +138,7 @@ export const recordFinanceEntry = (data: Record<string, unknown>) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-export const linkFinanceEntry = (id: string, data: { deal_id: string | null; opportunity_id: string | null }) =>
+export const linkFinanceEntry = (id: string, data: { deal_id: string | null; initiative_id: string | null }) =>
   request(`/api/finance/ledger/${encodeURIComponent(id)}/link`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

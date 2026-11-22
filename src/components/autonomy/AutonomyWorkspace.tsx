@@ -13,7 +13,7 @@ import {
   getAutonomy,
   saveAutonomy,
   saveAutonomyConfig,
-  restartOpportunity,
+  restartInitiative,
   saveExperimentRules,
   type AutonomyOverview,
   type AutonomyResource,
@@ -41,7 +41,16 @@ const scoreFields = [
   "difficulty_score",
   "time_to_launch_score",
 ] as const;
-const statuses = ["idea", "researching", "approved", "building", "launched", "stopped"] as const;
+const statuses = [
+  "proposed",
+  "approved",
+  "in_progress",
+  "blocked",
+  "launched",
+  "measuring",
+  "stopped",
+  "done",
+] as const;
 const pretty = (value: string) => value.replaceAll("_", " ");
 const localDate = (value: unknown) => {
   const date = new Date(Number(value));
@@ -87,9 +96,9 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
           return t({
             en: "Choose a project with a saved absolute workspace path.",
           });
-        if (cause.code === "goal_has_linked_opportunities")
+        if (cause.code === "goal_has_linked_initiatives")
           return t({
-            en: "This goal has linked opportunities. Keep its business and project or update those links first.",
+            en: "This goal has linked initiatives. Keep its business and project or update those links first.",
           });
         if (cause.code) return pretty(cause.code);
       }
@@ -153,7 +162,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
       row.period_start = new Date(String(row.period_start)).getTime();
       row.period_end = new Date(String(row.period_end)).getTime();
     }
-    if (resource === "opportunities") {
+    if (resource === "initiatives") {
       for (const key of [...scoreFields, "budget", "task_limit", "time_limit_days"]) row[key] = Number(row[key]);
       row.goal_id = row.goal_id || null;
     }
@@ -181,7 +190,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
   const label = (tab: AutonomyResource) =>
     ({
       goals: t({ en: "Goals" }),
-      opportunities: t({ en: "Opportunities" }),
+      initiatives: t({ en: "Initiatives" }),
       schedules: t({ en: "Schedules" }),
     })[tab];
   const edit = (row: object | null = null, leadPreset = false) => {
@@ -219,7 +228,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
           <h1 className="text-lg font-semibold">{t({ en: "Autonomy" })}</h1>
           <p className="mt-1 max-w-3xl text-sm" style={{ color: "var(--th-text-secondary)" }}>
             {t({
-              en: "Set goals, review opportunities and schedule research. Customer-facing work and spending keep their approval rules.",
+              en: "Set goals, review initiatives and schedule research. Customer-facing work and spending keep their approval rules.",
             })}
           </p>
         </div>
@@ -253,7 +262,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
             className="flex flex-wrap gap-2 border-b pb-3"
             style={{ borderColor: "var(--th-border)" }}
           >
-            {(["goals", "opportunities", "schedules"] as const).map((tab) => (
+            {(["goals", "initiatives", "schedules"] as const).map((tab) => (
               <button
                 key={tab}
                 id={`autonomy-tab-${tab}`}
@@ -420,20 +429,22 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                       </Field>
                     </>
                   )}
-                  {resource === "opportunities" && (
+                  {resource === "initiatives" && (
                     <>
-                      <Field label={t({ en: "Linked goal" })}>
+                      {/* Every initiative belongs to a goal (work restructure), so there is no "None". */}
+                      <Field label={t({ en: "Goal" })}>
                         <select
                           name="goal_id"
+                          required
                           defaultValue={String(editing?.goal_id ?? "")}
                           className={inputClass}
                           style={inputStyle}
                         >
-                          <option value="">{t({ en: "None" })}</option>
                           {data.goals
                             .filter((goal) => goal.business === business && goal.project_id === projectId)
                             .map((goal) => (
                               <option key={goal.id} value={goal.id}>
+                                {goal.title ? `${goal.title} · ` : ""}
                                 {BUSINESS_NAMES[goal.business]} · {pretty(goal.metric)} · {goal.target}
                               </option>
                             ))}
@@ -442,7 +453,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                       <Field label={t({ en: "Status" })}>
                         <select
                           name="status"
-                          defaultValue={String(editing?.status ?? "idea")}
+                          defaultValue={String(editing?.status ?? "proposed")}
                           className={inputClass}
                           style={inputStyle}
                         >
@@ -585,10 +596,10 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                     </>
                   )}
                 </div>
-                {resource === "opportunities" && (
+                {resource === "initiatives" && (
                   <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
                     {t({
-                      en: "Scores run from 0–100. An opportunity that uses its budget, its task limit or its days live without a sale is stopped by the stop rules (below). Spending still needs approval.",
+                      en: "Scores run from 0–100. An initiative that uses its budget, its task limit or its days live without a sale is stopped by the stop rules (below). Spending still needs approval.",
                     })}
                   </p>
                 )}
@@ -614,9 +625,9 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                   <li key={row.id} className="flex min-w-0 flex-wrap items-start justify-between gap-3 py-4">
                     <div className="min-w-0 flex-1">
                       <p className="break-words text-sm font-medium">
-                        {"title" in row
-                          ? row.title
-                          : `${pretty(row.metric)} · ${row.progress === null ? t({ en: "Not measured yet" }) : `${row.progress} / ${row.target}`}`}
+                        {"metric" in row
+                          ? `${row.title ? `${row.title} · ` : ""}${pretty(row.metric)} · ${row.progress === null ? t({ en: "Not measured yet" }) : `${row.progress} / ${row.target}`}`
+                          : row.title}
                       </p>
                       <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-muted)" }}>
                         {BUSINESS_NAMES[row.business]}
@@ -707,7 +718,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           type="button"
                           className="ax-btn-secondary"
                           disabled={busy}
-                          onClick={() => void mutate(() => restartOpportunity(row.id))}
+                          onClick={() => void mutate(() => restartInitiative(row.id))}
                         >
                           {t({ en: "Restart" })}
                         </button>
@@ -792,7 +803,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
               >
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="enabled" defaultChecked={data.experiment_rules.enabled} />
-                  {t({ en: "Stop opportunities automatically" })}
+                  {t({ en: "Stop initiatives automatically" })}
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -830,7 +841,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 </div>
                 <p className="text-xs" style={{ color: "var(--th-text-muted)" }}>
                   {t({
-                    en: "An opportunity that has sold anything is never stopped by these rules. Each opportunity's own limits apply too (the lower one wins). Stopped opportunities can be restarted with a fresh window.",
+                    en: "An initiative that has sold anything is never stopped by these rules. Each initiative's own limits apply too (the lower one wins). Stopped initiatives can be restarted with a fresh window.",
                   })}
                 </p>
                 <button type="submit" className="ax-btn-secondary" disabled={busy}>

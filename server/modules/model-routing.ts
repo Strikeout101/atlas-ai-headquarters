@@ -242,13 +242,78 @@ function director(db: Db, taskType?: string): Agent | null {
   const config = modelDirectorConfig(db);
   const id =
     (taskType === "design" ? config.designDirectorAgentId : config.technicalDirectorAgentId) || config.directorAgentId;
-  if (!id) return null;
-  const row = db
+  const columns = "id, name, cli_provider, cli_model, api_model, api_provider_id, cli_reasoning_level";
+  const row = id
+    ? (db.prepare(`SELECT ${columns} FROM agents WHERE id = ? AND status != 'offline'`).get(id) as Agent | undefined)
+    : undefined;
+  if (row && (row.cli_provider === "claude" || row.cli_provider === "codex")) return row;
+  // The model director is always on: without a configured director (or when it is offline), a VP chooses.
+  try {
+    return (
+      (db
+        .prepare(
+          `SELECT ${columns} FROM agents WHERE role = 'vp' AND status != 'offline' AND cli_provider IN ('claude','codex') ORDER BY name LIMIT 1`,
+        )
+        .get() as Agent | undefined) ?? null
+    );
+  } catch {
+    return null; // An agents table without roles (older schema): fall back to the configured default model.
+  }
+}
+
+export const RUNNABLE_PROVIDERS = ["claude", "codex", "gemini", "opencode", "kimi", "copilot", "antigravity", "api"];
+
+function runnable(agent: { cli_provider: string | null; api_provider_id?: string | null }): boolean {
+  if (!agent.cli_provider || !RUNNABLE_PROVIDERS.includes(agent.cli_provider)) return false;
+  return agent.cli_provider !== "api" || Boolean(agent.api_provider_id);
+}
+
+/**
+ * Before any task starts: an agent with no usable model must not break anything. When the agent has no provider
+ * (or one ATLAS cannot run), the VPs give it the provider its department partner uses, else a VP's, else Codex,
+ * save that on the agent and record it in the autonomy log. Returns the agent as it should run now.
+ */
+export function ensureRunnableAgent<
+  T extends {
+    id: string;
+    name: string;
+    cli_provider: string | null;
+    department_id?: string | null;
+    api_provider_id?: string | null;
+  },
+>(db: Db, agent: T, now = Date.now()): { agent: T; fixed: string | null } {
+  if (runnable(agent)) return { agent, fixed: null };
+  const candidates = db
     .prepare(
-      "SELECT id, name, cli_provider, cli_model, api_model, api_provider_id, cli_reasoning_level FROM agents WHERE id = ? AND status != 'offline'",
+      `SELECT cli_provider, api_provider_id, role, department_id FROM agents
+       WHERE id != ? AND status != 'offline' AND cli_provider IS NOT NULL AND cli_provider != 'api'
+       ORDER BY CASE WHEN department_id = ? THEN 0 WHEN role = 'vp' THEN 1 ELSE 2 END, name`,
     )
-    .get(id) as Agent | undefined;
-  return row && (row.cli_provider === "claude" || row.cli_provider === "codex") ? row : null;
+    .all(agent.id, agent.department_id ?? null) as Array<{
+    cli_provider: string;
+    role: string;
+    department_id: string | null;
+  }>;
+  const pick = candidates.find((row) => RUNNABLE_PROVIDERS.includes(row.cli_provider));
+  const provider = pick?.cli_provider ?? "codex";
+  const source = !pick
+    ? "the default"
+    : pick.department_id && pick.department_id === agent.department_id
+      ? "the department partner"
+      : pick.role === "vp"
+        ? "a VP"
+        : "another agent";
+  db.prepare("UPDATE agents SET cli_provider = ?, cli_model = NULL WHERE id = ?").run(provider, agent.id);
+  const before = agent.cli_provider ? `'${agent.cli_provider}', which can't run` : "no model";
+  const fixed = `VPs set ${agent.name} to ${provider} (from ${source}); it had ${before}.`;
+  try {
+    db.prepare(
+      "INSERT INTO autonomy_ledger(event,business,source_id,task_id,message,created_at) VALUES ('vp_model_fix',NULL,?,NULL,?,?)",
+    ).run(agent.id, fixed, now);
+  } catch {
+    /* The ledger table is optional in isolated tests. */
+  }
+  return { agent: { ...agent, cli_provider: provider, cli_model: null } as T, fixed };
 }
 
 /** Match the same validated local route before subscription admission, without starting a director. */

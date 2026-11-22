@@ -33,6 +33,7 @@ import { registerDepartmentRoutes } from "./core/departments.ts";
 import { registerGitHubRoutes } from "./core/github-routes.ts";
 import { registerProjectRoutes } from "./core/projects.ts";
 import { registerTaskCrudRoutes } from "./core/tasks/crud.ts";
+import { registerTaskReviewRoutes } from "./core/tasks/review-routes.ts";
 import { registerTaskExecutionRoutes } from "./core/tasks/execution.ts";
 import { registerTaskSubtaskRoutes } from "./core/tasks/subtasks.ts";
 import { registerUpdateAutoRoutes } from "./core/update-auto/register.ts";
@@ -376,6 +377,8 @@ export function registerRoutesPartA(ctx: RuntimeContext): Record<string, never> 
     killPidTree,
     logsDir,
   });
+
+  registerTaskReviewRoutes({ app, db: db as any, getReviewDeps: () => __ctx.reviewDeps });
 
   // ---------------------------------------------------------------------------
   // SubTask endpoints

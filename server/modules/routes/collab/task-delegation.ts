@@ -121,7 +121,8 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
     const leaderName = teamLeader.name;
     const leaderDeptId = teamLeader.department_id!;
     const leaderDeptName = getDeptName(leaderDeptId);
-    const skipPlannedMeeting = !!options.skipPlannedMeeting;
+    // Team-lead meetings only for `$` directives; chat, @mentions and handoffs go straight to work.
+    const skipPlannedMeeting = !options.directive || !!options.skipPlannedMeeting;
     const skipPlanSubtasks = !!options.skipPlanSubtasks;
 
     // --- Step 1: Team leader acknowledges (1~2 sec) ---
@@ -333,7 +334,11 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
       const runPlanningPhase = (afterPlan: () => void) => {
         if (isTaskWorkflowInterrupted(taskId)) return;
         if (skipPlannedMeeting) {
-          appendTaskLog(taskId, "system", "Planned meeting skipped by CEO directive");
+          appendTaskLog(
+            taskId,
+            "system",
+            options.directive ? "Planned meeting skipped by CEO directive" : "No meeting: not a $ directive",
+          );
           if (!skipPlanSubtasks) {
             seedApprovedPlanSubtasks(taskId, leaderDeptId, []);
           }

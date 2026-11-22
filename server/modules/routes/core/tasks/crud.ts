@@ -1,4 +1,11 @@
 import fs from "node:fs";
+import {
+  ensureWorkModelSchema,
+  TASK_IMPORTANCE,
+  type TaskImportance,
+  type WorkType,
+} from "../../../bootstrap/schema/work-model-migration.ts";
+import { isWorkType } from "../../../work-model.ts";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -185,6 +192,8 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
       }
     }
 
+    const workFields = readWorkFields(body as Record<string, unknown>);
+    if ("error" in workFields) return res.status(400).json({ error: workFields.error });
     db.prepare(
       `
     INSERT INTO tasks (
@@ -215,6 +224,7 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
       t,
       t,
     );
+    applyWorkFields(db as any, id, workFields);
     recordTaskCreationAudit({
       taskId: id,
       taskTitle: title,
@@ -348,6 +358,10 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
       return res.status(400).json({ error: "invalid_output_format" });
     }
 
+    const patchWorkFields = readWorkFields(body as Record<string, unknown>);
+    if ("error" in patchWorkFields) return res.status(400).json({ error: patchWorkFields.error });
+    if (patchWorkFields.work_type || patchWorkFields.importance) ensureWorkModelSchema(db as any);
+
     const allowedFields = [
       "title",
       "description",
@@ -361,6 +375,8 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
       "project_path",
       "result",
       "hidden",
+      "work_type",
+      "importance",
     ];
 
     const updates: string[] = ["updated_at = ?"];
@@ -497,4 +513,32 @@ export function registerTaskCrudRoutes(deps: TaskCrudRouteDeps): void {
     broadcast("task_update", { id, deleted: true });
     res.json({ ok: true });
   });
+}
+
+/** Type of work and importance (work restructure): optional on create and edit, validated, never guessed here. */
+function readWorkFields(
+  body: Record<string, unknown>,
+): { work_type?: WorkType; importance?: TaskImportance } | { error: string } {
+  const out: { work_type?: WorkType; importance?: TaskImportance } = {};
+  if (body.work_type !== undefined && body.work_type !== null) {
+    if (!isWorkType(body.work_type)) return { error: "invalid_work_type" };
+    out.work_type = body.work_type;
+  }
+  if (body.importance !== undefined && body.importance !== null) {
+    if (!(TASK_IMPORTANCE as readonly string[]).includes(String(body.importance)))
+      return { error: "invalid_importance" };
+    out.importance = body.importance as TaskImportance;
+  }
+  return out;
+}
+
+function applyWorkFields(
+  db: Parameters<typeof ensureWorkModelSchema>[0],
+  taskId: string,
+  fields: { work_type?: WorkType; importance?: TaskImportance },
+): void {
+  if (!fields.work_type && !fields.importance) return;
+  ensureWorkModelSchema(db);
+  if (fields.work_type) db.prepare("UPDATE tasks SET work_type = ? WHERE id = ?").run(fields.work_type, taskId);
+  if (fields.importance) db.prepare("UPDATE tasks SET importance = ? WHERE id = ?").run(fields.importance, taskId);
 }

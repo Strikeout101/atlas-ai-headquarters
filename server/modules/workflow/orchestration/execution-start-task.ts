@@ -3,7 +3,13 @@ import { buildCompactKnowledgeBlock } from "../../agent-knowledge.ts";
 import { taskToolsScriptPath } from "../core/task-tools-line.ts";
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
 import { getDepartmentPrompt } from "../department-lookup.ts";
-import { routeTaskModel, getCurrentTaskModelRoute } from "../../model-routing.ts";
+import {
+  routeTaskModel,
+  getCurrentTaskModelRoute,
+  ensureRunnableAgent,
+  RUNNABLE_PROVIDERS,
+} from "../../model-routing.ts";
+import { ensureTaskWorkModel, isWorkType, resolveWorkFolder, workTypeInstructions } from "../../work-model.ts";
 import { getContextRollover, markContextRolloverStarted } from "../agents/context-rollover-store.ts";
 import {
   buildCompactContextRolloverPrompt,
@@ -49,6 +55,11 @@ type CreateExecutionStartTaskToolsDeps = {
   runAgentOneShot: RuntimeContext["runAgentOneShot"];
 };
 
+/** What a start attempt did, for callers that report back (the manual Run button). Most callers ignore it. */
+export type TaskStartResult =
+  | { ok: true; cwd: string; worktree: boolean; pid: number | null; logPath: string }
+  | { ok: false; error: string };
+
 export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskToolsDeps) {
   const {
     nowMs,
@@ -87,15 +98,19 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     execAgent: any,
     deptId: string | null,
     deptName: string,
-  ): Promise<void> {
+  ): Promise<TaskStartResult> {
     const blocked =
       automaticStartBlockReason(db, taskId) ||
       admitAutonomyTaskStart(db as any, taskId) ||
       autonomyTaskStartBlockReason(db as any, taskId);
     if (blocked) {
       appendTaskLog(taskId, "system", `Not started: ${blocked}`);
-      return;
+      return { ok: false, error: blocked };
     }
+    // An agent with no usable model never blocks work: the VPs give it one first (work restructure, phase 2).
+    const checked = ensureRunnableAgent(db as any, execAgent);
+    execAgent = checked.agent;
+    if (checked.fixed) appendTaskLog(taskId, "system", checked.fixed);
     const execName = execAgent.name;
     const t = nowMs();
     db.prepare(
@@ -103,6 +118,9 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     ).run(execAgent.id, t, t, taskId);
     db.prepare("UPDATE agents SET status = 'working', current_task_id = ? WHERE id = ?").run(taskId, execAgent.id);
     appendTaskLog(taskId, "system", `${execName} started (approved)`);
+    // Work type, business, goal, initiative and importance, filled from what the task links to when missing.
+    const workRow = ensureTaskWorkModel(db as any, taskId);
+    const workType = isWorkType(workRow?.work_type) ? workRow.work_type : "code";
 
     broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
     broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(execAgent.id));
@@ -116,7 +134,8 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     const current = db.prepare("SELECT status, assigned_agent_id FROM tasks WHERE id = ?").get(taskId) as
       | { status: string; assigned_agent_id: string | null }
       | undefined;
-    if (current?.status !== "in_progress" || current.assigned_agent_id !== execAgent.id) return;
+    if (current?.status !== "in_progress" || current.assigned_agent_id !== execAgent.id)
+      return { ok: false, error: "task_changed_during_model_routing" };
     const admissionBlock = automaticStartBlockReason(db, taskId) || autonomyTaskStartBlockReason(db as any, taskId);
     if (admissionBlock) {
       db.prepare("UPDATE tasks SET status='pending',updated_at=? WHERE id=? AND status='in_progress'").run(
@@ -130,11 +149,14 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       appendTaskLog(taskId, "system", `Autonomous launch held after routing: ${admissionBlock}`);
       broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id=?").get(taskId));
       broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id=?").get(execAgent.id));
-      return;
+      return { ok: false, error: admissionBlock };
     }
 
     let provider = getCurrentTaskModelRoute(db as any, taskId)?.provider || execAgent.cli_provider || "claude";
-    if (!["claude", "codex", "gemini", "opencode", "kimi", "copilot", "antigravity", "api"].includes(provider)) return;
+    if (!RUNNABLE_PROVIDERS.includes(provider)) {
+      appendTaskLog(taskId, "error", `Not started: provider '${provider}' cannot run tasks`);
+      return { ok: false, error: "unsupported_provider" };
+    }
     let executionSession = ensureTaskExecutionSession(taskId, execAgent.id, provider);
     const pendingInterruptPrompts = loadPendingInterruptPrompts(db as any, taskId, executionSession.sessionId);
     const interruptPromptBlock = buildInterruptPromptBlock(pendingInterruptPrompts);
@@ -149,12 +171,23 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
           base_branch: string | null;
         }
       | undefined;
-    if (!taskData) return;
+    if (!taskData) return { ok: false, error: "not_found" };
     const taskLang = resolveLang(taskData.description ?? taskData.title);
     notifyTaskStatus(taskId, taskData.title, "in_progress", taskLang);
 
     const projPath = resolveProjectPath(taskData);
-    const worktreePath = createWorktree(projPath, taskId, execAgent.name, taskData.base_branch ?? undefined);
+    const isCode = workType === "code";
+    // Only code gets git: a worktree on its own branch. Everything else works in a plain folder (plan section 3.1).
+    let worktreePath: string | null = null;
+    if (isCode) {
+      worktreePath = createWorktree(projPath, taskId, execAgent.name, taskData.base_branch ?? undefined);
+    } else {
+      try {
+        worktreePath = resolveWorkFolder(db as any, workRow ?? {}, projPath || null);
+      } catch (error) {
+        appendTaskLog(taskId, "error", `Work folder could not be created: ${String(error)}`);
+      }
+    }
     if (!worktreePath) {
       const rollbackAt = nowMs();
       appendTaskLog(
@@ -175,16 +208,23 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       notifyCeo(
         pickL(
           l([
-            `[WORKTREE REQUIRED] Blocked execution for '${taskData.title}'. Isolated worktree creation failed, so run was aborted to protect the project root.`,
+            isCode
+              ? `[WORKTREE REQUIRED] Blocked execution for '${taskData.title}'. Isolated worktree creation failed, so run was aborted to protect the project root.`
+              : `Couldn't start '${taskData.title}': its work folder couldn't be created.`,
           ]),
           taskLang,
         ),
         taskId,
       );
-      return;
+      return { ok: false, error: isCode ? "worktree_failed" : "work_folder_failed" };
     }
     const agentCwd = worktreePath;
-    appendTaskLog(taskId, "system", `Git worktree created: ${worktreePath} (branch: climpire/${taskId.slice(0, 8)})`);
+    if (isCode) {
+      appendTaskLog(taskId, "system", `Git worktree created: ${worktreePath} (branch: climpire/${taskId.slice(0, 8)})`);
+    } else {
+      db.prepare("UPDATE tasks SET work_folder = ? WHERE id = ?").run(worktreePath, taskId);
+      appendTaskLog(taskId, "system", `Work folder (${workType}, no git): ${worktreePath}`);
+    }
     const logFilePath = path.join(logsDir, `${taskId}.log`);
     const roleLabels: Record<string, string> = {
       team_leader: "Team Leader",
@@ -206,8 +246,8 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     const compactRollover = rollover && rollover.status !== "complete";
     const conversationCtx = compactRollover ? "" : getRecentConversationContext(execAgent.id);
     const continuationCtx = getTaskContinuationContext(taskId);
-    const recentChanges = compactRollover ? "" : getRecentChanges(projPath, taskId);
-    if (provider === "claude") {
+    const recentChanges = compactRollover || !isCode ? "" : getRecentChanges(projPath, taskId);
+    if (provider === "claude" && isCode) {
       ensureClaudeMd(projPath, worktreePath);
     }
     const continuationInstruction = continuationCtx
@@ -225,7 +265,10 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       taskLang,
     );
     let availableSkillsPromptBlock = buildAvailableSkillsPromptBlock(provider);
-    const promptOptions = { allowWarningFix: hasExplicitWarningFixRequest(taskData.title, taskData.description) };
+    const promptOptions = {
+      allowWarningFix: hasExplicitWarningFixRequest(taskData.title, taskData.description),
+      workType,
+    };
     let initialLocalPrompt: string | null = null;
     const localRoute = getCurrentTaskModelRoute(db as any, taskId);
     if (!compactRollover && localRoute?.provider === "api" && localRoute.context_window_tokens) {
@@ -251,7 +294,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
         provider = fallback?.provider || execAgent.cli_provider || "claude";
         executionSession = ensureTaskExecutionSession(taskId, execAgent.id, provider);
         availableSkillsPromptBlock = buildAvailableSkillsPromptBlock(provider);
-        if (provider === "claude") ensureClaudeMd(projPath, worktreePath);
+        if (provider === "claude" && isCode) ensureClaudeMd(projPath, worktreePath);
         appendTaskLog(
           taskId,
           "system",
@@ -294,8 +337,8 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
               execAgent.personality ? `Personality: ${execAgent.personality}` : "",
               deptConstraint,
               deptPromptBlock,
-              `NOTE: You are working in an isolated Git worktree branch (climpire/${taskId.slice(0, 8)}). Run relevant tests, but do not commit until the user explicitly approves.`,
-              `If your current model cannot finish this task, write .climpire-model-upgrade.json at the worktree root with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The director will decide; the worktree will be preserved for resume.`,
+              workTypeInstructions(workType, worktreePath),
+              `If your current model cannot finish this task, write .climpire-model-upgrade.json in the working folder with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The VPs will decide; your work is kept for resume.`,
               interruptPromptBlock,
               continuationInstruction,
               runInstruction,
@@ -316,7 +359,8 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       );
     }
 
-    appendTaskLog(taskId, "system", `RUN start (agent=${execAgent.name}, provider=${provider})`);
+    appendTaskLog(taskId, "system", `RUN start (agent=${execAgent.name}, provider=${provider}, work=${workType})`);
+    let launchedPid: number | null = null;
     if (provider === "api") {
       try {
         markContextRolloverStarted(db as any, taskId, nowMs());
@@ -325,6 +369,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       }
       const controller = new AbortController();
       const fakePid = getNextHttpAgentPid();
+      launchedPid = fakePid;
       launchApiProviderAgent(
         taskId,
         execAgent.api_provider_id ?? null,
@@ -338,6 +383,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     } else if (provider === "copilot" || provider === "antigravity") {
       const controller = new AbortController();
       const fakePid = getNextHttpAgentPid();
+      launchedPid = fakePid;
       launchHttpAgent(
         taskId,
         provider,
@@ -364,6 +410,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
         modelForProvider,
         reasoningLevel,
       );
+      launchedPid = typeof child.pid === "number" ? child.pid : null;
       child.on("close", (code: number | null) => {
         handleTaskRunComplete(taskId, code ?? 1);
       });
@@ -373,10 +420,11 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
     const launchedTask = db.prepare("SELECT status FROM tasks WHERE id = ?").get(taskId) as
       | { status: string }
       | undefined;
-    if (launchedTask?.status !== "in_progress") return;
-    const worktreeNote = pickL(l([` (isolated branch: climpire/${taskId.slice(0, 8)})`]), taskLang);
+    if (launchedTask?.status !== "in_progress") return { ok: false, error: "launch_failed" };
+    const worktreeNote = isCode ? pickL(l([` (isolated branch: climpire/${taskId.slice(0, 8)})`]), taskLang) : "";
     notifyCeo(pickL(l([`${execName} started work on '${taskData.title}'.${worktreeNote}`]), taskLang), taskId);
     startProgressTimer(taskId, taskData.title, deptId);
+    return { ok: true, cwd: agentCwd, worktree: isCode, pid: launchedPid, logPath: logFilePath };
   }
 
   return {

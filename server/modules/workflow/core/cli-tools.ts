@@ -50,20 +50,22 @@ export function createCliTools(deps: CreateCliToolsDeps) {
     provider: string,
     model?: string,
     reasoningLevel?: string,
-    opts: { noTools?: boolean } = {},
+    opts: { noTools?: boolean; readOnly?: boolean } = {},
   ): string[] {
     const { noTools = false } = opts;
+    // Read-only (reviews): the agent can read and search files and the web, but cannot change anything.
+    const readOnly = !noTools && opts.readOnly === true;
     switch (provider) {
       case "codex": {
         const args = ["codex"];
         if (!noTools) args.push("--enable", "multi_agent");
         if (model) args.push("-m", model);
         if (reasoningLevel) args.push("-c", `model_reasoning_effort="${reasoningLevel}"`);
-        if (!noTools) args.push("--yolo");
+        if (!noTools && !readOnly) args.push("--yolo");
         // Codex's built-in web search (on the owner's subscription) is off unless asked for.
         if (!noTools) args.push("--search");
         args.push("exec", "--json");
-        if (noTools) args.push("--sandbox", "read-only");
+        if (noTools || readOnly) args.push("--sandbox", "read-only");
         return args;
       }
       case "claude": {
@@ -80,6 +82,7 @@ export function createCliTools(deps: CreateCliToolsDeps) {
         if (model) args.push("--model", model);
         // Keep no-tools as a single argv token so empty value is preserved across shells.
         if (noTools) args.push("--tools=");
+        else if (readOnly) args.push("--tools=Read,Grep,Glob,WebSearch,WebFetch");
         return args;
       }
       case "gemini": {

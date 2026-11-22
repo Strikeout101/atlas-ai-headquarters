@@ -1,4 +1,5 @@
 import type { RuntimeContext, WorkflowOrchestrationExports } from "../../types/runtime-context.ts";
+import { startReview, type ReviewDeps } from "../task-review.ts";
 import { areRunsAllowed } from "../control-state.ts";
 import type { Lang } from "../../types/lang.ts";
 import fs from "node:fs";
@@ -11,10 +12,6 @@ import {
   readNonNegativeIntEnv,
   REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
   REVIEW_MAX_MEMO_ITEMS_PER_ROUND,
-  REVIEW_MAX_REMEDIATION_REQUESTS,
-  REVIEW_MAX_REVISION_SIGNALS_PER_DEPT_PER_ROUND,
-  REVIEW_MAX_REVISION_SIGNALS_PER_ROUND,
-  REVIEW_MAX_ROUNDS,
 } from "../../db/runtime.ts";
 import {
   BUILTIN_GOOGLE_CLIENT_ID,
@@ -190,7 +187,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
   const rerouteSubtasksByPlanningLeader = __ctx.rerouteSubtasksByPlanningLeader;
   const createSubtaskFromCli = __ctx.createSubtaskFromCli;
   const completeSubtaskFromCli = __ctx.completeSubtaskFromCli;
-  const seedReviewRevisionSubtasks = __ctx.seedReviewRevisionSubtasks;
   const codexThreadToSubtask = __ctx.codexThreadToSubtask;
   const parseAndCreateSubtasks = __ctx.parseAndCreateSubtasks;
   const ANTIGRAVITY_ENDPOINTS = __ctx.ANTIGRAVITY_ENDPOINTS;
@@ -277,7 +273,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
   const meetingTaskIdByAgent = new Map<string, string>();
   type MeetingReviewDecision = "reviewing" | "approved" | "hold";
   const meetingReviewDecisionByAgent = new Map<string, MeetingReviewDecision>();
-  const projectReviewGateNotifiedAt = new Map<string, number>();
   const REVIEW_MEETING_ONESHOT_TIMEOUT_MS = (() => {
     const raw = process.env.REVIEW_MEETING_ONESHOT_TIMEOUT_MS?.trim();
     if (!raw) return 65_000;
@@ -302,8 +297,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
 
   const taskExecutionSessions = new Map<string, TaskExecutionSessionState>();
 
-  type ReviewRoundMode = "parallel_remediation" | "merge_synthesis" | "final_decision";
-
   function ensureTaskExecutionSession(taskId: string, agentId: string, provider: string): TaskExecutionSessionState {
     return sessionReviewTools.ensureTaskExecutionSession(taskId, agentId, provider);
   }
@@ -322,23 +315,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
 
   function clearTaskWorkflowState(taskId: string): void {
     sessionReviewTools.clearTaskWorkflowState(taskId);
-  }
-
-  function getReviewRoundMode(round: number): ReviewRoundMode {
-    return sessionReviewTools.getReviewRoundMode(round);
-  }
-
-  function scheduleNextReviewRound(taskId: string, taskTitle: string, currentRound: number, lang: Lang): void {
-    sessionReviewTools.scheduleNextReviewRound(taskId, taskTitle, currentRound, lang);
-  }
-
-  function getProjectReviewGateSnapshot(projectId: string): {
-    activeTotal: number;
-    activeReview: number;
-    rootReviewTotal: number;
-    ready: boolean;
-  } {
-    return sessionReviewTools.getProjectReviewGateSnapshot(projectId);
   }
 
   const progressNotifyTools = createProgressNotifyTools({
@@ -493,8 +469,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
       meetingTaskIdByAgent,
       meetingReviewDecisionByAgent,
       getTaskStatusById,
-      getReviewRoundMode,
-      scheduleNextReviewRound,
       startTaskExecutionForAgent,
       startProgressTimer,
       stopProgressTimer,
@@ -511,18 +485,14 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     appendMeetingMinuteEntry,
     finishMeetingMinutes,
     normalizeRevisionMemoNote,
-    reserveReviewRevisionMemoItems,
-    loadRecentReviewRevisionMemoItems,
     collectRevisionMemoItems,
     collectPlannedActionItems,
     appendTaskProjectMemo,
-    appendTaskReviewFinalMemo,
     markAgentInMeeting,
     isAgentInMeeting,
     callLeadersToCeoOffice,
     dismissLeadersFromCeoOffice,
     emitMeetingSpeech,
-    startReviewConsensusMeeting,
   } = workflowMeetingTools;
 
   const { startPlannedApprovalMeeting } = createPlannedApprovalTools({
@@ -710,6 +680,8 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     recoverCrossDeptQueueAfterMissingCallback,
     subtaskDelegationCallbacks,
     finishReview,
+    startTaskReview,
+    helperTaskFinished,
     reconcileDelegatedSubtasksAfterRun,
     completeTaskWithoutReview,
     isReportDesignCheckpointTask,
@@ -746,8 +718,6 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     pickL,
     l,
     resolveLang,
-    getProjectReviewGateSnapshot,
-    projectReviewGateNotifiedAt,
     notifyCeo,
     taskWorktrees,
     mergeToDevAndCreatePR,
@@ -768,20 +738,36 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     crossDeptNextCallbacks,
     recoverCrossDeptQueueAfterMissingCallback,
     subtaskDelegationCallbacks,
-    startReviewConsensusMeeting,
-    processSubtaskDelegations,
+    helperTaskFinished,
   });
 
   function reconcileDelegatedSubtasksAfterRun(taskId: string, exitCode: number): void {
     reviewFinalizeTools.reconcileDelegatedSubtasksAfterRun(taskId, exitCode);
   }
 
-  function finishReview(
-    taskId: string,
-    taskTitle: string,
-    options?: { bypassProjectDecisionGate?: boolean; trigger?: string },
-  ): void {
+  function finishReview(taskId: string, taskTitle: string, options?: { trigger?: string }): void {
     reviewFinalizeTools.finishReview(taskId, taskTitle, options);
+  }
+
+  // Reviews (work restructure, phase 4): one reviewer on the other model, structured verdict, auto-return.
+  const reviewDeps: ReviewDeps = {
+    db: db as any,
+    runAgentOneShot,
+    startTask: (taskId, agent, deptId, deptName) => startTaskExecutionForAgent(taskId, agent, deptId, deptName),
+    completeTask: (taskId, title) => finishReview(taskId, title, { trigger: "review_approved" }),
+    appendTaskLog,
+    broadcast,
+    notifyOwner: (message, taskId) => notifyCeo(message, taskId),
+    reviewFolder: (taskId) => taskWorktrees.get(taskId)?.worktreePath ?? null,
+  };
+  function startTaskReview(taskId: string): void {
+    void startReview(reviewDeps, taskId).catch((error) =>
+      appendTaskLog(taskId, "error", `Review could not run: ${String(error)}`),
+    );
+  }
+  function helperTaskFinished(_helperTaskId: string, parentTaskId: string): void {
+    // The parent's review was waiting for its helpers; it starts once none is open.
+    startTaskReview(parentTaskId);
   }
 
   return {
@@ -808,8 +794,9 @@ export function initializeWorkflowPartC(ctx: RuntimeContext): WorkflowOrchestrat
     startTaskExecutionForAgent,
     resumePendingContextRollovers,
     startPlannedApprovalMeeting,
-    scheduleNextReviewRound,
     handleTaskRunComplete,
     finishReview,
+    startTaskReview,
+    reviewDeps,
   };
 }

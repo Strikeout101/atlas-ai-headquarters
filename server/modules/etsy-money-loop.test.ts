@@ -58,15 +58,17 @@ import {
 import { generateImage, mockupHtml, registerImage, renderMockup, saveStudioSettings, findChrome } from "./studio.ts";
 import { searchMedia } from "./media-library.ts";
 import {
-  evaluateOpportunities,
-  opportunityBudgetBlock,
-  restartOpportunity,
+  evaluateInitiatives,
+  initiativeBudgetBlock,
+  restartInitiative,
   saveExperimentRules,
   startVariant,
   variantResults,
 } from "./experiments.ts";
-import { ensureAutonomyEngineSchema, queueAutonomyWork } from "./autonomy-engine.ts";
-import { advancePlaybook, getPlaybook, proposeOpportunity, savePlaybook, startPlaybook } from "./playbooks.ts";
+import { ensureAutonomyEngineSchema } from "./autonomy-engine.ts";
+import { getPlaybook, proposeInitiative, savePlaybook } from "./playbooks.ts";
+import { applyWorkModelMigration } from "./bootstrap/schema/work-model-migration.ts";
+import { ensureWorkEngineSchema, initiativeStartBlock } from "./work-engine.ts";
 
 let projectDir: string;
 beforeAll(() => {
@@ -96,10 +98,12 @@ function harness() {
   databases.push(db);
   applyBaseSchema(db);
   applyTaskSchemaMigrations(db);
+  applyWorkModelMigration(db);
   ensureAutonomySchema(db);
   ensureAgentProposalSchema(db);
   ensureFinanceSchema(db);
   ensureAutonomyEngineSchema(db);
+  ensureWorkEngineSchema(db);
   db.prepare(
     "INSERT INTO projects (id,name,project_path,core_goal,created_at,updated_at,business) VALUES ('p1','Etsy shop',?,'Sell digital products',1,1,'ventures')",
   ).run(projectDir);
@@ -108,8 +112,10 @@ function harness() {
       ('planning','Planning','','','','','#000',1),('design','Design','','','','','#000',2);
     INSERT INTO agents (id,name,role,cli_provider,department_id) VALUES
       ('lead-p','Sage','team_leader','codex','planning'),('lead-d','Iris','team_leader','codex','design');
-    INSERT INTO opportunities (id,business,project_id,title,description,budget,status,created_at,updated_at)
-      VALUES ('o1','ventures','p1','Budget planner','Monthly planner',5,'building',1,1);`);
+    INSERT INTO business_goals (id,business,project_id,metric,target,period_start,period_end,created_at,updated_at)
+      VALUES ('g0','ventures',NULL,'revenue',100,0,1,1,1);
+    INSERT INTO initiatives (id,business,project_id,goal_id,title,description,budget,status,created_at,updated_at)
+      VALUES ('o1','ventures','p1','g0','Budget planner','Monthly planner',5,'in_progress',1,1);`);
   return db;
 }
 
@@ -167,7 +173,7 @@ function approvedEtsyListing(db: DatabaseSync) {
       files: ["products/planner.pdf"],
       mockups: ["products/page.png"],
       project_id: "p1",
-      opportunity_id: "o1",
+      initiative_id: "o1",
       taxonomy_id: 2078,
     },
     {},
@@ -292,7 +298,7 @@ describe("Etsy connection", () => {
       listing_url: "https://www.etsy.com/listing/9001/budget-planner",
     });
     expect(db.prepare("SELECT COUNT(*) AS n FROM ledger_entries").get()).toEqual({ n: 0 });
-    expect(db.prepare("SELECT status, launched_at FROM opportunities WHERE id='o1'").get()).toEqual({
+    expect(db.prepare("SELECT status, launched_at FROM initiatives WHERE id='o1'").get()).toEqual({
       status: "launched",
       launched_at: NOW,
     });
@@ -376,16 +382,16 @@ describe("Etsy connection", () => {
     await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 1000 });
     const rows = db
       .prepare(
-        "SELECT source, kind, amount_minor, verified, opportunity_id FROM ledger_entries ORDER BY source, amount_minor",
+        "SELECT source, kind, amount_minor, verified, initiative_id FROM ledger_entries ORDER BY source, amount_minor",
       )
       .all();
     expect(rows).toEqual([
-      { source: "etsy_fee", kind: "expense", amount_minor: 20, verified: 1, opportunity_id: "o1" },
-      { source: "etsy_fee", kind: "expense", amount_minor: 30, verified: 1, opportunity_id: null },
-      { source: "etsy_receipt", kind: "revenue", amount_minor: 450, verified: 1, opportunity_id: "o1" },
-      { source: "etsy_refund", kind: "expense", amount_minor: 450, verified: 1, opportunity_id: null },
+      { source: "etsy_fee", kind: "expense", amount_minor: 20, verified: 1, initiative_id: "o1" },
+      { source: "etsy_fee", kind: "expense", amount_minor: 30, verified: 1, initiative_id: null },
+      { source: "etsy_receipt", kind: "revenue", amount_minor: 450, verified: 1, initiative_id: "o1" },
+      { source: "etsy_refund", kind: "expense", amount_minor: 450, verified: 1, initiative_id: null },
     ]);
-    expect(db.prepare("SELECT favorers, sales FROM opportunity_metrics WHERE opportunity_id='o1'").get()).toEqual({
+    expect(db.prepare("SELECT favorers, sales FROM initiative_metrics WHERE initiative_id='o1'").get()).toEqual({
       favorers: 7,
       sales: 1,
     });
@@ -468,7 +474,7 @@ describe("Etsy listings after launch", () => {
     const submitted = submitListing(db, revision.id, NOW);
     expect(listingApprover(db, submitted, NOW)).toBe("vp");
     decideListing(db, revision.id, true, "owner", "", NOW);
-    startVariant(db, { opportunity_id: "o1", variable: "price", value: "5.00", listing_id: revision.id }, {}, NOW);
+    startVariant(db, { initiative_id: "o1", variable: "price", value: "5.00", listing_id: revision.id }, {}, NOW);
 
     const { fetchFn, calls } = fakeEtsy({
       "PATCH /v3/application/shops/777/listings/9001": () => ({
@@ -514,7 +520,7 @@ describe("Etsy listings after launch", () => {
     // Same images as the live listing, so they are left alone.
     expect(calls.some((call) => call.url.pathname.includes("/images"))).toBe(false);
     expect(getListing(db, live.id)).toMatchObject({ title: "Budget planner 2027", price_minor: 500 });
-    expect(db.prepare("SELECT started_at FROM opportunity_variants WHERE listing_id=?").get(revision.id)).toEqual({
+    expect(db.prepare("SELECT started_at FROM initiative_variants WHERE listing_id=?").get(revision.id)).toEqual({
       started_at: LATER,
     });
     expect(db.prepare("SELECT event FROM autonomy_ledger WHERE event='etsy_revised'").get()).toEqual({
@@ -559,13 +565,13 @@ describe("Etsy listings after launch", () => {
     expect(getListing(db, priced.id)!.status).toBe("approved");
   });
 
-  it("takes down listings of stopped opportunities, but never one the owner brought in", async () => {
+  it("takes down listings of stopped initiatives, but never one the owner brought in", async () => {
     const db = harness();
     connected(db);
     const live = publishedEtsyListing(db);
-    db.prepare("UPDATE opportunities SET status='stopped', stop_reason='no sales in 30 days live' WHERE id='o1'").run();
+    db.prepare("UPDATE initiatives SET status='stopped', stop_reason='no sales in 30 days live' WHERE id='o1'").run();
     db.prepare(
-      `INSERT INTO listing_packages (id,business,platform,opportunity_id,title,status,etsy_listing_id,etsy_state,etsy_adopted,created_at,updated_at)
+      `INSERT INTO listing_packages (id,business,platform,initiative_id,title,status,etsy_listing_id,etsy_state,etsy_adopted,created_at,updated_at)
        VALUES ('adopted','ventures','etsy','o1','Old planner','published','8000','active',1,1,1)`,
     ).run();
     const { fetchFn, calls } = fakeEtsy({
@@ -645,12 +651,12 @@ describe("Etsy listings after launch", () => {
       ["7000", "inactive", false],
     ]);
     expect(() => adoptEtsyListing(db, "9001", {}, NOW)).toThrow("etsy_listing_already_in_atlas");
-    expect(() => adoptEtsyListing(db, "7000", { opportunity_id: "nope" }, NOW)).toThrow("invalid_opportunity_id");
-    const adopted = adoptEtsyListing(db, "7000", { opportunity_id: "o1" }, NOW);
+    expect(() => adoptEtsyListing(db, "7000", { initiative_id: "nope" }, NOW)).toThrow("invalid_initiative_id");
+    const adopted = adoptEtsyListing(db, "7000", { initiative_id: "o1" }, NOW);
     expect(adopted).toMatchObject({
       status: "published",
       etsy_adopted: 1,
-      opportunity_id: "o1",
+      initiative_id: "o1",
       project_id: "p1",
       tags: ["calendar"],
       when_made: "2020_2026",
@@ -1037,16 +1043,19 @@ describe("Etsy shop setup", () => {
     });
     await refreshShopProfile(db, { fetch: fetchFn, now: () => NOW });
     const goal = goalRow(db);
-    const workId = queueShopSetupIfNeeded(db, goal, "Sell event-rental trackers and wedding workbooks.", NOW);
-    expect(workId).toBeTruthy();
-    const proposal = db
-      .prepare(
-        "SELECT p.department_id, p.title, p.description, w.purpose, w.goal_id FROM autonomy_work w JOIN agent_task_proposals p ON p.id=w.proposal_id",
-      )
-      .get() as Record<string, string>;
-    expect(proposal).toMatchObject({ department_id: "design", purpose: "shop_setup", goal_id: "g1" });
-    expect(proposal.description).toContain("etsy.shop_propose");
-    expect(proposal.description).toContain("Sell event-rental trackers");
+    const taskId = queueShopSetupIfNeeded(db, goal, "Sell event-rental trackers and wedding workbooks.", NOW);
+    expect(taskId).toBeTruthy();
+    const task = db.prepare("SELECT * FROM tasks WHERE id=?").get(taskId) as Record<string, string>;
+    expect(task).toMatchObject({
+      department_id: "design",
+      playbook_step: "shop_setup",
+      goal_id: "g1",
+      work_type: "shop_admin",
+      status: "planned",
+      origin: "autonomy",
+    });
+    expect(task.description).toContain("etsy.shop_propose");
+    expect(task.description).toContain("Sell event-rental trackers");
     expect(queueShopSetupIfNeeded(db, goal, "", NOW + 1000)).toBeNull();
   });
 
@@ -1128,13 +1137,13 @@ describe("Etsy shop setup", () => {
       "GET /v3/application/shops/777": () => ({ body: shopBody() }),
       "GET /v3/application/shops/777/sections": () => ({ body: { results: [] } }),
     });
-    startVariant(db, { opportunity_id: "o1", variable: "title", value: "New title" }, {}, NOW - 1);
+    startVariant(db, { initiative_id: "o1", variable: "title", value: "New title" }, {}, NOW - 1);
     await syncEtsy(db, { fetch: fetchFn, now: () => NOW });
     views = 100;
     await syncEtsy(db, { fetch: fetchFn, now: () => NOW + 30 * 60_000 });
     expect(etsyShopListings(db)[0]).toMatchObject({ listing_id: "9001", views: 100 });
     expect(variantResults(db, "o1", NOW + 30 * 60_000)[0]).toMatchObject({ variable: "title", views_gained: 60 });
-    expect(db.prepare("SELECT views FROM opportunity_metrics ORDER BY recorded_at").all()).toEqual([
+    expect(db.prepare("SELECT views FROM initiative_metrics ORDER BY recorded_at").all()).toEqual([
       { views: 40 },
       { views: 100 },
     ]);
@@ -1220,7 +1229,7 @@ describe("image studio", () => {
       business: "ventures" as const,
       projectId: "p1",
       projectPath: projectDir,
-      opportunityId: "o1",
+      initiativeId: "o1",
       agentId: "lead-d",
     };
     const asset = registerImage(
@@ -1237,7 +1246,7 @@ describe("image studio", () => {
       width: 1,
       height: 1,
       cost_minor: 0,
-      opportunity_id: "o1",
+      initiative_id: "o1",
       tags: ["lifestyle"],
     });
     expect(fs.existsSync(path.join(projectDir, asset.path))).toBe(true);
@@ -1262,7 +1271,7 @@ describe("image studio", () => {
     const asset = await renderMockup(
       db,
       { template: "grid", title: "Budget planner", images: ["products/page.png"], tags: ["Planner"] },
-      { business: "ventures", projectId: "p1", projectPath: projectDir, opportunityId: "o1" },
+      { business: "ventures", projectId: "p1", projectPath: projectDir, initiativeId: "o1" },
       { now: () => NOW, render: async (doc) => (rendered.push(doc), Buffer.from("png")) },
     );
     expect(asset).toMatchObject({ kind: "mockup", project_id: "p1", cost_minor: 0, tags: ["planner"] });
@@ -1296,7 +1305,7 @@ describe("image studio", () => {
 
   it("keeps image generation off until configured, and stops at the monthly cap with a recorded cost", async () => {
     const db = harness();
-    const ctx = { business: "ventures" as const, projectId: "p1", projectPath: projectDir, opportunityId: "o1" };
+    const ctx = { business: "ventures" as const, projectId: "p1", projectPath: projectDir, initiativeId: "o1" };
     await expect(generateImage(db, { prompt: "a cozy desk" }, ctx)).rejects.toThrow("studio_generation_off");
     saveStudioSettings(
       db,
@@ -1316,11 +1325,11 @@ describe("image studio", () => {
       })) as typeof fetch;
     const asset = await generateImage(db, { prompt: "a cozy desk" }, ctx, { fetch: fetchFn, now: () => NOW });
     expect(asset).toMatchObject({ kind: "generated", cost_minor: 4, source: "provider:img-1" });
-    expect(db.prepare("SELECT source, amount_minor, verified, opportunity_id FROM ledger_entries").get()).toEqual({
+    expect(db.prepare("SELECT source, amount_minor, verified, initiative_id FROM ledger_entries").get()).toEqual({
       source: "tool_usage",
       amount_minor: 4,
       verified: 0,
-      opportunity_id: "o1",
+      initiative_id: "o1",
     });
     await expect(
       generateImage(db, { prompt: "another desk" }, ctx, { fetch: fetchFn, now: () => NOW }),
@@ -1331,7 +1340,7 @@ describe("image studio", () => {
 describe("experiments and auto-stop", () => {
   it("blocks new work past the budget or task limit, and stops by the owner's rules", () => {
     const db = harness();
-    expect(opportunityBudgetBlock(db, "o1")).toBeNull();
+    expect(initiativeBudgetBlock(db, "o1")).toBeNull();
     upsertProviderLedgerEntry(db, {
       business: "ventures",
       kind: "expense",
@@ -1342,43 +1351,29 @@ describe("experiments and auto-stop", () => {
       verified: false,
       description: "images",
       occurred_at: NOW,
-      opportunity_id: "o1",
+      initiative_id: "o1",
     });
-    expect(opportunityBudgetBlock(db, "o1")).toMatch(/budget reached/);
-    expect(() =>
-      queueAutonomyWork(
-        db,
-        {
-          business: "ventures",
-          project_id: "p1",
-          department_id: "design",
-          title: "More images",
-          description: "x",
-          reason: "y",
-          opportunity_id: "o1",
-        },
-        NOW,
-      ),
-    ).toThrow("opportunity_budget_reached");
-    expect(evaluateOpportunities(db, NOW)).toEqual(["o1"]);
-    expect(db.prepare("SELECT status, stop_reason FROM opportunities WHERE id='o1'").get()).toEqual({
+    expect(initiativeBudgetBlock(db, "o1")).toMatch(/budget reached/);
+    expect(initiativeStartBlock(db, "o1", NOW)).toMatch(/budget reached/);
+    expect(evaluateInitiatives(db, NOW)).toEqual(["o1"]);
+    expect(db.prepare("SELECT status, stop_reason FROM initiatives WHERE id='o1'").get()).toEqual({
       status: "stopped",
       stop_reason: "budget of 5.00 USD used with no sales",
     });
     expect(db.prepare("SELECT event FROM autonomy_ledger WHERE event='auto_stopped'").get()).toBeTruthy();
-    restartOpportunity(db, "o1", NOW + 1);
-    expect(db.prepare("SELECT status FROM opportunities WHERE id='o1'").get()).toEqual({ status: "building" });
+    restartInitiative(db, "o1", NOW + 1);
+    expect(db.prepare("SELECT status FROM initiatives WHERE id='o1'").get()).toEqual({ status: "in_progress" });
     saveExperimentRules(db, { enabled: false });
-    expect(evaluateOpportunities(db, NOW + 2)).toEqual([]);
+    expect(evaluateInitiatives(db, NOW + 2)).toEqual([]);
   });
 
-  it("stops a launched opportunity with no sales after its time limit, but not one that sells", () => {
+  it("stops a launched initiative with no sales after its time limit, but not one that sells", () => {
     const db = harness();
     db.prepare(
-      "UPDATE opportunities SET budget=0, status='launched', launched_at=?, time_limit_days=10 WHERE id='o1'",
+      "UPDATE initiatives SET budget=0, status='launched', launched_at=?, time_limit_days=10 WHERE id='o1'",
     ).run(NOW - 11 * 86_400_000);
     db.exec(
-      "INSERT INTO opportunities (id,business,project_id,title,status,launched_at,time_limit_days,created_at,updated_at) VALUES ('o2','ventures','p1','Seller','launched',1,10,1,1)",
+      "INSERT INTO initiatives (id,business,project_id,goal_id,title,status,launched_at,time_limit_days,created_at,updated_at) VALUES ('o2','ventures','p1','g0','Seller','launched',1,10,1,1)",
     );
     upsertProviderLedgerEntry(db, {
       business: "ventures",
@@ -1390,16 +1385,16 @@ describe("experiments and auto-stop", () => {
       verified: true,
       description: "sale",
       occurred_at: NOW,
-      opportunity_id: "o2",
+      initiative_id: "o2",
     });
-    expect(evaluateOpportunities(db, NOW)).toEqual(["o1"]);
+    expect(evaluateInitiatives(db, NOW)).toEqual(["o1"]);
   });
 
   it("measures each variant over its own window", () => {
     const db = harness();
     const first = startVariant(
       db,
-      { opportunity_id: "o1", variable: "price", value: "4.50" },
+      { initiative_id: "o1", variable: "price", value: "4.50" },
       {},
       NOW - 10 * 86_400_000,
     );
@@ -1413,9 +1408,9 @@ describe("experiments and auto-stop", () => {
       verified: true,
       description: "sale",
       occurred_at: NOW - 9 * 86_400_000,
-      opportunity_id: "o1",
+      initiative_id: "o1",
     });
-    startVariant(db, { opportunity_id: "o1", variable: "price", value: "6.00" }, {}, NOW - 5 * 86_400_000);
+    startVariant(db, { initiative_id: "o1", variable: "price", value: "6.00" }, {}, NOW - 5 * 86_400_000);
     const results = variantResults(db, "o1", NOW);
     expect(results.find((v) => v.id === first.id)).toMatchObject({ sales: 1, revenue_minor: 450 });
     expect(results.find((v) => v.value === "6.00")).toMatchObject({ sales: 0, ended_at: null });
@@ -1423,48 +1418,53 @@ describe("experiments and auto-stop", () => {
 });
 
 describe("Etsy playbook", () => {
-  it("records research ideas, starts the playbook and queues each next step through the normal gates", () => {
+  it("records research ideas under the current goal and its business's playbook", () => {
     const db = harness();
     const playbook = getPlaybook(db, "etsy_digital")!;
-    expect(playbook.steps.map((s) => s.key)).toEqual(["build", "mockups", "listing"]);
+    expect(playbook.steps.map((s) => [s.key, s.work_type ?? null, s.kind ?? "task"])).toEqual([
+      ["build", "product", "task"],
+      ["mockups", "design", "task"],
+      ["listing", "listing", "task"],
+      ["publish", null, "owner_approval"],
+    ]);
+    expect(playbook.steps[2].wait_for).toBe("shop_setup");
+    expect(playbook.caps).toEqual({ task_cap_daily: 3 });
     db.exec(
       "INSERT INTO tasks (id,title,status,created_at,updated_at) VALUES ('t-research','Research','in_progress',1,1)",
     );
-    const idea = proposeOpportunity(
+    // Every initiative belongs to a goal: with only an expired goal, research ideas are refused.
+    expect(() =>
+      proposeInitiative(
+        db,
+        { title: "Orphan idea", description: "No goal to serve" },
+        { business: "ventures", projectId: "p1", taskId: "t-research" },
+        NOW,
+      ),
+    ).toThrow("initiative_needs_goal");
+    db.exec(
+      "INSERT INTO business_goals (id,business,metric,target,period_start,period_end,created_at,updated_at) VALUES ('gcur','ventures','revenue',2000,0,9000000000000000,1,1)",
+    );
+    const idea = proposeInitiative(
       db,
       { title: "Wedding seating chart template", description: "Evidence...", demand_score: 70, budget: 3 },
-      { business: "ventures", projectId: "p1", taskId: "t-research", playbook: "etsy_digital" },
+      { business: "ventures", taskId: "t-research" },
       NOW,
     );
-    expect(idea).toMatchObject({ status: "idea", playbook: "etsy_digital", budget: 3 });
-    const workId = startPlaybook(db, String(idea.id), queueAutonomyWork, NOW);
-    const work = db.prepare("SELECT * FROM autonomy_work WHERE id=?").get(workId) as Record<string, unknown>;
-    expect(work).toMatchObject({ playbook_step: "build", status: "pending", opportunity_id: idea.id });
-    const proposal = db
-      .prepare("SELECT title, department_id, description FROM agent_task_proposals WHERE id=?")
-      .get(String(work.proposal_id)) as Record<string, string>;
-    expect(proposal.title).toBe("Make the product: Wedding seating chart template");
-    expect(proposal.department_id).toBe("design");
-    expect(proposal.description).toContain(`Opportunity ${idea.id}`);
-    const next = advancePlaybook(db, work, queueAutonomyWork, NOW + 1);
-    expect(db.prepare("SELECT playbook_step FROM autonomy_work WHERE id=?").get(next)).toEqual({
-      playbook_step: "mockups",
+    expect(idea).toMatchObject({
+      status: "proposed",
+      goal_id: "gcur",
+      playbook: "etsy_digital",
+      budget: 3,
+      project_id: null,
     });
-    const last = advancePlaybook(
-      db,
-      db.prepare("SELECT * FROM autonomy_work WHERE id=?").get(next) as Record<string, unknown>,
-      queueAutonomyWork,
-      NOW + 2,
-    );
-    advancePlaybook(
-      db,
-      db.prepare("SELECT * FROM autonomy_work WHERE id=?").get(last) as Record<string, unknown>,
-      queueAutonomyWork,
-      NOW + 3,
-    );
-    expect(db.prepare("SELECT playbook_stage FROM opportunities WHERE id=?").get(String(idea.id))).toEqual({
-      playbook_stage: "awaiting_listing",
-    });
+    expect(() =>
+      proposeInitiative(
+        db,
+        { title: "Wedding seating chart template" },
+        { business: "ventures", taskId: "t-research" },
+        NOW,
+      ),
+    ).toThrow("initiative_duplicate");
   });
 
   it("lets the owner edit the steps but not point them at a missing department", () => {
@@ -1490,8 +1490,8 @@ describe("ledger sources on an older database", () => {
     applyBaseSchema(db);
     applyTaskSchemaMigrations(db);
     ensureAutonomySchema(db);
-    db.exec(`CREATE TABLE deals (id TEXT PRIMARY KEY,business TEXT NOT NULL,contact_id TEXT REFERENCES business_contacts(id) ON DELETE SET NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,opportunity_id TEXT REFERENCES opportunities(id),title TEXT NOT NULL,stage TEXT NOT NULL DEFAULT 'lead',expected_amount_minor INTEGER NOT NULL DEFAULT 0,currency TEXT NOT NULL DEFAULT 'USD',notes TEXT NOT NULL DEFAULT '',generated_at INTEGER,published_at INTEGER,ordered_at INTEGER,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
-      CREATE TABLE ledger_entries (id TEXT PRIMARY KEY,business TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('revenue','expense')),amount_minor INTEGER NOT NULL,currency TEXT NOT NULL,source TEXT NOT NULL CHECK(source IN ('manual','square_payment','square_fee')),external_id TEXT,verified INTEGER NOT NULL DEFAULT 0,deal_id TEXT REFERENCES deals(id),opportunity_id TEXT REFERENCES opportunities(id),description TEXT NOT NULL DEFAULT '',occurred_at INTEGER NOT NULL,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(source,external_id));
+    db.exec(`CREATE TABLE deals (id TEXT PRIMARY KEY,business TEXT NOT NULL,contact_id TEXT REFERENCES business_contacts(id) ON DELETE SET NULL,project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,initiative_id TEXT REFERENCES initiatives(id),title TEXT NOT NULL,stage TEXT NOT NULL DEFAULT 'lead',expected_amount_minor INTEGER NOT NULL DEFAULT 0,currency TEXT NOT NULL DEFAULT 'USD',notes TEXT NOT NULL DEFAULT '',generated_at INTEGER,published_at INTEGER,ordered_at INTEGER,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+      CREATE TABLE ledger_entries (id TEXT PRIMARY KEY,business TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('revenue','expense')),amount_minor INTEGER NOT NULL,currency TEXT NOT NULL,source TEXT NOT NULL CHECK(source IN ('manual','square_payment','square_fee')),external_id TEXT,verified INTEGER NOT NULL DEFAULT 0,deal_id TEXT REFERENCES deals(id),initiative_id TEXT REFERENCES initiatives(id),description TEXT NOT NULL DEFAULT '',occurred_at INTEGER NOT NULL,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(source,external_id));
       INSERT INTO ledger_entries VALUES ('old','ventures','revenue',100,'USD','square_payment','x',1,NULL,NULL,'',1,1,1);`);
     ensureFinanceSchema(db);
     upsertProviderLedgerEntry(db, {
@@ -1522,6 +1522,9 @@ describe("agent tools through the gateway", () => {
       db.exec(
         "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-gw','Mockups','in_progress','lead-d','p1',1,1)",
       );
+      db.exec(
+        "INSERT INTO business_goals (id,business,metric,target,period_start,period_end,created_at,updated_at) VALUES ('gcur','ventures','revenue',2000,0,9000000000000000,1,1)",
+      );
       const app = express();
       app.use(express.json());
       registerAgentToolRoutes(app, db, (() => {}) as never);
@@ -1545,10 +1548,8 @@ describe("agent tools through the gateway", () => {
       expect(bytes.subarray(1, 4).toString()).toBe("PNG");
       const found = await call({ operation: "media.search", query: "gateway" }).expect(200);
       expect(found.body.items).toHaveLength(1);
-      const idea = await call({ operation: "opportunity.propose", title: "Gateway idea", demand_score: 50 }).expect(
-        201,
-      );
-      expect(idea.body.item).toMatchObject({ status: "idea", business: "ventures", project_id: "p1" });
+      const idea = await call({ operation: "initiative.propose", title: "Gateway idea", demand_score: 50 }).expect(201);
+      expect(idea.body.item).toMatchObject({ status: "proposed", business: "ventures", project_id: "p1" });
       await call({ operation: "studio.generate", prompt: "a desk" }).expect(400);
       await call({ operation: "media.search" }, createAgentTaskToken("t-gw", "someone-else")).expect(403);
     },
@@ -1560,21 +1561,14 @@ describe("agent tools through the gateway", () => {
     const { default: request } = await import("supertest");
     const { registerAgentToolRoutes } = await import("./routes/ops/agent-tools.ts");
     const { createAgentTaskToken } = await import("../security/agent-task-token.ts");
-    const { queueGoalStrategy } = await import("./goal-strategy.ts");
     const db = harness();
     db.prepare(
       "INSERT INTO business_goals(id,business,project_id,metric,target,period_start,period_end,created_at,updated_at) VALUES ('g1','ventures','p1','verified_revenue',2000,?,?,?,?)",
     ).run(NOW, NOW + 30 * 86_400_000, NOW, NOW);
-    const workId = queueGoalStrategy(
-      db,
-      db.prepare("SELECT * FROM business_goals").get() as never,
-      "no strategy yet",
-      NOW,
-    );
+    // The research phase's synthesis task: it alone may save the goal's strategy.
     db.exec(
-      "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-plan','Strategy','in_progress','lead-p','p1',1,1)",
+      "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,business,goal_id,playbook_step,origin,created_at,updated_at) VALUES ('t-plan','Strategy','in_progress','lead-p','p1','ventures','g1','strategy','autonomy',1,1)",
     );
-    db.prepare("UPDATE autonomy_work SET task_id='t-plan', status='running' WHERE id=?").run(workId);
     const app = express();
     app.use(express.json());
     registerAgentToolRoutes(app, db, (() => {}) as never);
@@ -1582,14 +1576,20 @@ describe("agent tools through the gateway", () => {
       request(app).post("/api/agent-tools").set("x-agent-task-token", createAgentTaskToken(task, "lead-p")).send(data);
     const summary = `Sell printable wedding planners. ${"Median price 7 USD; 290 sales a month needed; start with 30 listings. ".repeat(4)}`;
     const saved = await call({ operation: "strategy.save", summary }).expect(201);
-    expect(saved.body.item).toMatchObject({ goal_id: "g1", task_id: "t-plan", agent_id: "lead-p" });
+    expect(saved.body.item).toMatchObject({
+      goal_id: "g1",
+      task_id: "t-plan",
+      agent_id: "lead-p",
+      status: "proposed",
+      version: 1,
+    });
     const idea = await call({
-      operation: "opportunity.propose",
+      operation: "initiative.propose",
       title: "Printable wedding planner",
       description: "1,200 listings, median 7 USD",
       demand_score: 70,
     }).expect(201);
-    expect(idea.body.item).toMatchObject({ goal_id: "g1", playbook: "etsy_digital", status: "idea" });
+    expect(idea.body.item).toMatchObject({ goal_id: "g1", playbook: "etsy_digital", status: "proposed" });
     db.exec(
       "INSERT INTO tasks (id,title,status,assigned_agent_id,project_id,created_at,updated_at) VALUES ('t-other','Other','in_progress','lead-p','p1',1,1)",
     );

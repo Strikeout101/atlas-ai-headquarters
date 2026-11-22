@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { appendAutonomyLedger, ensureAutonomySchema } from "./autonomy-store.ts";
 import { isBusinessKey } from "./businesses.ts";
-import { opportunityMoney } from "./profit.ts";
+import { initiativeMoney } from "./profit.ts";
 
 /**
- * Experiments and auto-stop. Every opportunity has a money budget (`budget`, in USD), a task limit and a time limit.
+ * Experiments and auto-stop. Every initiative has a money budget (`budget`, in USD), a task limit and a time limit.
  * Agents try variants of a listing (title, price, images, tags) and the results are measured from verified sales and
- * Etsy favorites. Rules the owner can edit stop opportunities that use their budget, run out of time or keep taking
+ * Etsy favorites. Rules the owner can edit stop initiatives that use their budget, run out of time or keep taking
  * work without a sale. A stop is recorded in the autonomy ledger with its reason; the owner can restart one.
  */
 type Db = DatabaseSync;
@@ -15,7 +15,7 @@ type Row = Record<string, unknown>;
 
 export const VARIANT_VARIABLES = ["title", "price", "images", "tags", "other"] as const;
 const DAY_MS = 86_400_000;
-const LIVE_STATUSES = ["researching", "approved", "building", "launched"];
+const LIVE_STATUSES = ["approved", "in_progress", "blocked", "launched", "measuring"];
 
 export interface ExperimentRules {
   enabled: boolean;
@@ -30,9 +30,9 @@ function columns(db: Db, table: string): Set<string> {
 
 export function ensureExperimentSchema(db: Db): void {
   ensureAutonomySchema(db);
-  const have = columns(db, "opportunities");
+  const have = columns(db, "initiatives");
   const add = (name: string, sql: string) => {
-    if (!have.has(name)) db.exec(`ALTER TABLE opportunities ADD COLUMN ${name} ${sql}`);
+    if (!have.has(name)) db.exec(`ALTER TABLE initiatives ADD COLUMN ${name} ${sql}`);
   };
   add("task_limit", "INTEGER NOT NULL DEFAULT 10");
   add("time_limit_days", "INTEGER NOT NULL DEFAULT 30");
@@ -42,17 +42,17 @@ export function ensureExperimentSchema(db: Db): void {
   add("playbook", "TEXT");
   add("playbook_stage", "TEXT");
   add("source_task_id", "TEXT");
-  db.exec(`CREATE TABLE IF NOT EXISTS opportunity_variants (
-    id TEXT PRIMARY KEY, opportunity_id TEXT NOT NULL REFERENCES opportunities(id), listing_id TEXT,
+  db.exec(`CREATE TABLE IF NOT EXISTS initiative_variants (
+    id TEXT PRIMARY KEY, initiative_id TEXT NOT NULL REFERENCES initiatives(id), listing_id TEXT,
     variable TEXT NOT NULL CHECK(variable IN ('title','price','images','tags','other')), value TEXT NOT NULL,
     reason TEXT NOT NULL DEFAULT '', agent_id TEXT, task_id TEXT, started_at INTEGER NOT NULL, ended_at INTEGER
   );
-  CREATE INDEX IF NOT EXISTS idx_variants_opportunity ON opportunity_variants(opportunity_id, started_at);
-  CREATE TABLE IF NOT EXISTS opportunity_metrics (
-    id INTEGER PRIMARY KEY, opportunity_id TEXT NOT NULL, listing_id TEXT, favorers INTEGER, sales INTEGER,
+  CREATE INDEX IF NOT EXISTS idx_variants_initiative ON initiative_variants(initiative_id, started_at);
+  CREATE TABLE IF NOT EXISTS initiative_metrics (
+    id INTEGER PRIMARY KEY, initiative_id TEXT NOT NULL, listing_id TEXT, favorers INTEGER, sales INTEGER,
     revenue_minor INTEGER, currency TEXT, recorded_at INTEGER NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS idx_metrics_opportunity ON opportunity_metrics(opportunity_id, recorded_at);
+  CREATE INDEX IF NOT EXISTS idx_metrics_initiative ON initiative_metrics(initiative_id, recorded_at);
   CREATE TABLE IF NOT EXISTS experiment_rules (
     id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 1,
     stop_when_budget_spent_without_revenue INTEGER NOT NULL DEFAULT 1,
@@ -62,8 +62,8 @@ export function ensureExperimentSchema(db: Db): void {
   );
   INSERT OR IGNORE INTO experiment_rules(id) VALUES (1);`);
   // Lifetime views of the listing, read from Etsy with favorites (2026-11-22).
-  if (!columns(db, "opportunity_metrics").has("views"))
-    db.exec("ALTER TABLE opportunity_metrics ADD COLUMN views INTEGER");
+  if (!columns(db, "initiative_metrics").has("views"))
+    db.exec("ALTER TABLE initiative_metrics ADD COLUMN views INTEGER");
 }
 
 function fail(message: string): never {
@@ -111,103 +111,104 @@ export function saveExperimentRules(db: Db, input: Row, now = Date.now()): Exper
   return experimentRules(db);
 }
 
-/** Tasks the engine has started for an opportunity since its window began (a restart opens a new window). */
-function taskCount(db: Db, opportunity: Row): number {
+/** Tasks started for an initiative since its window began (a restart opens a new window). Retries count once. */
+function taskCount(db: Db, initiative: Row): number {
   return Number(
     (
       db
         .prepare(
-          "SELECT COUNT(*) AS n FROM autonomy_work WHERE opportunity_id=? AND status IN ('planned','running','done','failed') AND created_at>=?",
+          "SELECT COUNT(*) AS n FROM tasks WHERE initiative_id=? AND started_at IS NOT NULL AND created_at>=? AND status<>'cancelled'",
         )
-        .get(String(opportunity.id), Number(opportunity.window_started_at ?? 0)) as { n: number }
+        .get(String(initiative.id), Number(initiative.window_started_at ?? 0)) as { n: number }
     ).n,
   );
 }
 
-function budgetMinor(opportunity: Row): number {
-  return Math.round(Number(opportunity.budget ?? 0) * 100);
+function budgetMinor(initiative: Row): number {
+  return Math.round(Number(initiative.budget ?? 0) * 100);
 }
 
 /**
- * Why new work for this opportunity must not start, or null. An opportunity that earns more than it spent may keep
+ * Why new work for this initiative must not start, or null. An initiative that earns more than it spent may keep
  * going past its budget; one with no sales stops at its money budget and at its task limit.
  */
-export function opportunityBudgetBlock(db: Db, opportunityId: string): string | null {
+export function initiativeBudgetBlock(db: Db, initiativeId: string): string | null {
   ensureExperimentSchema(db);
-  const opportunity = db.prepare("SELECT * FROM opportunities WHERE id=?").get(opportunityId) as Row | undefined;
-  if (!opportunity) return null;
-  if (opportunity.status === "stopped")
-    return `opportunity stopped${opportunity.stop_reason ? `: ${opportunity.stop_reason}` : ""}`;
-  const { spent_minor, earned_minor } = opportunityMoney(db, opportunityId);
-  const budget = budgetMinor(opportunity);
+  const initiative = db.prepare("SELECT * FROM initiatives WHERE id=?").get(initiativeId) as Row | undefined;
+  if (!initiative) return null;
+  if (initiative.status === "stopped")
+    return `initiative stopped${initiative.stop_reason ? `: ${initiative.stop_reason}` : ""}`;
+  const { spent_minor, earned_minor } = initiativeMoney(db, initiativeId);
+  const budget = budgetMinor(initiative);
   if (budget > 0 && spent_minor >= budget && earned_minor < spent_minor)
     return `budget reached (spent ${(spent_minor / 100).toFixed(2)} of ${(budget / 100).toFixed(2)} USD)`;
   if (earned_minor === 0) {
-    const limit = Math.min(Number(opportunity.task_limit ?? 10), experimentRules(db).max_tasks_without_revenue);
-    if (taskCount(db, opportunity) >= limit) return `task limit reached (${limit} tasks without a sale)`;
+    const limit = Math.min(Number(initiative.task_limit ?? 10), experimentRules(db).max_tasks_without_revenue);
+    if (taskCount(db, initiative) >= limit) return `task limit reached (${limit} tasks without a sale)`;
   }
   return null;
 }
 
-function stop(db: Db, opportunity: Row, reason: string, now: number): void {
-  db.prepare("UPDATE opportunities SET status='stopped', stop_reason=?, updated_at=? WHERE id=?").run(
+function stop(db: Db, initiative: Row, reason: string, now: number): void {
+  db.prepare("UPDATE initiatives SET status='stopped', stop_reason=?, updated_at=? WHERE id=?").run(
     reason,
     now,
-    String(opportunity.id),
+    String(initiative.id),
   );
+  // Steps that have not started yet are cancelled; running work finishes.
   db.prepare(
-    "UPDATE autonomy_work SET status='skipped', updated_at=? WHERE opportunity_id=? AND status IN ('pending','planned')",
-  ).run(now, String(opportunity.id));
+    "UPDATE tasks SET status='cancelled', updated_at=? WHERE initiative_id=? AND origin='autonomy' AND status='planned'",
+  ).run(now, String(initiative.id));
   appendAutonomyLedger(
     db,
     {
       event: "auto_stopped",
-      business: isBusinessKey(opportunity.business) ? opportunity.business : null,
-      sourceId: String(opportunity.id),
-      message: `Stopped "${String(opportunity.title).slice(0, 120)}": ${reason}`,
+      business: isBusinessKey(initiative.business) ? initiative.business : null,
+      sourceId: String(initiative.id),
+      message: `Stopped "${String(initiative.title).slice(0, 120)}": ${reason}`,
     },
     now,
   );
 }
 
 /** Applies the owner's stop rules. Returns the ids it stopped. Runs on every engine tick. */
-export function evaluateOpportunities(db: Db, now = Date.now()): string[] {
+export function evaluateInitiatives(db: Db, now = Date.now()): string[] {
   ensureExperimentSchema(db);
   const rules = experimentRules(db);
   if (!rules.enabled) return [];
   const stopped: string[] = [];
   const rows = db
-    .prepare(`SELECT * FROM opportunities WHERE status IN (${LIVE_STATUSES.map(() => "?").join(",")})`)
+    .prepare(`SELECT * FROM initiatives WHERE status IN (${LIVE_STATUSES.map(() => "?").join(",")})`)
     .all(...LIVE_STATUSES) as Row[];
-  for (const opportunity of rows) {
-    const { spent_minor, earned_minor } = opportunityMoney(db, String(opportunity.id));
+  for (const initiative of rows) {
+    const { spent_minor, earned_minor } = initiativeMoney(db, String(initiative.id));
     if (earned_minor > 0) continue;
-    const budget = budgetMinor(opportunity);
+    const budget = budgetMinor(initiative);
     let reason: string | null = null;
     if (rules.stop_when_budget_spent_without_revenue && budget > 0 && spent_minor >= budget)
       reason = `budget of ${(budget / 100).toFixed(2)} USD used with no sales`;
-    const days = Math.min(Number(opportunity.time_limit_days ?? 30), rules.no_sale_days_after_launch);
-    const launchedAt = Number(opportunity.launched_at ?? 0);
-    const windowStart = Math.max(launchedAt, Number(opportunity.window_started_at ?? 0));
+    const days = Math.min(Number(initiative.time_limit_days ?? 30), rules.no_sale_days_after_launch);
+    const launchedAt = Number(initiative.launched_at ?? 0);
+    const windowStart = Math.max(launchedAt, Number(initiative.window_started_at ?? 0));
     if (!reason && launchedAt > 0 && now - windowStart >= days * DAY_MS) reason = `no sales in ${days} days live`;
-    if (!reason && taskCount(db, opportunity) >= rules.max_tasks_without_revenue)
+    if (!reason && taskCount(db, initiative) >= rules.max_tasks_without_revenue)
       reason = `${rules.max_tasks_without_revenue} tasks with no sale`;
     if (reason) {
-      stop(db, opportunity, reason, now);
-      stopped.push(String(opportunity.id));
+      stop(db, initiative, reason, now);
+      stopped.push(String(initiative.id));
     }
   }
   return stopped;
 }
 
-/** Owner: bring a stopped opportunity back with a fresh window for its time and task limits. */
-export function restartOpportunity(db: Db, id: string, now = Date.now()): Row {
+/** Owner: bring a stopped initiative back with a fresh window for its time and task limits. */
+export function restartInitiative(db: Db, id: string, now = Date.now()): Row {
   ensureExperimentSchema(db);
-  const opportunity =
-    (db.prepare("SELECT * FROM opportunities WHERE id=?").get(id) as Row | undefined) ?? fail("opportunity_not_found");
-  if (opportunity.status !== "stopped") fail("opportunity_not_stopped");
-  db.prepare("UPDATE opportunities SET status=?, stop_reason=NULL, window_started_at=?, updated_at=? WHERE id=?").run(
-    opportunity.launched_at ? "launched" : "building",
+  const initiative =
+    (db.prepare("SELECT * FROM initiatives WHERE id=?").get(id) as Row | undefined) ?? fail("initiative_not_found");
+  if (initiative.status !== "stopped") fail("initiative_not_stopped");
+  db.prepare("UPDATE initiatives SET status=?, stop_reason=NULL, window_started_at=?, updated_at=? WHERE id=?").run(
+    initiative.launched_at ? "launched" : "in_progress",
     now,
     now,
     id,
@@ -216,22 +217,22 @@ export function restartOpportunity(db: Db, id: string, now = Date.now()): Row {
     db,
     {
       event: "restarted",
-      business: isBusinessKey(opportunity.business) ? opportunity.business : null,
+      business: isBusinessKey(initiative.business) ? initiative.business : null,
       sourceId: id,
-      message: `Owner restarted "${String(opportunity.title).slice(0, 120)}" with a fresh budget window`,
+      message: `Owner restarted "${String(initiative.title).slice(0, 120)}" with a fresh budget window`,
     },
     now,
   );
-  return db.prepare("SELECT * FROM opportunities WHERE id=?").get(id) as Row;
+  return db.prepare("SELECT * FROM initiatives WHERE id=?").get(id) as Row;
 }
 
-/** A listing for this opportunity went live: the clock for "no sales in N days" starts now. */
-export function markOpportunityLaunched(db: Db, opportunityId: string | null | undefined, now = Date.now()): void {
-  if (!opportunityId) return;
+/** A listing for this initiative went live: the clock for "no sales in N days" starts now. */
+export function markInitiativeLaunched(db: Db, initiativeId: string | null | undefined, now = Date.now()): void {
+  if (!initiativeId) return;
   ensureExperimentSchema(db);
   db.prepare(
-    "UPDATE opportunities SET launched_at=COALESCE(launched_at, ?), status=CASE WHEN status='stopped' THEN status ELSE 'launched' END, updated_at=? WHERE id=?",
-  ).run(now, now, opportunityId);
+    "UPDATE initiatives SET launched_at=COALESCE(launched_at, ?), status=CASE WHEN status='stopped' THEN status ELSE 'launched' END, updated_at=? WHERE id=?",
+  ).run(now, now, initiativeId);
 }
 
 export function startVariant(
@@ -241,27 +242,28 @@ export function startVariant(
   now = Date.now(),
 ): Row {
   ensureExperimentSchema(db);
-  const opportunityId =
-    typeof input.opportunity_id === "string" ? input.opportunity_id : fail("invalid_opportunity_id");
-  const opportunity = db.prepare("SELECT * FROM opportunities WHERE id=?").get(opportunityId) as Row | undefined;
-  if (!opportunity) fail("opportunity_not_found");
-  if (opportunity.status === "stopped") fail("opportunity_stopped");
+  const initiativeId = typeof input.initiative_id === "string" ? input.initiative_id : fail("invalid_initiative_id");
+  const initiative = db.prepare("SELECT * FROM initiatives WHERE id=?").get(initiativeId) as Row | undefined;
+  if (!initiative) fail("initiative_not_found");
+  if (initiative.status === "stopped") fail("initiative_stopped");
   const variable = input.variable;
   if (!(VARIANT_VARIABLES as readonly unknown[]).includes(variable)) fail("invalid_variable");
   const value = typeof input.value === "string" ? input.value.trim() : "";
   if (!value || value.length > 2000) fail("invalid_value");
   const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 1000) : "";
   const listingId = typeof input.listing_id === "string" && input.listing_id ? input.listing_id.slice(0, 128) : null;
-  db.prepare(
-    "UPDATE opportunity_variants SET ended_at=? WHERE opportunity_id=? AND variable=? AND ended_at IS NULL",
-  ).run(now, opportunityId, String(variable));
+  db.prepare("UPDATE initiative_variants SET ended_at=? WHERE initiative_id=? AND variable=? AND ended_at IS NULL").run(
+    now,
+    initiativeId,
+    String(variable),
+  );
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO opportunity_variants(id,opportunity_id,listing_id,variable,value,reason,agent_id,task_id,started_at)
+    `INSERT INTO initiative_variants(id,initiative_id,listing_id,variable,value,reason,agent_id,task_id,started_at)
      VALUES (?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
-    opportunityId,
+    initiativeId,
     listingId,
     String(variable),
     value,
@@ -270,13 +272,13 @@ export function startVariant(
     author.taskId ?? null,
     now,
   );
-  return db.prepare("SELECT * FROM opportunity_variants WHERE id=?").get(id) as Row;
+  return db.prepare("SELECT * FROM initiative_variants WHERE id=?").get(id) as Row;
 }
 
-export function recordOpportunityMetric(
+export function recordInitiativeMetric(
   db: Db,
   input: {
-    opportunity_id: string;
+    initiative_id: string;
     listing_id?: string | null;
     favorers?: number | null;
     views?: number | null;
@@ -288,9 +290,9 @@ export function recordOpportunityMetric(
 ): void {
   ensureExperimentSchema(db);
   db.prepare(
-    "INSERT INTO opportunity_metrics(opportunity_id,listing_id,favorers,views,sales,revenue_minor,currency,recorded_at) VALUES (?,?,?,?,?,?,?,?)",
+    "INSERT INTO initiative_metrics(initiative_id,listing_id,favorers,views,sales,revenue_minor,currency,recorded_at) VALUES (?,?,?,?,?,?,?,?)",
   ).run(
-    input.opportunity_id,
+    input.initiative_id,
     input.listing_id ?? null,
     input.favorers ?? null,
     input.views ?? null,
@@ -302,11 +304,11 @@ export function recordOpportunityMetric(
 }
 
 /** Sales and revenue (verified ledger rows), and favorites and views gained, during each variant's window. */
-export function variantResults(db: Db, opportunityId: string, now = Date.now()) {
+export function variantResults(db: Db, initiativeId: string, now = Date.now()) {
   ensureExperimentSchema(db);
   const variants = db
-    .prepare("SELECT * FROM opportunity_variants WHERE opportunity_id=? ORDER BY started_at DESC LIMIT 20")
-    .all(opportunityId) as Row[];
+    .prepare("SELECT * FROM initiative_variants WHERE initiative_id=? ORDER BY started_at DESC LIMIT 20")
+    .all(initiativeId) as Row[];
   const hasLedger = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get();
   return variants.map(
     (
@@ -324,28 +326,28 @@ export function variantResults(db: Db, opportunityId: string, now = Date.now()) 
         ? (db
             .prepare(
               `SELECT COUNT(*) AS sales, COALESCE(SUM(amount_minor),0) AS revenue FROM ledger_entries
-             WHERE opportunity_id=? AND kind='revenue' AND verified=1 AND occurred_at>=? AND occurred_at<?`,
+             WHERE initiative_id=? AND kind='revenue' AND verified=1 AND occurred_at>=? AND occurred_at<?`,
             )
-            .get(opportunityId, from, to) as { sales: number; revenue: number })
+            .get(initiativeId, from, to) as { sales: number; revenue: number })
         : { sales: 0, revenue: 0 };
       const favorers = (at: number, dir: "first" | "last") =>
         db
           .prepare(
-            `SELECT favorers FROM opportunity_metrics WHERE opportunity_id=? AND favorers IS NOT NULL AND recorded_at${
+            `SELECT favorers FROM initiative_metrics WHERE initiative_id=? AND favorers IS NOT NULL AND recorded_at${
               dir === "first" ? ">=" : "<="
             }? ORDER BY recorded_at ${dir === "first" ? "ASC" : "DESC"} LIMIT 1`,
           )
-          .get(opportunityId, at) as { favorers: number } | undefined;
+          .get(initiativeId, at) as { favorers: number } | undefined;
       const startFav = favorers(from, "first")?.favorers;
       const endFav = favorers(to, "last")?.favorers;
       const views = (at: number, dir: "first" | "last") =>
         db
           .prepare(
-            `SELECT views FROM opportunity_metrics WHERE opportunity_id=? AND views IS NOT NULL AND recorded_at${
+            `SELECT views FROM initiative_metrics WHERE initiative_id=? AND views IS NOT NULL AND recorded_at${
               dir === "first" ? ">=" : "<="
             }? ORDER BY recorded_at ${dir === "first" ? "ASC" : "DESC"} LIMIT 1`,
           )
-          .get(opportunityId, at) as { views: number } | undefined;
+          .get(initiativeId, at) as { views: number } | undefined;
       const startViews = views(from, "first")?.views;
       const endViews = views(to, "last")?.views;
       return {
@@ -360,29 +362,29 @@ export function variantResults(db: Db, opportunityId: string, now = Date.now()) 
   );
 }
 
-/** What the planner sees for one opportunity: money, age, limits and experiment results. */
-export function opportunitySummary(db: Db, opportunity: Row, now = Date.now()) {
-  const money = opportunityMoney(db, String(opportunity.id));
+/** What the planner sees for one initiative: money, age, limits and experiment results. */
+export function initiativeSummary(db: Db, initiative: Row, now = Date.now()) {
+  const money = initiativeMoney(db, String(initiative.id));
   return {
     spent_usd: money.spent_minor / 100,
     earned_usd: money.earned_minor / 100,
-    budget_usd: Number(opportunity.budget ?? 0),
-    days_live: opportunity.launched_at ? Math.floor((now - Number(opportunity.launched_at)) / DAY_MS) : null,
-    tasks_in_window: taskCount(db, opportunity),
-    task_limit: Number(opportunity.task_limit ?? 10),
-    playbook_stage: opportunity.playbook_stage ?? null,
-    stop_reason: opportunity.stop_reason ?? null,
-    // Latest lifetime views and favorites across the opportunity's listings, as Etsy last reported them.
+    budget_usd: Number(initiative.budget ?? 0),
+    days_live: initiative.launched_at ? Math.floor((now - Number(initiative.launched_at)) / DAY_MS) : null,
+    tasks_in_window: taskCount(db, initiative),
+    task_limit: Number(initiative.task_limit ?? 10),
+    playbook_stage: initiative.playbook_stage ?? null,
+    stop_reason: initiative.stop_reason ?? null,
+    // Latest lifetime views and favorites across the initiative's listings, as Etsy last reported them.
     views:
       (
         db
           .prepare(
-            `SELECT SUM(views) AS n FROM (SELECT listing_id, views FROM opportunity_metrics m WHERE opportunity_id=? AND views IS NOT NULL
-             AND recorded_at=(SELECT MAX(recorded_at) FROM opportunity_metrics x WHERE x.opportunity_id=m.opportunity_id AND x.listing_id IS m.listing_id))`,
+            `SELECT SUM(views) AS n FROM (SELECT listing_id, views FROM initiative_metrics m WHERE initiative_id=? AND views IS NOT NULL
+             AND recorded_at=(SELECT MAX(recorded_at) FROM initiative_metrics x WHERE x.initiative_id=m.initiative_id AND x.listing_id IS m.listing_id))`,
           )
-          .get(String(opportunity.id)) as { n: number | null }
+          .get(String(initiative.id)) as { n: number | null }
       ).n ?? null,
-    variants: variantResults(db, String(opportunity.id), now).map((v) => ({
+    variants: variantResults(db, String(initiative.id), now).map((v) => ({
       variable: v.variable,
       value: String(v.value).slice(0, 200),
       days: Math.round(v.days),

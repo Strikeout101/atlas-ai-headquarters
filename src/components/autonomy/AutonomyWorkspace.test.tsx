@@ -10,7 +10,7 @@ vi.mock("../../api/autonomy", () => ({ getAutonomy: vi.fn(), saveAutonomy: vi.fn
 vi.mock("../../api/organization-projects", () => ({ getProjects: vi.fn() }));
 const overview: AutonomyOverview = {
   goals: [],
-  opportunities: [],
+  initiatives: [],
   schedules: [],
   ledger: [],
   config: { daily_start_cap: 6, usage_threshold: 0.8, failure_limit: 3, planning_interval_minutes: 360 },

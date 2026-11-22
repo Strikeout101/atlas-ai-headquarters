@@ -95,80 +95,11 @@ export function createSessionReviewTools(deps: CreateSessionReviewToolsDeps) {
     }
   }
 
-  type ReviewRoundMode = "parallel_remediation" | "merge_synthesis" | "final_decision";
-
-  function getReviewRoundMode(round: number): ReviewRoundMode {
-    if (round <= 1) return "parallel_remediation";
-    if (round === 2) return "merge_synthesis";
-    return "final_decision";
-  }
-
-  function scheduleNextReviewRound(taskId: string, taskTitle: string, currentRound: number, lang: Lang): void {
-    const nextRound = currentRound + 1;
-    appendTaskLog(taskId, "system", `Review round ${currentRound}: scheduling round ${nextRound} finalization meeting`);
-    notifyCeo(
-      pickL(
-        l([
-          `[CEO OFFICE] '${taskTitle}' review round ${currentRound} consolidation is complete. Moving directly to final approval round ${nextRound}.`,
-        ]),
-        lang,
-      ),
-      taskId,
-    );
-    setTimeout(
-      () => {
-        const current = db.prepare("SELECT status FROM tasks WHERE id = ?").get(taskId) as
-          | { status: string }
-          | undefined;
-        if (!current || current.status !== "review") return;
-        finishReview(taskId, taskTitle, {
-          bypassProjectDecisionGate: true,
-          trigger: "review_round_transition",
-        });
-      },
-      randomDelay(1200, 1900),
-    );
-  }
-
-  function getProjectReviewGateSnapshot(projectId: string): {
-    activeTotal: number;
-    activeReview: number;
-    rootReviewTotal: number;
-    ready: boolean;
-  } {
-    const row = db
-      .prepare(
-        `
-  SELECT
-    SUM(CASE WHEN status NOT IN ('done', 'cancelled') THEN 1 ELSE 0 END) AS active_total,
-    SUM(CASE WHEN status NOT IN ('done', 'cancelled') AND status = 'review' THEN 1 ELSE 0 END) AS active_review,
-    SUM(CASE WHEN status = 'review' AND source_task_id IS NULL THEN 1 ELSE 0 END) AS root_review_total
-  FROM tasks
-  WHERE project_id = ?
-`,
-      )
-      .get(projectId) as
-      | {
-          active_total: number | null;
-          active_review: number | null;
-          root_review_total: number | null;
-        }
-      | undefined;
-    const activeTotal = row?.active_total ?? 0;
-    const activeReview = row?.active_review ?? 0;
-    const rootReviewTotal = row?.root_review_total ?? 0;
-    const ready = activeTotal > 0 && activeTotal === activeReview && rootReviewTotal > 0;
-    return { activeTotal, activeReview, rootReviewTotal, ready };
-  }
-
   return {
     ensureTaskExecutionSession,
     endTaskExecutionSession,
     getTaskStatusById,
     isTaskWorkflowInterrupted,
     clearTaskWorkflowState,
-    getReviewRoundMode,
-    scheduleNextReviewRound,
-    getProjectReviewGateSnapshot,
   };
 }

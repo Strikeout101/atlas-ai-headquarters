@@ -8,8 +8,9 @@ import {
   recordContextRollover,
 } from "../agents/context-rollover-store.ts";
 import { summarizeTaskRunFailure } from "../agents/run-failure-summary.ts";
-import { recordAutonomyTaskFailure } from "../../autonomy-engine.ts";
+import { recordStepFailure } from "../../work-engine.ts";
 import { captureTaskLessons } from "../../task-lessons.ts";
+import { ensureHandoffAfterRun } from "../../work-model.ts";
 
 type CreateRunCompleteHandlerDeps = Record<string, any>;
 
@@ -28,7 +29,6 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     broadcast,
     processSubtaskDelegations,
     taskWorktrees,
-    cleanupWorktree,
     findTeamLeader,
     getAgentDisplayName,
     pickL,
@@ -41,6 +41,8 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     recoverCrossDeptQueueAfterMissingCallback,
     subtaskDelegationCallbacks,
     finishReview,
+    startTaskReview,
+    helperTaskFinished,
     reconcileDelegatedSubtasksAfterRun,
     completeTaskWithoutReview,
     isReportDesignCheckpointTask,
@@ -120,7 +122,10 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     } catch {
       /* ignore */
     }
-    const worktreePath = (taskWorktrees.get(taskId) as { worktreePath?: string } | undefined)?.worktreePath;
+    // Code tasks run in a git worktree; every other kind runs in a plain work folder (work restructure).
+    const worktreePath =
+      (taskWorktrees.get(taskId) as { worktreePath?: string } | undefined)?.worktreePath ??
+      ((task as { work_folder?: string | null }).work_folder || undefined);
     const markerRequest = consumeModelUpgradeMarker(db, taskId, worktreePath);
     let gatewayRequest: Record<string, unknown> | undefined;
     if (task.started_at) {
@@ -297,12 +302,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     }
     if (failureKind && exitCode !== 0) {
       if (failureKind === "provider_unavailable" || failureKind === "worker_interrupted")
-        recordAutonomyTaskFailure(
-          db,
-          taskId,
-          "Autonomous worker stopped unexpectedly or its provider became unavailable",
-          t,
-        );
+        recordStepFailure(db, taskId, "the worker stopped unexpectedly or its provider became unavailable", t);
       try {
         holdContextRollover(db, taskId, t);
       } catch {
@@ -332,7 +332,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     const logKind = finalExitCode === 0 ? "completed" : "failed";
     appendTaskLog(taskId, "system", `RUN ${logKind} (exit code: ${finalExitCode})`);
     if (finalExitCode !== 0) {
-      recordAutonomyTaskFailure(db, taskId, `Autonomous run failed (exit code ${finalExitCode})`, t);
+      recordStepFailure(db, taskId, `the run failed (exit code ${finalExitCode})`, t);
       try {
         const logFile = path.join(logsDir, `${taskId}.log`);
         if (fs.existsSync(logFile)) {
@@ -355,22 +355,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       } catch {
         /* Optional schema in isolated tests. */
       }
-      const pendingSubtasks = db
-        .prepare(
-          "SELECT id, target_department_id FROM subtasks WHERE task_id = ? AND status NOT IN ('done', 'cancelled')",
-        )
-        .all(taskId) as Array<{ id: string; target_department_id: string | null }>;
-      if (pendingSubtasks.length > 0) {
-        const now = nowMs();
-        for (const sub of pendingSubtasks) {
-          // Only auto-complete subtasks without a foreign department target
-          if (!sub.target_department_id) {
-            db.prepare("UPDATE subtasks SET status = 'done', completed_at = ? WHERE id = ?").run(now, sub.id);
-            const updated = db.prepare("SELECT * FROM subtasks WHERE id = ?").get(sub.id);
-            broadcast("subtask_update", updated);
-          }
-        }
-      }
+      // Subtasks are marked done only by the agent (its own todo events or subtask.done), never by a clean exit.
       // Trigger delegation for foreign-department subtasks
       processSubtaskDelegations(taskId);
 
@@ -388,8 +373,18 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
                 ? "Lessons: the agent reported none"
                 : "Lessons: none left by the agent";
         appendTaskLog(taskId, "system", note);
+        // The next step and the reviewer read the hand-off, not the log. Write one if the agent skipped task.handoff.
+        const handoff = ensureHandoffAfterRun(db as any, taskId, output);
+        if (handoff?.generated)
+          appendTaskLog(
+            taskId,
+            "system",
+            "Hand-off: the agent skipped task.handoff; ATLAS wrote one from the final output",
+          );
+        else if (handoff)
+          appendTaskLog(taskId, "system", `Hand-off saved by the agent (${handoff.files.length} file(s))`);
       } catch {
-        /* lessons never block completion */
+        /* lessons and hand-offs never block completion */
       }
     }
 
@@ -484,35 +479,18 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     }
 
     if (finalExitCode === 0) {
-      // ── SUCCESS: Move to 'review' for team leader check ──
+      // ── SUCCESS: one reviewer on the other model checks it (task-review.ts) ──
       db.prepare("UPDATE tasks SET status = 'review', updated_at = ? WHERE id = ?").run(t, taskId);
-
-      appendTaskLog(taskId, "system", "Status → review (team leader review pending)");
-
-      const updatedTask = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId);
-      broadcast("task_update", updatedTask);
+      appendTaskLog(taskId, "system", "Status → review");
+      broadcast("task_update", db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId));
       if (task) notifyTaskStatus(taskId, task.title, "review", resolveLang(task.description ?? task.title));
 
-      // Collaboration child tasks should wait in review until parent consolidation meeting.
-      // Queue continuation is still triggered so sequential delegation does not stall.
       if (task?.source_task_id) {
+        // A helper task's result is checked by its parent's reviewer (with its hand-off), so it finishes here.
         reconcileDelegatedSubtasksAfterRun(taskId, 0);
-        const sourceLang = resolveLang(task.description ?? task.title);
-        appendTaskLog(
-          taskId,
-          "system",
-          "Status → review (delegated collaboration task waiting for parent consolidation)",
-        );
-        notifyCeo(
-          pickL(
-            l([
-              `'${task.title}' collaboration child task is now waiting in Review. It will be consolidated in the parent task's single review/merge meeting.`,
-            ]),
-            sourceLang,
-          ),
-          taskId,
-        );
-
+        appendTaskLog(taskId, "system", "Helper task: its parent's reviewer checks this hand-off");
+        finishReview(taskId, task.title);
+        helperTaskFinished?.(taskId, task.source_task_id);
         const nextDelay = 800 + Math.random() * 600;
         const nextCallback = crossDeptNextCallbacks.get(taskId);
         if (nextCallback) {
@@ -529,74 +507,7 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
         return;
       }
 
-      // Notify: task entering review
-      if (task) {
-        const lang = resolveLang(task.description ?? task.title);
-        const leader = findTeamLeader(task.department_id);
-        const leaderName = leader ? getAgentDisplayName(leader, lang) : pickL(l(["Team Lead"]), lang);
-        notifyCeo(pickL(l([`${leaderName} is reviewing the result for '${task.title}'.`]), lang), taskId);
-      }
-
-      // Schedule team leader review message (2-3s delay)
-      setTimeout(() => {
-        if (!task) return;
-        const leader = findTeamLeader(task.department_id);
-        if (!leader) {
-          // No team leader — auto-approve
-          finishReview(taskId, task.title);
-          return;
-        }
-
-        // Read the task result and pretty-parse it for the report
-        let reportBody = "";
-        try {
-          const logFile = path.join(logsDir, `${taskId}.log`);
-          if (fs.existsSync(logFile)) {
-            const raw = fs.readFileSync(logFile, "utf8");
-            const pretty = prettyStreamJson(raw);
-            // Take the last ~500 chars of the pretty output as summary
-            reportBody = pretty.length > 500 ? "..." + pretty.slice(-500) : pretty;
-          }
-        } catch {
-          /* ignore */
-        }
-
-        // If worktree exists, include diff summary in the report
-        const wtInfo = taskWorktrees.get(taskId);
-        let diffSummary = "";
-        if (wtInfo) {
-          diffSummary = getWorktreeDiffSummary(wtInfo.projectPath, taskId);
-          if (hasVisibleDiffSummary(diffSummary)) {
-            appendTaskLog(taskId, "system", `Worktree diff summary:\n${diffSummary}`);
-          }
-        }
-
-        // Team leader sends completion report with actual result content + diff
-        const reportLang = resolveLang(task.description ?? task.title);
-        let reportContent = reportBody
-          ? pickL(l([`CEO, reporting completion for '${task.title}'.\n\n📋 Result:\n${reportBody}`]), reportLang)
-          : pickL(
-              l([`CEO, reporting completion for '${task.title}'. The work has been finished successfully.`]),
-              reportLang,
-            );
-
-        const subtaskProgressLabel = pickL(l(["📌 Remediation/Collaboration Progress"]), reportLang);
-        const subtaskProgress = formatTaskSubtaskProgressSummary(taskId, reportLang);
-        if (subtaskProgress) {
-          reportContent += `\n\n${subtaskProgressLabel}\n${subtaskProgress}`;
-        }
-
-        if (hasVisibleDiffSummary(diffSummary)) {
-          reportContent += pickL(l([`\n\n📝 Changes (branch: ${wtInfo?.branchName}):\n${diffSummary}`]), reportLang);
-        }
-
-        sendAgentMessage(leader, reportContent, "report", "all", null, taskId);
-
-        // After another 2-3s: team leader approves → move to done
-        setTimeout(() => {
-          finishReview(taskId, task.title);
-        }, 2500);
-      }, 2500);
+      startTaskReview?.(taskId);
     } else {
       // ── FAILURE: Reset to inbox, team leader reports failure ──
       db.prepare("UPDATE tasks SET status = 'inbox', updated_at = ? WHERE id = ?").run(t, taskId);
@@ -608,12 +519,9 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
       const updatedTask = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId);
       broadcast("task_update", updatedTask);
 
-      // Clean up worktree on failure — failed work shouldn't persist
-      const failWtInfo = taskWorktrees.get(taskId);
-      if (failWtInfo) {
-        cleanupWorktree(failWtInfo.projectPath, taskId);
-        appendTaskLog(taskId, "system", "Worktree cleaned up (task failed)");
-      }
+      // Keep the work: a retry or "Resume" continues from it instead of starting over (work restructure, phase 2).
+      // Worktrees are cleaned up when the task is finished or cancelled.
+      if (taskWorktrees.get(taskId)) appendTaskLog(taskId, "system", "Worktree kept so the next attempt can continue");
 
       if (task) {
         const leader = findTeamLeader(task.department_id);

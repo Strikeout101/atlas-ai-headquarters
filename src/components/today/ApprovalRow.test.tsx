@@ -43,7 +43,7 @@ describe("ApprovalRow", () => {
       amount_minor: 125,
       currency: "JPY",
       purpose: "One design asset license",
-      opportunity_id: null,
+      initiative_id: null,
     };
     const { onDecide } = renderRow(item);
     expect(screen.getByText(/125/)).toBeInTheDocument();

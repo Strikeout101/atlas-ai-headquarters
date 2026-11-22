@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, isBusinessKey, type BusinessKey } from "./businesses.ts";
 import { businessPolicy } from "./business-policies.ts";
 import { recordApprovalDecision } from "./trust-ramp.ts";
-import { markOpportunityLaunched } from "./experiments.ts";
+import { markInitiativeLaunched } from "./experiments.ts";
 
 /**
  * Listing packages: everything needed to publish one product on a storefront, prepared by agents.
@@ -35,7 +35,7 @@ export interface ListingPackage {
   business: BusinessKey;
   platform: ListingPlatform;
   project_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   title: string;
   description: string;
   tags: string[];
@@ -73,7 +73,7 @@ export function ensureListingSchema(db: DatabaseSync): void {
   db.exec(`CREATE TABLE IF NOT EXISTS listing_packages (
     id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
     platform TEXT NOT NULL CHECK(platform IN ('etsy','itch')),
-    project_id TEXT, opportunity_id TEXT,
+    project_id TEXT, initiative_id TEXT,
     title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '[]',
     price_minor INTEGER NOT NULL DEFAULT 0 CHECK(typeof(price_minor)='integer' AND price_minor BETWEEN 0 AND 100000000),
     currency TEXT NOT NULL DEFAULT 'USD', files TEXT NOT NULL DEFAULT '[]', mockups TEXT NOT NULL DEFAULT '[]',
@@ -174,7 +174,7 @@ const EDITABLE = [
   "mockups",
   "notes",
   "project_id",
-  "opportunity_id",
+  "initiative_id",
   "taxonomy_id",
   "who_made",
   "when_made",
@@ -205,7 +205,7 @@ function contentValues(input: Row, current?: ListingPackage) {
     mockups: filePaths(merged.mockups, "mockups"),
     notes: text(merged.notes, "notes", 4000),
     project_id: text(merged.project_id, "project_id", 128) || null,
-    opportunity_id: text(merged.opportunity_id, "opportunity_id", 128) || null,
+    initiative_id: text(merged.initiative_id, "initiative_id", 128) || null,
     taxonomy_id: (() => {
       const value = merged.taxonomy_id;
       if (value === undefined || value === null || value === "") return null;
@@ -240,7 +240,7 @@ export function createListing(
   const values = contentValues(input);
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO listing_packages (id,business,platform,project_id,opportunity_id,title,description,tags,price_minor,currency,
+    `INSERT INTO listing_packages (id,business,platform,project_id,initiative_id,title,description,tags,price_minor,currency,
       files,mockups,notes,fee_minor,fee_currency,status,agent_id,task_id,created_at,updated_at,taxonomy_id,who_made,when_made)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'draft',?,?,?,?,?,?,?)`,
   ).run(
@@ -248,7 +248,7 @@ export function createListing(
     input.business as string,
     platform,
     values.project_id,
-    values.opportunity_id,
+    values.initiative_id,
     values.title,
     values.description,
     JSON.stringify(values.tags),
@@ -279,11 +279,11 @@ export function updateListing(db: DatabaseSync, id: string, input: Row, now = Da
   if (!Object.keys(input).length) fail("no_fields_to_update");
   const values = contentValues(input, current);
   db.prepare(
-    `UPDATE listing_packages SET project_id=?,opportunity_id=?,title=?,description=?,tags=?,price_minor=?,currency=?,
+    `UPDATE listing_packages SET project_id=?,initiative_id=?,title=?,description=?,tags=?,price_minor=?,currency=?,
       files=?,mockups=?,notes=?,taxonomy_id=?,who_made=?,when_made=?,updated_at=? WHERE id=? AND status='draft'`,
   ).run(
     values.project_id,
-    values.opportunity_id,
+    values.initiative_id,
     values.title,
     values.description,
     JSON.stringify(values.tags),
@@ -368,14 +368,14 @@ export function createRevision(
     platform: target.platform,
     currency: target.currency,
     project_id: target.project_id,
-    opportunity_id: target.opportunity_id,
+    initiative_id: target.initiative_id,
     taxonomy_id: target.taxonomy_id,
     who_made: target.who_made,
     when_made: target.when_made,
   });
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO listing_packages (id,business,platform,project_id,opportunity_id,title,description,tags,price_minor,currency,
+    `INSERT INTO listing_packages (id,business,platform,project_id,initiative_id,title,description,tags,price_minor,currency,
       files,mockups,notes,fee_minor,fee_currency,status,agent_id,task_id,created_at,updated_at,taxonomy_id,who_made,when_made,
       etsy_listing_id,revision_of,listing_url)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,'draft',?,?,?,?,?,?,?,?,?,?)`,
@@ -384,7 +384,7 @@ export function createRevision(
     target.business,
     target.platform,
     values.project_id,
-    values.opportunity_id,
+    values.initiative_id,
     values.title,
     values.description,
     JSON.stringify(values.tags),
@@ -588,7 +588,7 @@ export function markListingPublished(
     if (current.fee_minor > 0 && hasLedger && opts.recordFee !== false) {
       // Recorded by hand, so it is never "verified": only imported payment evidence is.
       db.prepare(
-        `INSERT INTO ledger_entries (id,business,kind,amount_minor,currency,source,external_id,verified,opportunity_id,
+        `INSERT INTO ledger_entries (id,business,kind,amount_minor,currency,source,external_id,verified,initiative_id,
            description,occurred_at,created_at,updated_at)
          VALUES (?,?,'expense',?,?,'manual',?,0,?,?,?,?,?)`,
       ).run(
@@ -597,15 +597,15 @@ export function markListingPublished(
         current.fee_minor,
         current.fee_currency,
         `listing-fee:${current.id}`,
-        current.opportunity_id,
+        current.initiative_id,
         `${current.platform === "etsy" ? "Etsy" : "itch.io"} listing fee: ${current.title}`.slice(0, 300),
         now,
         now,
         now,
       );
     }
-    // The opportunity is live now: its "no sales in N days" clock starts.
-    if (current.opportunity_id) markOpportunityLaunched(db, current.opportunity_id, now);
+    // The initiative is live now: its "no sales in N days" clock starts.
+    if (current.initiative_id) markInitiativeLaunched(db, current.initiative_id, now);
     db.exec("RELEASE listing_published");
     return getListing(db, id)!;
   } catch (error) {

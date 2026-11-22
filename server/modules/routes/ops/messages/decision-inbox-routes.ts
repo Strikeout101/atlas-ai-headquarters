@@ -1,25 +1,25 @@
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
-import type { AgentRow } from "../../shared/types.ts";
 import type { DecisionInboxRouteItem } from "./decision-inbox/types.ts";
 import {
   createDecisionInboxMessengerBridge,
   type DecisionReplyBridgeInput,
   type DecisionReplyBridgeResult,
 } from "./decision-inbox/messenger-bridge.ts";
-import { handleProjectReviewDecisionReply } from "./decision-inbox/project-review-reply.ts";
-import { handleReviewRoundDecisionReply } from "./decision-inbox/review-round-reply.ts";
 import { handleTimeoutResumeDecisionReply } from "./decision-inbox/timeout-reply.ts";
-import { createProjectAndTimeoutDecisionItems } from "./decision-inbox/project-timeout-items.ts";
-import { createReviewRoundDecisionItems } from "./decision-inbox/review-round-items.ts";
-import { createDecisionStateHelpers } from "./decision-inbox/state-helpers.ts";
-import { createProjectReviewPlanningHelpers } from "./decision-inbox/project-review-planning.ts";
-import { createReviewRoundPlanningHelpers } from "./decision-inbox/review-round-planning.ts";
+import { buildReviewOwnerDecisionItems, buildTimeoutResumeDecisionItems } from "./decision-inbox/timeout-items.ts";
 import { readYoloModeEnabled, runYoloDecisionAutopilot } from "./decision-inbox/yolo-mode.ts";
+import { resolveReviewByOwner } from "../../../task-review.ts";
 
 export type { DecisionReplyBridgeInput, DecisionReplyBridgeResult };
 
 export type DecisionInboxRouteBridge = {
   tryHandleInboxDecisionReply: (input: DecisionReplyBridgeInput) => Promise<DecisionReplyBridgeResult>;
+};
+
+const REVIEW_ACTIONS: Record<string, string> = {
+  review_accept: "accept",
+  review_retry: "retry",
+  review_drop: "drop",
 };
 
 export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxRouteBridge {
@@ -30,153 +30,17 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
     nowMs,
     activeProcesses,
     appendTaskLog,
-    broadcast,
-    finishReview,
-    getAgentDisplayName,
     getDeptName,
     getPreferredLanguage,
     l,
     pickL,
-    findTeamLeader,
     normalizeTextField,
-    processSubtaskDelegations,
-    resolveLang,
-    runAgentOneShot,
-    scheduleNextReviewRound,
-    seedReviewRevisionSubtasks,
     startTaskExecutionForAgent,
-    chooseSafeReply,
   } = __ctx;
 
-  const PROJECT_REVIEW_TASK_SELECTED_LOG_PREFIX = "Decision inbox: project review task option selected";
-  const REVIEW_DECISION_RESOLVED_LOG_PREFIX = "Decision inbox: review decision resolved";
-
-  const {
-    buildProjectReviewSnapshotHash,
-    getProjectReviewDecisionState,
-    upsertProjectReviewDecisionState,
-    buildReviewRoundSnapshotHash,
-    getReviewRoundDecisionState,
-    upsertReviewRoundDecisionState,
-    recordProjectReviewDecisionEvent,
-  } = createDecisionStateHelpers({ db, nowMs });
-
-  const { formatPlannerSummaryForDisplay, resolvePlanningLeadMeta, queueProjectReviewPlanningConsolidation } =
-    createProjectReviewPlanningHelpers({
-      db,
-      nowMs,
-      l,
-      pickL,
-      findTeamLeader,
-      runAgentOneShot,
-      chooseSafeReply,
-      getAgentDisplayName,
-      getProjectReviewDecisionState,
-      recordProjectReviewDecisionEvent,
-    });
-
-  const { queueReviewRoundPlanningConsolidation } = createReviewRoundPlanningHelpers({
-    db,
-    nowMs,
-    l,
-    pickL,
-    findTeamLeader,
-    runAgentOneShot,
-    chooseSafeReply,
-    getAgentDisplayName,
-    getReviewRoundDecisionState,
-    formatPlannerSummaryForDisplay,
-    recordProjectReviewDecisionEvent,
-    getProjectReviewDecisionState,
-  });
-
-  const { getProjectReviewTaskChoices, buildProjectReviewDecisionItems, buildTimeoutResumeDecisionItems } =
-    createProjectAndTimeoutDecisionItems({
-      db,
-      nowMs,
-      getPreferredLanguage,
-      pickL,
-      l,
-      buildProjectReviewSnapshotHash,
-      getProjectReviewDecisionState,
-      upsertProjectReviewDecisionState,
-      resolvePlanningLeadMeta,
-      formatPlannerSummaryForDisplay,
-      queueProjectReviewPlanningConsolidation,
-      PROJECT_REVIEW_TASK_SELECTED_LOG_PREFIX,
-    });
-
-  const { getReviewDecisionFallbackLabel, getReviewDecisionNotes, buildReviewRoundDecisionItems } =
-    createReviewRoundDecisionItems({
-      db,
-      nowMs,
-      getPreferredLanguage,
-      pickL,
-      l,
-      buildReviewRoundSnapshotHash,
-      getReviewRoundDecisionState,
-      upsertReviewRoundDecisionState,
-      resolvePlanningLeadMeta,
-      formatPlannerSummaryForDisplay,
-      queueReviewRoundPlanningConsolidation,
-    });
-
-  function openSupplementRound(
-    taskId: string,
-    assignedAgentId: string | null,
-    fallbackDepartmentId: string | null,
-    logPrefix = "Decision inbox",
-  ): { started: boolean; reason: string } {
-    const branchTs = nowMs();
-    db.prepare("UPDATE tasks SET status = 'pending', updated_at = ? WHERE id = ?").run(branchTs, taskId);
-    const pendingTask = db.prepare("SELECT * FROM tasks WHERE id = ?").get(taskId);
-    broadcast("task_update", pendingTask);
-    appendTaskLog(taskId, "system", `${logPrefix}: supplement round opened (review -> pending)`);
-
-    if (!assignedAgentId) {
-      appendTaskLog(taskId, "system", `${logPrefix}: supplement round pending (no assigned agent)`);
-      return { started: false, reason: "no_assignee" };
-    }
-
-    const agent = db.prepare("SELECT * FROM agents WHERE id = ?").get(assignedAgentId) as AgentRow | undefined;
-    if (!agent) {
-      appendTaskLog(taskId, "system", `${logPrefix}: supplement round pending (assigned agent not found)`);
-      return { started: false, reason: "agent_not_found" };
-    }
-    if (agent.status === "offline") {
-      appendTaskLog(taskId, "system", `${logPrefix}: supplement round pending (assigned agent offline)`);
-      return { started: false, reason: "agent_offline" };
-    }
-    if (activeProcesses.has(taskId)) {
-      return { started: false, reason: "already_running" };
-    }
-    if (
-      agent.status === "working" &&
-      agent.current_task_id &&
-      agent.current_task_id !== taskId &&
-      activeProcesses.has(agent.current_task_id)
-    ) {
-      appendTaskLog(
-        taskId,
-        "system",
-        `${logPrefix}: supplement round pending (agent busy on ${agent.current_task_id})`,
-      );
-      return { started: false, reason: "agent_busy" };
-    }
-
-    const deptId = agent.department_id ?? fallbackDepartmentId ?? null;
-    const deptName = deptId ? getDeptName(deptId) : "Unassigned";
-    appendTaskLog(taskId, "system", `${logPrefix}: supplement round execution started`);
-    startTaskExecutionForAgent(taskId, agent, deptId, deptName);
-    return { started: true, reason: "started" };
-  }
-
   function getDecisionInboxItems(): DecisionInboxRouteItem[] {
-    const items = [
-      ...buildProjectReviewDecisionItems(),
-      ...buildReviewRoundDecisionItems(),
-      ...buildTimeoutResumeDecisionItems(),
-    ];
+    const text = { db, nowMs, getPreferredLanguage, pickL, l };
+    const items = [...buildReviewOwnerDecisionItems(text), ...buildTimeoutResumeDecisionItems(text)];
     items.sort((a, b) => b.created_at - a.created_at);
     return items;
   }
@@ -205,9 +69,20 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
       return { status: 400, payload: { error: "option_not_found", option_number: optionNumber } };
     }
 
+    if (currentItem.kind === "review_owner" && currentItem.task_id) {
+      const action = REVIEW_ACTIONS[selectedOption.action];
+      if (!action) return { status: 400, payload: { error: "unknown_review_action" } };
+      const taskId = currentItem.task_id;
+      const notes = typeof body.note === "string" ? body.note : undefined;
+      // Runs in the background: "one more go" starts the agent again.
+      void resolveReviewByOwner(__ctx.reviewDeps, taskId, { action, notes }).catch((error) =>
+        appendTaskLog(taskId, "error", `Owner's review decision failed: ${String(error)}`),
+      );
+      return { status: 200, payload: { ok: true, task_id: taskId, action } };
+    }
+
     let status = 200;
     let payload: Record<string, unknown> = { ok: true };
-    const req = { body } as any;
     const res = {
       status(code: number) {
         status = code;
@@ -218,65 +93,6 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
         return this;
       },
     } as any;
-
-    if (
-      handleProjectReviewDecisionReply({
-        req,
-        res,
-        currentItem,
-        selectedOption,
-        optionNumber,
-        deps: {
-          db,
-          appendTaskLog,
-          nowMs,
-          normalizeTextField,
-          getPreferredLanguage,
-          pickL,
-          l,
-          broadcast,
-          finishReview,
-          getProjectReviewDecisionState,
-          recordProjectReviewDecisionEvent,
-          getProjectReviewTaskChoices,
-          openSupplementRound,
-          processSubtaskDelegations,
-          PROJECT_REVIEW_TASK_SELECTED_LOG_PREFIX,
-        },
-      })
-    ) {
-      return { status, payload };
-    }
-
-    if (
-      handleReviewRoundDecisionReply({
-        req,
-        res,
-        currentItem,
-        selectedOption,
-        optionNumber,
-        deps: {
-          db,
-          l,
-          pickL,
-          nowMs,
-          resolveLang,
-          normalizeTextField,
-          appendTaskLog,
-          processSubtaskDelegations,
-          seedReviewRevisionSubtasks,
-          scheduleNextReviewRound,
-          getProjectReviewDecisionState,
-          getReviewDecisionNotes,
-          getReviewDecisionFallbackLabel,
-          recordProjectReviewDecisionEvent,
-          openSupplementRound,
-          REVIEW_DECISION_RESOLVED_LOG_PREFIX,
-        },
-      })
-    ) {
-      return { status, payload };
-    }
 
     if (
       handleTimeoutResumeDecisionReply({

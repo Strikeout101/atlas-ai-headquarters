@@ -12,7 +12,7 @@ export interface ListingPackage {
   business: BusinessKind;
   platform: ListingPlatform;
   project_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   title: string;
   description: string;
   tags: string[];

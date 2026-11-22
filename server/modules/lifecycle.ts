@@ -13,7 +13,10 @@ import { runVpReviewTick, VP_REVIEW_TICK_MS } from "./vp-review.ts";
 import { executeVpApproval } from "./vp-execution.ts";
 import { isAutonomyAllowed } from "./control-state.ts";
 import { isPasswordConfigured } from "../security/login-sessions.ts";
-import { ensureAutonomyEngineSchema, runAutonomyEngineTick } from "./autonomy-engine.ts";
+import { ensureAutonomyEngineSchema } from "./autonomy-engine.ts";
+import { runWorkEngineTick } from "./work-engine.ts";
+import { queueShopSetupIfNeeded } from "./etsy-shop.ts";
+import { requestFreshResearchOnce } from "./goal-strategy.ts";
 import { runVpPlanningTick } from "./autonomy-planner.ts";
 import { runSquareSyncTick, SQUARE_SYNC_INTERVAL_MS } from "./square-sync.ts";
 import { ETSY_SYNC_INTERVAL_MS, runEtsyTick } from "./etsy.ts";
@@ -42,7 +45,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     distDir,
     endTaskExecutionSession,
     express,
-    finishReview,
+    startTaskReview,
     getDecryptedOAuthToken,
     handleTaskRunComplete,
     isAgentInMeeting,
@@ -68,6 +71,8 @@ export function startLifecycle(ctx: RuntimeContext): void {
     logsDir,
   } = ctx as any;
   ensureAutonomyEngineSchema(db);
+  // Work restructure: each goal's old strategy becomes input for one fresh, wider research run (runs once).
+  if (requestFreshResearchOnce(db)) console.log("[ATLAS] Goals will start a fresh research run when autonomy resumes");
 
   // ---------------------------------------------------------------------------
   // Production: serve React UI from dist/
@@ -148,39 +153,6 @@ export function startLifecycle(ctx: RuntimeContext): void {
         }
       }
     }
-  }
-
-  function pruneDuplicateReviewMeetings(): void {
-    const rows = db
-      .prepare(
-        `
-    WITH ranked AS (
-      SELECT
-        id,
-        ROW_NUMBER() OVER (
-          PARTITION BY task_id, round, status
-          ORDER BY started_at DESC, created_at DESC, id DESC
-        ) AS rn
-      FROM meeting_minutes
-      WHERE meeting_type = 'review'
-        AND status IN ('in_progress', 'failed')
-    )
-    SELECT id
-    FROM ranked
-    WHERE rn > 1
-  `,
-      )
-      .all() as Array<{ id: string }>;
-    if (rows.length === 0) return;
-
-    const delEntries = db.prepare("DELETE FROM meeting_minute_entries WHERE meeting_id = ?");
-    const delMeetings = db.prepare("DELETE FROM meeting_minutes WHERE id = ?");
-    runInTransaction(() => {
-      for (const id of rows.map((r) => r.id)) {
-        delEntries.run(id);
-        delMeetings.run(id);
-      }
-    });
   }
 
   type InProgressRecoveryReason = "startup" | "interval";
@@ -381,7 +353,6 @@ export function startLifecycle(ctx: RuntimeContext): void {
   }
 
   function recoverInterruptedWorkflowOnStartup(): void {
-    pruneDuplicateReviewMeetings();
     try {
       reconcileCrossDeptSubtasks();
     } catch (err) {
@@ -411,7 +382,8 @@ export function startLifecycle(ctx: RuntimeContext): void {
           | { status: string }
           | undefined;
         if (!current || current.status !== "review") return;
-        finishReview(task.id, task.title);
+        // Interrupted reviews run again; ones waiting for the VPs' or owner's decision stay put.
+        startTaskReview(task.id);
       }, delay);
     });
   }
@@ -546,11 +518,12 @@ export function startLifecycle(ctx: RuntimeContext): void {
             recordTaskCreationAudit: (input) => (ctx as any).recordTaskCreationAudit(input),
           }),
       });
-      await runAutonomyEngineTick({
+      await runWorkEngineTick({
         db,
         startTask: (taskId, agent, departmentId, departmentName) =>
           (ctx as any).startTaskExecutionForAgent(taskId, agent, departmentId, departmentName),
         broadcast,
+        hooks: { shopSetup: queueShopSetupIfNeeded },
       });
       await runVpPlanningTick({ db, runAgentOneShot });
     } catch (err) {

@@ -34,15 +34,11 @@ export default function DecisionInboxModal({
     optionNumber: number;
   } | null>(null);
   const [followupDraft, setFollowupDraft] = useState("");
-  const [reviewPickSelections, setReviewPickSelections] = useState<Record<string, number[]>>({});
-  const [reviewPickDrafts, setReviewPickDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) {
       setFollowupTarget(null);
       setFollowupDraft("");
-      setReviewPickSelections({});
-      setReviewPickDrafts({});
       return;
     }
     if (!followupTarget) return;
@@ -52,35 +48,6 @@ export default function DecisionInboxModal({
       setFollowupDraft("");
     }
   }, [open, followupTarget, items]);
-
-  useEffect(() => {
-    setReviewPickSelections((prev) => {
-      const keep = new Set(items.map((item) => item.id));
-      const next: Record<string, number[]> = {};
-      let changed = false;
-      for (const [itemId, nums] of Object.entries(prev)) {
-        if (!keep.has(itemId)) {
-          changed = true;
-          continue;
-        }
-        next[itemId] = nums;
-      }
-      return changed ? next : prev;
-    });
-    setReviewPickDrafts((prev) => {
-      const keep = new Set(items.map((item) => item.id));
-      const next: Record<string, string> = {};
-      let changed = false;
-      for (const [itemId, draft] of Object.entries(prev)) {
-        if (!keep.has(itemId)) {
-          changed = true;
-          continue;
-        }
-        next[itemId] = draft;
-      }
-      return changed ? next : prev;
-    });
-  }, [items]);
 
   const followupItem = useMemo(
     () => (followupTarget ? (items.find((entry) => entry.id === followupTarget.itemId) ?? null) : null),
@@ -113,96 +80,18 @@ export default function DecisionInboxModal({
     setFollowupDraft("");
   }
 
-  function getReviewPickOptions(item: DecisionInboxItem) {
-    return item.options.filter((option) => option.action === "apply_review_pick");
-  }
-
-  function getReviewSkipOption(item: DecisionInboxItem) {
-    return item.options.find((option) => option.action === "skip_to_next_round");
-  }
-
-  function toggleReviewPick(itemId: string, optionNumber: number) {
-    setReviewPickSelections((prev) => {
-      const current = prev[itemId] ?? [];
-      const exists = current.includes(optionNumber);
-      const nextList = exists
-        ? current.filter((num) => num !== optionNumber)
-        : [...current, optionNumber].sort((a, b) => a - b);
-      return {
-        ...prev,
-        [itemId]: nextList,
-      };
-    });
-  }
-
-  function setReviewDraft(itemId: string, value: string) {
-    setReviewPickDrafts((prev) => ({
-      ...prev,
-      [itemId]: value,
-    }));
-  }
-
-  function clearReviewInput(itemId: string) {
-    setReviewPickSelections((prev) => {
-      if (!(itemId in prev)) return prev;
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
-    setReviewPickDrafts((prev) => {
-      if (!(itemId in prev)) return prev;
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
-  }
-
-  function handleSubmitReviewPick(item: DecisionInboxItem) {
-    const pickOptions = getReviewPickOptions(item);
-    const selected = reviewPickSelections[item.id] ?? [];
-    const extraNote = (reviewPickDrafts[item.id] ?? "").trim();
-    const optionNumber = selected[0] ?? pickOptions[0]?.number;
-    if (!optionNumber) return;
-    if (selected.length <= 0 && !extraNote) {
-      window.alert(
-        t({
-          en: "Pick at least one option or enter an extra note.",
-        }),
-      );
-      return;
-    }
-    onReplyOption(item, optionNumber, {
-      selected_option_numbers: selected,
-      ...(extraNote ? { note: extraNote } : {}),
-    });
-    clearReviewInput(item.id);
-  }
-
-  function handleSkipReviewRound(item: DecisionInboxItem) {
-    const skipOption = getReviewSkipOption(item);
-    if (!skipOption) return;
-    clearReviewInput(item.id);
-    onReplyOption(item, skipOption.number);
-  }
-
   const getKindLabel = (kind: DecisionInboxItem["kind"]) => {
-    if (kind === "project_review_ready") {
-      return t({ en: "Project Decision" });
-    }
     if (kind === "task_timeout_resume") {
       return t({ en: "Timeout Resume" });
     }
-    if (kind === "review_round_pick") {
-      return t({
-        en: "Review Round Decision",
-      });
+    if (kind === "review_owner") {
+      return t({ en: "Stuck review" });
     }
     return t({ en: "Agent Request" });
   };
   const getKindAvatarFallback = (kind: DecisionInboxItem["kind"]) => {
-    if (kind === "project_review_ready") return "🧑‍💼";
     if (kind === "task_timeout_resume") return "⏱️";
-    if (kind === "review_round_pick") return "🧾";
+    if (kind === "review_owner") return "🧾";
     return "🤖";
   };
 
@@ -298,81 +187,7 @@ export default function DecisionInboxModal({
                   </div>
 
                   <div className="mt-2 space-y-1.5">
-                    {item.kind === "review_round_pick" ? (
-                      (() => {
-                        if (item.options.length === 0) {
-                          return (
-                            <p className="rounded-md border border-slate-700/70 bg-slate-900/50 px-2.5 py-2 text-xs text-slate-400">
-                              {t({
-                                en: "Planning lead is consolidating opinions...",
-                              })}
-                            </p>
-                          );
-                        }
-                        const pickOptions = getReviewPickOptions(item);
-                        const skipOption = getReviewSkipOption(item);
-                        const selected = reviewPickSelections[item.id] ?? [];
-                        const selectedCount = selected.length;
-                        const draft = reviewPickDrafts[item.id] ?? "";
-                        const isItemBusy = Boolean(busyKey?.startsWith(`${item.id}:`));
-                        return (
-                          <div className="space-y-2">
-                            {pickOptions.map((option) => {
-                              const selectedFlag = selected.includes(option.number);
-                              return (
-                                <button
-                                  key={`${item.id}:${option.number}`}
-                                  type="button"
-                                  onClick={() => toggleReviewPick(item.id, option.number)}
-                                  disabled={isItemBusy}
-                                  className={`decision-inbox-option w-full whitespace-normal break-words rounded-md px-2.5 py-1.5 text-left text-xs leading-relaxed transition disabled:cursor-not-allowed disabled:opacity-60${selectedFlag ? " decision-inbox-option-active" : ""}`}
-                                >
-                                  {`${option.number}. ${option.label}`}
-                                </button>
-                              );
-                            })}
-                            <p className="text-[11px] text-slate-400">
-                              {t({
-                                en: `Selected: ${selectedCount} item(s)`,
-                              })}
-                            </p>
-                            <textarea
-                              value={draft}
-                              onChange={(event) => setReviewDraft(item.id, event.target.value)}
-                              rows={2}
-                              placeholder={t({
-                                en: "Enter extra notes if needed. (Optional)",
-                              })}
-                              className="w-full resize-y rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"
-                            />
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              {skipOption ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSkipReviewRound(item)}
-                                  disabled={isItemBusy}
-                                  className="decision-round-skip rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  {isItemBusy ? t({ en: "Sending..." }) : `${skipOption.number}. ${skipOption.label}`}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => handleSubmitReviewPick(item)}
-                                disabled={isItemBusy}
-                                className="decision-round-submit rounded-md px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isItemBusy
-                                  ? t({ en: "Sending..." })
-                                  : t({
-                                      en: "Run Selected",
-                                    })}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : item.options.length > 0 ? (
+                    {item.options.length > 0 ? (
                       item.options.map((option) => {
                         const key = `${item.id}:${option.number}`;
                         const isBusy = busyKey === key;
@@ -390,13 +205,9 @@ export default function DecisionInboxModal({
                       })
                     ) : (
                       <p className="rounded-md border border-slate-700/70 bg-slate-900/50 px-2.5 py-2 text-xs text-slate-400">
-                        {item.kind === "project_review_ready"
-                          ? t({
-                              en: "Planning lead is consolidating opinions...",
-                            })
-                          : t({
-                              en: "Options are being prepared...",
-                            })}
+                        {t({
+                          en: "Options are being prepared...",
+                        })}
                       </p>
                     )}
                   </div>

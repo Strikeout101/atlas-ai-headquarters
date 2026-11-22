@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { autonomyOverview } from "./autonomy-store.ts";
 import { BUSINESS_KEYS, isBusinessKey, type BusinessKey } from "./businesses.ts";
-import { ensureExperimentSchema, opportunitySummary } from "./experiments.ts";
+import { ensureExperimentSchema, initiativeSummary } from "./experiments.ts";
 import { ensureFinanceSchema } from "./finance-store.ts";
 import { listMilestones } from "./goal-milestones.ts";
 import { profitLines, profitSettings } from "./profit.ts";
@@ -26,21 +26,18 @@ export function streamOverview(db: Db, businessInput: unknown, now = Date.now())
   const goals = (overview.goals as Row[])
     .filter((goal) => goal.business === business)
     .map((goal) => ({ ...goal, milestones: listMilestones(db, String(goal.id)) }));
-  const opportunities = (overview.opportunities as Row[])
-    .filter((opportunity) => opportunity.business === business)
-    .map((opportunity): Row & { results: ReturnType<typeof opportunitySummary> } => ({
-      ...opportunity,
-      results: opportunitySummary(db, opportunity, now),
+  const initiatives = (overview.initiatives as Row[])
+    .filter((initiative) => initiative.business === business)
+    .map((initiative): Row & { results: ReturnType<typeof initiativeSummary> } => ({
+      ...initiative,
+      results: initiativeSummary(db, initiative, now),
     }));
   const work = db
     .prepare(
-      `SELECT w.id, w.status, w.opportunity_id, w.playbook_step, w.created_at, w.task_id, p.title, p.status AS proposal_status,
-              t.status AS task_status
-       FROM autonomy_work w
-       LEFT JOIN agent_task_proposals p ON p.id = w.proposal_id
-       LEFT JOIN tasks t ON t.id = w.task_id
-       WHERE w.business=? AND w.status IN ('pending','planned','running')
-       ORDER BY w.created_at`,
+      `SELECT id, title, status, initiative_id, playbook_step, created_at
+       FROM tasks
+       WHERE business=? AND origin='autonomy' AND status IN ('planned','in_progress','review','pending','inbox')
+       ORDER BY created_at`,
     )
     .all(business) as Row[];
   const listings = table(db, "listing_packages")
@@ -67,15 +64,15 @@ export function streamOverview(db: Db, businessInput: unknown, now = Date.now())
   const events = db
     .prepare("SELECT event, message, created_at FROM autonomy_ledger WHERE business=? ORDER BY id DESC LIMIT 20")
     .all(business);
-  const stages = ["idea", "researching", "approved", "building", "launched", "stopped"];
+  const stages = ["proposed", "approved", "in_progress", "blocked", "launched", "measuring", "stopped", "done"];
   return {
     business,
     businesses: [...BUSINESS_KEYS],
     goals,
     pipeline: Object.fromEntries(
-      stages.map((stage) => [stage, opportunities.filter((o) => o.status === stage).length]),
+      stages.map((stage) => [stage, initiatives.filter((o) => o.status === stage).length]),
     ) as Record<string, number>,
-    opportunities,
+    initiatives,
     next: work,
     listings: Object.fromEntries(listings.map((row) => [row.status, Number(row.n)])),
     schedules,

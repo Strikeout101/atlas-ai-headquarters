@@ -79,7 +79,7 @@ export interface EtsyShopListing {
   quantity: number | null;
   seen_at: number;
   package_id: string | null;
-  opportunity_id: string | null;
+  initiative_id: string | null;
   adopted: boolean;
 }
 
@@ -112,10 +112,10 @@ export const etsyApi = {
       settings: EtsySettings;
     }>("/api/etsy/sync", historyDays === undefined ? {} : { history_days: historyDays }),
   shopListings: async () => (await request<{ ok: true; items: EtsyShopListing[] }>("/api/etsy/listings")).items,
-  adopt: async (etsyListingId: string, opportunityId: string | null) =>
+  adopt: async (etsyListingId: string, initiativeId: string | null) =>
     (
       await post<{ ok: true; item: ListingPackage }>(`/api/etsy/listings/${encodeURIComponent(etsyListingId)}/adopt`, {
-        opportunity_id: opportunityId,
+        initiative_id: initiativeId,
       })
     ).item,
   shop: async () => {

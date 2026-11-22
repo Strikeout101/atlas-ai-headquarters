@@ -159,7 +159,7 @@ describe("Etsy card", () => {
       currency: "USD",
       quantity: 1,
       seen_at: 1,
-      opportunity_id: null,
+      initiative_id: null,
       adopted: false,
       num_favorers: 4,
     };
@@ -185,7 +185,7 @@ describe("Etsy card", () => {
     ]);
     vi.mocked(etsyApi.adopt).mockResolvedValue({} as never);
     vi.mocked(autonomy.getAutonomy).mockResolvedValue({
-      opportunities: [
+      initiatives: [
         { id: "o1", business: "ventures", title: "Calendars", status: "launched" },
         { id: "o2", business: "tech", title: "Websites", status: "launched" },
       ],
@@ -197,7 +197,7 @@ describe("Etsy card", () => {
     const list = await screen.findByRole("list", { name: "Shop listings" });
     expect(within(list).getByText("Made by ATLAS")).toBeVisible();
     expect(within(list).getByText(/inactive · 3\.00 USD · 4 favorites/)).toBeVisible();
-    const select = within(list).getByLabelText("Opportunity for Old calendar");
+    const select = within(list).getByLabelText("Initiative for Old calendar");
     expect(within(select).queryByText("Websites")).toBeNull();
     await user.selectOptions(select, "o1");
     await user.click(within(list).getByRole("button", { name: "Bring into ATLAS" }));

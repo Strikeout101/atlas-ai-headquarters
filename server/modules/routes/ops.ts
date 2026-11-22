@@ -74,7 +74,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
   const fetchClaudeUsage = __ctx.fetchClaudeUsage;
   const fetchCodexUsage = __ctx.fetchCodexUsage;
   const fetchGeminiUsage = __ctx.fetchGeminiUsage;
-  const finishReview = __ctx.finishReview;
+  const startTaskReview = __ctx.startTaskReview;
   const firstQueryValue = __ctx.firstQueryValue;
   const generateProjectContext = __ctx.generateProjectContext;
   const getActiveOAuthAccountIds = __ctx.getActiveOAuthAccountIds;
@@ -280,7 +280,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
             const current = db.prepare("SELECT status FROM tasks WHERE id = ?").get(task.id) as
               | { status: string }
               | undefined;
-            if (current?.status === "review") finishReview(task.id, task.title);
+            if (current?.status === "review") startTaskReview(task.id);
           },
           1200 + idx * 400,
         );

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { BUSINESS_SQL_LIST, type BusinessKey } from "./businesses.ts";
 import { getFinancialGoalProgress } from "./finance-store.ts";
+import { businessGoalsTableSql, initiativesTableSql } from "./bootstrap/schema/work-model-migration.ts";
 
 export interface AutonomyConfig {
   id: number;
@@ -14,26 +15,8 @@ export interface AutonomyConfig {
 /** Phase 4 data only. No goal, venture or routine is enabled by installing the schema. */
 export function ensureAutonomySchema(db: DatabaseSync): void {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS business_goals (
-      id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
-      project_id TEXT NOT NULL REFERENCES projects(id), metric TEXT NOT NULL, target REAL NOT NULL CHECK(target>=0),
-      currency TEXT NOT NULL DEFAULT 'USD',
-      period_start INTEGER NOT NULL, period_end INTEGER NOT NULL CHECK(period_end>period_start),
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS opportunities (
-      id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
-      project_id TEXT NOT NULL REFERENCES projects(id), goal_id TEXT REFERENCES business_goals(id),
-      title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
-      demand_score REAL NOT NULL DEFAULT 0 CHECK(demand_score BETWEEN 0 AND 100),
-      revenue_score REAL NOT NULL DEFAULT 0 CHECK(revenue_score BETWEEN 0 AND 100),
-      cost_score REAL NOT NULL DEFAULT 0 CHECK(cost_score BETWEEN 0 AND 100),
-      difficulty_score REAL NOT NULL DEFAULT 0 CHECK(difficulty_score BETWEEN 0 AND 100),
-      time_to_launch_score REAL NOT NULL DEFAULT 0 CHECK(time_to_launch_score BETWEEN 0 AND 100),
-      budget REAL NOT NULL DEFAULT 0 CHECK(budget>=0),
-      status TEXT NOT NULL DEFAULT 'idea' CHECK(status IN ('idea','researching','approved','building','launched','stopped')),
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    );
+    ${businessGoalsTableSql()};
+    ${initiativesTableSql()};
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
       project_id TEXT NOT NULL REFERENCES projects(id), department_id TEXT REFERENCES departments(id),
@@ -42,13 +25,6 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
       interval_minutes INTEGER NOT NULL CHECK(interval_minutes>0), next_run_at INTEGER NOT NULL,
       enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)), consecutive_failures INTEGER NOT NULL DEFAULT 0,
       last_task_id TEXT REFERENCES tasks(id), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS autonomy_work (
-      id TEXT PRIMARY KEY, business TEXT NOT NULL CHECK(business IN (${BUSINESS_SQL_LIST})),
-      project_id TEXT NOT NULL REFERENCES projects(id), opportunity_id TEXT REFERENCES opportunities(id),
-      schedule_id TEXT REFERENCES schedules(id), proposal_id TEXT, task_id TEXT REFERENCES tasks(id),
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','planned','running','done','failed','skipped')),
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS autonomy_ledger (
       id INTEGER PRIMARY KEY, event TEXT NOT NULL, business TEXT, source_id TEXT, task_id TEXT,
@@ -62,8 +38,6 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     );
     INSERT OR IGNORE INTO autonomy_config(id) VALUES (1);
     CREATE INDEX IF NOT EXISTS idx_autonomy_ledger_created ON autonomy_ledger(created_at);
-    CREATE INDEX IF NOT EXISTS idx_autonomy_work_status ON autonomy_work(status,created_at);
-    CREATE INDEX IF NOT EXISTS idx_autonomy_work_task ON autonomy_work(task_id);
     CREATE INDEX IF NOT EXISTS idx_schedules_due ON schedules(enabled,next_run_at);
     CREATE TABLE IF NOT EXISTS autonomy_provider_invocations (
       invocation_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, provider_id TEXT NOT NULL,
@@ -154,7 +128,7 @@ export function autonomyOverview(db: DatabaseSync) {
     }));
   return {
     goals,
-    opportunities: db.prepare("SELECT * FROM opportunities ORDER BY created_at DESC").all(),
+    initiatives: db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all(),
     schedules: db.prepare("SELECT * FROM schedules ORDER BY next_run_at ASC").all(),
     config: autonomyConfig(db),
     ledger: db.prepare("SELECT * FROM autonomy_ledger ORDER BY id DESC LIMIT 200").all(),
