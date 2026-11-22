@@ -28,6 +28,24 @@ export const UPDATE_HEALTH_TIMEOUT_MS = 90_000;
 export const HEALTHY_RESET_MS = 10 * 60_000;
 export const KEEP_RELEASES = 3;
 export const KEEP_LOG_DAYS = 14;
+/** A watch-loop pass that takes longer than this is logged with the step it was on, and the loop moves on. */
+export const TICK_STALL_MS = 15 * 60_000;
+/** One "alive" line in supervisor.log this often, so a stalled loop shows when it stopped. */
+export const HEARTBEAT_MS = 30 * 60_000;
+
+/**
+ * Settles with `fallback` after `ms` even if `promise` never does. The timer is a normal (ref'd) one, so it fires
+ * whatever else the event loop is doing; a never-settling fetch or child process cannot freeze the caller.
+ */
+export function withDeadline(promise, ms, fallback) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 /** Backoff before restarting after the nth crash in a row: 2s, 4s, 8s ... up to 60s. */
 export function restartDelay(crashesInARow) {
@@ -109,6 +127,8 @@ export function createSupervisor(deps) {
   let healthFailures = 0;
   let stopping = false;
   let busy = false;
+  /** What the supervisor is waiting on right now, for the stall log. */
+  let step = "idle";
   const save = () => deps.writeState({ ...state, server_pid: child?.pid ?? null });
 
   function watch(proc) {
@@ -144,6 +164,7 @@ export function createSupervisor(deps) {
     if (!child) return;
     expectedExit = true;
     const proc = child;
+    step = `stopping server pid ${proc.pid ?? "?"}`;
     await deps.stopServer(proc);
     if (child === proc) child = null;
   }
@@ -152,6 +173,7 @@ export function createSupervisor(deps) {
     const deadline = deps.now() + timeoutMs;
     while (deps.now() < deadline) {
       if (!child) return false;
+      step = "waiting for the new server to be healthy";
       if (await deps.checkHealth()) return true;
       await deps.sleep(2_000);
     }
@@ -233,10 +255,15 @@ export function createSupervisor(deps) {
 
   /** One pass of the watch loop: requests first, then health. */
   async function tick() {
+    step = "reading requests";
     await handle(deps.takeRequest());
+    step = "idle";
     if (stopping || busy || !child) return;
     if (deps.now() - (state.started_at ?? 0) < STARTUP_GRACE_MS) return;
-    if (await deps.checkHealth()) {
+    step = "health check";
+    const healthy = await deps.checkHealth();
+    step = "idle";
+    if (healthy) {
       healthFailures = 0;
       if (crashesInARow && deps.now() - (state.started_at ?? 0) > HEALTHY_RESET_MS) crashesInARow = 0;
       return;
@@ -257,6 +284,7 @@ export function createSupervisor(deps) {
     handle,
     update,
     isStopping: () => stopping,
+    currentStep: () => step,
     child: () => child,
     shutdown: async () => {
       stopping = true;
@@ -442,12 +470,22 @@ async function main() {
       killTree(proc.pid);
       setTimeout(resolve, 10_000).unref();
     });
+  // AbortSignal.timeout alone has been seen to leave a fetch pending forever (the watch loop then stopped reading
+  // requests, 2026-11-21); an AbortController with its own timer plus a hard deadline cannot hang.
   const checkHealth = async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(10_000) });
-      return response.ok;
+      const response = await withDeadline(
+        fetch(`http://127.0.0.1:${port}/api/health`, { signal: controller.signal }),
+        12_000,
+        null,
+      );
+      return Boolean(response?.ok);
     } catch {
       return false;
+    } finally {
+      clearTimeout(timer);
     }
   };
   const takeRequest = () => {
@@ -497,16 +535,34 @@ async function main() {
   log(`supervisor started (pid ${process.pid}, port ${port}, data ${dataDir})`);
   await supervisor.boot();
   let lastHealth = 0;
+  let lastHeartbeat = Date.now();
+  let tickRunning = null;
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, 2_000));
     if (supervisor.isStopping()) break;
+    if (Date.now() - lastHeartbeat >= HEARTBEAT_MS) {
+      lastHeartbeat = Date.now();
+      log(`alive (server pid ${supervisor.child()?.pid ?? "none"}${tickRunning ? ", a pass is still running" : ""})`);
+    }
+    // A pass that stalled keeps running in the background; the loop does not wait on it again.
+    if (tickRunning) continue;
     // Requests are checked every 2s; health once a minute.
     if (fs.existsSync(requestFile) || Date.now() - lastHealth >= HEALTH_INTERVAL_MS) {
       if (!fs.existsSync(requestFile)) lastHealth = Date.now();
-      try {
-        await supervisor.tick();
-      } catch (error) {
-        log(`error: ${error?.message ?? error}`);
+      const pass = supervisor.tick().catch((error) => log(`error: ${error?.message ?? error}`));
+      tickRunning = pass;
+      const finished = await withDeadline(
+        pass.then(() => true),
+        TICK_STALL_MS,
+        false,
+      );
+      if (finished) tickRunning = null;
+      else {
+        log(`watch pass stalled for ${TICK_STALL_MS / 60_000} min at "${supervisor.currentStep()}"; carrying on`);
+        void pass.finally(() => {
+          tickRunning = null;
+          log("the stalled watch pass finished");
+        });
       }
     }
   }

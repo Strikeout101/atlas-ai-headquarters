@@ -29,7 +29,12 @@ import { upstreamUpdatesLocked } from "./routes/core/update-auto/upstream-lock.t
 import * as supervisor from "../../scripts/atlas-service/supervisor.mjs";
 
 const cleanup: Array<() => void> = [];
-afterEach(() => cleanup.splice(0).reverse().forEach((fn) => fn()));
+afterEach(() =>
+  cleanup
+    .splice(0)
+    .reverse()
+    .forEach((fn) => fn()),
+);
 
 function tempDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-reliability-"));
@@ -256,6 +261,24 @@ describe("service supervisor", () => {
     expect(h.children.map((c) => c.release)).toEqual(["releases/old", "releases/old"]);
     expect(h.sup.state.restarts).toBe(1);
     expect(h.sup.state.last_exit).toMatchObject({ code: 1 });
+  });
+
+  it("never lets a step that does not settle freeze the watch loop", async () => {
+    const never = new Promise(() => {});
+    expect(await supervisor.withDeadline(never, 20, "gave up")).toBe("gave up");
+    expect(await supervisor.withDeadline(Promise.resolve("done"), 1000, "gave up")).toBe("done");
+  });
+
+  it("still handles an update sent after a restart, and reports what it is doing", async () => {
+    const h = harness();
+    await h.sup.boot();
+    h.requests.push({ action: "restart" });
+    await h.sup.tick();
+    expect(h.sup.currentStep()).toBe("idle");
+    h.requests.push({ action: "update" });
+    await h.sup.tick();
+    expect(h.sup.state).toMatchObject({ current_sha: "new", last_update: { ok: true } });
+    expect(h.children.map((c) => c.release)).toEqual(["releases/old", "releases/old", "releases/new"]);
   });
 
   it("updates to HEAD when the new build is healthy", async () => {
