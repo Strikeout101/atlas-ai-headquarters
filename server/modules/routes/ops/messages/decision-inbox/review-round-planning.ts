@@ -1,3 +1,4 @@
+import { TEAM_VOICE } from "../../../../agent-knowledge.ts";
 import type { ReviewRoundPlanningDeps, ReviewRoundPlanningHelpers } from "./types.ts";
 
 export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps): ReviewRoundPlanningHelpers {
@@ -86,7 +87,7 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
         if (planningLeader) {
           const sourceBlock =
             input.optionNotes.length > 0
-              ? input.optionNotes.map((note, idx) => `${idx + 1}) ${clip(note, 320)}`).join("\n")
+              ? input.optionNotes.map((note, idx) => `${idx + 1}) ${clip(note, 1200)}`).join("\n")
               : pickL(l(["- No round opinions"]), input.lang);
           const prompt = [
             `You are the planning lead (${planningLeader.name}).`,
@@ -94,10 +95,11 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
             `Review round: ${input.reviewRound}`,
             input.projectName ? `Project: '${input.projectName}'` : "Project: (none)",
             `Language: ${input.lang}`,
+            "Every option is written out in full below. Do not open or read anything else; answer straight away.",
             "Goal:",
-            "- Read all round options and summarize each team's stance.",
-            "- Recommend which option numbers the CEO should pick (multiple allowed), or explicitly recommend SKIP.",
-            "- Keep it concise and decision-oriented.",
+            "- In a line or two each, say what each team wants.",
+            "- Recommend which option numbers the owner should pick (several are fine), or say SKIP, and why in one sentence.",
+            TEAM_VOICE,
             "",
             "Round option sources:",
             sourceBlock,
@@ -105,7 +107,7 @@ export function createReviewRoundPlanningHelpers(deps: ReviewRoundPlanningDeps):
           try {
             const run = await runAgentOneShot(planningLeader, prompt, {
               projectPath: input.projectPath || process.cwd(),
-              timeoutMs: 45_000,
+              timeoutMs: 90_000,
               noTools: true,
             });
             const preferred = String(chooseSafeReply(run, input.lang, "summary", planningLeader) || "").trim();

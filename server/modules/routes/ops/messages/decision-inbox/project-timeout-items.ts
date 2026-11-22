@@ -167,14 +167,14 @@ export function createProjectAndTimeoutDecisionItems(
       const summary =
         pendingChoices.length > 0
           ? t(
-              `Project '${projectName}' has all ${activeTotal} active items in Review.\nSelect the ${decisionTargetTotal} target item(s) first.\n${taskProgressLine}\n${pendingList}`,
+              `Everything in '${projectName}' is ready for review (${activeTotal} items).\nPick the ${decisionTargetTotal} item(s) to go over first.\n${taskProgressLine}\n${pendingList}`,
             )
           : requiresRepresentativeSelection
             ? t(
-                `Project '${projectName}' has all ${activeTotal} active items in Review.\nSelection for ${decisionTargetTotal} target item(s) is complete.\nChoose the next step from the options below.`,
+                `Everything in '${projectName}' is ready for review (${activeTotal} items), and you've picked what to go over.\nChoose what happens next below.`,
               )
             : t(
-                `Project '${projectName}' has all ${activeTotal} active items in Review.\nA representative pick step is not required.\nChoose how to proceed from the options below.`,
+                `Everything in '${projectName}' is ready for review (${activeTotal} items).\nChoose what happens next below.`,
               );
       const readyOptions =
         pendingChoices.length > 0
@@ -227,7 +227,7 @@ export function createProjectAndTimeoutDecisionItems(
       if (!decisionState || (decisionState.status !== "ready" && !useCollectingFallback)) {
         queueProjectReviewPlanningConsolidation(row.project_id, projectName, row.project_path, snapshotHash, lang);
         const collectingSummary = t(
-          `Project '${projectName}' has all ${activeTotal} active items in Review.\nPlanning lead is consolidating opinions...\nRepresentative options and meeting action will appear after consolidation.`,
+          `Everything in '${projectName}' is ready for review (${activeTotal} items).\nThe planning lead is looking it over and will suggest a next step in a moment.`,
         );
         out.push({
           id: `project-review-ready:${row.project_id}`,
@@ -249,18 +249,15 @@ export function createProjectAndTimeoutDecisionItems(
       }
 
       const plannerHeader = useCollectingFallback
-        ? t("Planning consolidation delayed - proceeding with baseline options")
-        : t("Planning consolidation complete");
+        ? t("The planning lead's suggestion is taking a while, so here are the choices as they are.")
+        : t(`${planningLeadMeta.agent_name ?? "Planning lead"}'s take:`);
       const plannerSummary = useCollectingFallback
         ? ""
         : formatPlannerSummaryForDisplay(String(decisionState?.planner_summary ?? "").trim());
-      const optionGuide =
-        pendingChoices.length <= 0 ? readyOptions.map((option) => `${option.number}. ${option.label}`).join("\n") : "";
-      const optionGuideBlock = optionGuide ? t(`Available options now:\n${optionGuide}`) : "";
-      const combinedSummaryBase = plannerSummary
-        ? `${plannerHeader}\n${plannerSummary}\n\n${summary}`
-        : `${plannerHeader}\n\n${summary}`;
-      const combinedSummary = optionGuideBlock ? `${combinedSummaryBase}\n\n${optionGuideBlock}` : combinedSummaryBase;
+      // The options are the buttons below the message; listing them here too showed every option twice.
+      const combinedSummary = plannerSummary
+        ? `${summary}\n\n${plannerHeader}\n${plannerSummary}`
+        : `${summary}\n\n${plannerHeader}`;
 
       out.push({
         id: `project-review-ready:${row.project_id}`,

@@ -40,8 +40,27 @@ export function createReviewRoundDecisionItems(deps: ReviewRoundDecisionItemDeps
       .all(taskId, reviewRound, reviewRound, Math.max(boundedLimit * 3, boundedLimit)) as Array<{
       raw_note: string | null;
     }>;
+    // The transcript of this round, to restore notes that were saved cut short ("…").
+    const entries = db
+      .prepare(
+        `SELECT e.department_name, e.speaker_name, e.content FROM meeting_minute_entries e
+         JOIN meeting_minutes m ON m.id = e.meeting_id
+         WHERE m.task_id = ? AND m.meeting_type = 'review' AND m.round = ? ORDER BY e.seq`,
+      )
+      .all(taskId, reviewRound) as Array<{ department_name: string | null; speaker_name: string; content: string }>;
+    const restore = (note: string) => {
+      if (!note.endsWith("…")) return note;
+      const head = note.slice(0, -1).trimEnd();
+      for (const entry of entries) {
+        const full = `${entry.department_name ?? ""} ${entry.speaker_name}: ${String(entry.content).replace(/\s+/g, " ").trim()}`;
+        if (full.startsWith(head) && full.length > head.length) return full;
+      }
+      return note;
+    };
+    // Newest first: the first note seen for a speaker is their latest stance, so each speaker is offered once.
     const out: string[] = [];
     const seen = new Set<string>();
+    const speakers = new Set<string>();
     for (const row of rawRows) {
       const normalized = String(row.raw_note ?? "")
         .replace(/\s+/g, " ")
@@ -50,7 +69,12 @@ export function createReviewRoundDecisionItems(deps: ReviewRoundDecisionItemDeps
       const key = normalized.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push(normalized);
+      const speaker = normalized.match(/^([^:]{1,80}):/)?.[1]?.toLowerCase();
+      if (speaker) {
+        if (speakers.has(speaker)) continue;
+        speakers.add(speaker);
+      }
+      out.push(restore(normalized));
       if (out.length >= limit) break;
     }
     return out;
@@ -126,7 +150,7 @@ export function createReviewRoundDecisionItems(deps: ReviewRoundDecisionItemDeps
       });
 
       const summary = t(
-        `Round ${row.meeting_round} team-lead opinions are consolidated.\nTask: '${taskTitle}'\n${projectName ? `Project: '${projectName}'\n` : ""}You can cherry-pick multiple opinions and include an extra note for remediation in one batch.\nOr choose 'Skip to Next Round' to move directly to round ${nextRound}.`,
+        `The team leads reviewed '${taskTitle}'${projectName ? ` (${projectName})` : ""} and want some changes (round ${row.meeting_round}).\nPick the ones you want made, as many as you like, add a note if you want, then press Run Selected.\nOr skip straight to round ${nextRound}.`,
       );
 
       const snapshotHash = buildReviewRoundSnapshotHash(row.meeting_id, row.meeting_round, notes);
@@ -161,7 +185,7 @@ export function createReviewRoundDecisionItems(deps: ReviewRoundDecisionItemDeps
           lang,
         });
         const collectingSummary = t(
-          `Round ${row.meeting_round} team-lead opinions are consolidated.\nTask: '${taskTitle}'\n${projectName ? `Project: '${projectName}'\n` : ""}Planning lead is consolidating recommendations...\nTeam summary and recommended picks will appear after consolidation.`,
+          `The team leads reviewed '${taskTitle}'${projectName ? ` (${projectName})` : ""} and want some changes (round ${row.meeting_round}).\nThe planning lead is reading their notes and will suggest which to pick in a moment.`,
         );
         out.push({
           id: `review-round-pick:${row.task_id}:${row.meeting_id}`,
@@ -185,17 +209,15 @@ export function createReviewRoundDecisionItems(deps: ReviewRoundDecisionItemDeps
       }
 
       const plannerHeader = useCollectingFallback
-        ? t("Planning consolidation delayed - proceeding with baseline options")
-        : t("Planning consolidation complete");
+        ? t("The planning lead's suggestion is taking a while, so here are the notes as they are.")
+        : t(`${planningLeadMeta.agent_name ?? "Planning lead"}'s take:`);
       const plannerSummary = useCollectingFallback
         ? ""
         : formatPlannerSummaryForDisplay(String(decisionState?.planner_summary ?? "").trim());
-      const optionGuide = options.map((option) => `${option.number}. ${option.label}`).join("\n");
-      const optionGuideBlock = optionGuide ? t(`Available options now:\n${optionGuide}`) : "";
-      const combinedSummaryBase = plannerSummary
-        ? `${plannerHeader}\n${plannerSummary}\n\n${summary}`
-        : `${plannerHeader}\n\n${summary}`;
-      const combinedSummary = optionGuideBlock ? `${combinedSummaryBase}\n\n${optionGuideBlock}` : combinedSummaryBase;
+      // The options are the buttons below the message; listing them here too showed every option twice.
+      const combinedSummary = plannerSummary
+        ? `${summary}\n\n${plannerHeader}\n${plannerSummary}`
+        : `${summary}\n\n${plannerHeader}`;
 
       out.push({
         id: `review-round-pick:${row.task_id}:${row.meeting_id}`,

@@ -1,6 +1,9 @@
 import type { Lang } from "../../../../types/lang.ts";
 import { randomUUID } from "node:crypto";
 
+/** Longest review note kept as a decision option. */
+const REVIEW_NOTE_MAX_CHARS = 1200;
+
 interface AgentRow {
   id: string;
   name: string;
@@ -182,24 +185,30 @@ export function createMeetingMinutesTools(deps: MeetingMinutesDeps) {
     maxItems = REVIEW_MAX_MEMO_ITEMS_PER_ROUND,
     maxPerDepartment = REVIEW_MAX_MEMO_ITEMS_PER_DEPT,
   ): string[] {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    const perDept = new Map<string, number>();
+    // One option per speaker: their latest stance in the round replaces their opening one, so a leader who spoke
+    // twice is not offered twice. Kept whole up to REVIEW_NOTE_MAX_CHARS (it used to stop at 220 characters).
+    void maxPerDepartment;
     const isIssue = (text: string) =>
       /0%|hold|revise|revision|required|pending|risk|block|missing|not attached|incomplete/i.test(text);
-
+    const latest = new Map<string, string>();
     for (const row of transcript) {
       const base = row.content.replace(/\s+/g, " ").trim();
       if (!base || !isIssue(base)) continue;
-      const deptKey = row.department.replace(/\s+/g, " ").trim().toLowerCase() || "unknown";
-      const deptCount = perDept.get(deptKey) ?? 0;
-      if (deptCount >= maxPerDepartment) continue;
+      const speakerKey = `${row.department}|${row.speaker}`.toLowerCase();
       const note = `${row.department} ${row.speaker}: ${base}`;
+      latest.delete(speakerKey);
+      latest.set(
+        speakerKey,
+        note.length > REVIEW_NOTE_MAX_CHARS ? `${note.slice(0, REVIEW_NOTE_MAX_CHARS - 1).trimEnd()}…` : note,
+      );
+    }
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const note of latest.values()) {
       const normalized = normalizeRevisionMemoNote(note);
       if (seen.has(normalized)) continue;
       seen.add(normalized);
-      perDept.set(deptKey, deptCount + 1);
-      out.push(note.length > 220 ? `${note.slice(0, 219).trimEnd()}…` : note);
+      out.push(note);
       if (out.length >= maxItems) break;
     }
     return out;
@@ -218,7 +227,7 @@ export function createMeetingMinutesTools(deps: MeetingMinutesDeps) {
       const normalized = note.toLowerCase();
       if (seen.has(normalized)) continue;
       seen.add(normalized);
-      out.push(note.length > 220 ? `${note.slice(0, 219).trimEnd()}…` : note);
+      out.push(note.length > REVIEW_NOTE_MAX_CHARS ? `${note.slice(0, REVIEW_NOTE_MAX_CHARS - 1).trimEnd()}…` : note);
       if (out.length >= maxItems) break;
     }
     return out;

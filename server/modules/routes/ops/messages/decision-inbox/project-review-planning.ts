@@ -1,3 +1,4 @@
+import { TEAM_VOICE } from "../../../../agent-knowledge.ts";
 import type {
   PlanningLeadMeta,
   PlanningLeadStateLike,
@@ -266,8 +267,10 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
             `You are the planning lead (${planningLeader.name}).`,
             `Consolidate project-level review status for '${projectName}'.`,
             `Language: ${lang}`,
+            "Everything you need is below. Do not open or read anything else; answer straight away.",
+            TEAM_VOICE,
             "Output requirements:",
-            "- Provide one concise paragraph for CEO decision support.",
+            "- One short paragraph that helps the owner decide.",
             "- Include: representative selection guidance, meeting start condition, and follow-up request usage hint.",
             "- If round-level decisions exist, reflect them explicitly in the recommendation.",
             "- Keep it under 10 lines.",
@@ -281,7 +284,7 @@ export function createProjectReviewPlanningHelpers(deps: ProjectReviewPlanningDe
           try {
             const run = await runAgentOneShot(planningLeader, prompt, {
               projectPath: projectPath || process.cwd(),
-              timeoutMs: 45_000,
+              timeoutMs: 90_000,
               noTools: true,
             });
             const preferred = String(chooseSafeReply(run, lang, "summary", planningLeader) || "").trim();

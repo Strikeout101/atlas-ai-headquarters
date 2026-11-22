@@ -325,7 +325,7 @@ export default function DecisionInboxModal({
                                   type="button"
                                   onClick={() => toggleReviewPick(item.id, option.number)}
                                   disabled={isItemBusy}
-                                  className={`decision-inbox-option w-full rounded-md px-2.5 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-60${selectedFlag ? " decision-inbox-option-active" : ""}`}
+                                  className={`decision-inbox-option w-full whitespace-normal break-words rounded-md px-2.5 py-1.5 text-left text-xs leading-relaxed transition disabled:cursor-not-allowed disabled:opacity-60${selectedFlag ? " decision-inbox-option-active" : ""}`}
                                 >
                                   {`${option.number}. ${option.label}`}
                                 </button>
@@ -382,7 +382,7 @@ export default function DecisionInboxModal({
                             type="button"
                             onClick={() => handleOptionClick(item, option.number, option.action)}
                             disabled={isBusy}
-                            className="decision-inbox-option w-full rounded-md px-2.5 py-1.5 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-60"
+                            className="decision-inbox-option w-full whitespace-normal break-words rounded-md px-2.5 py-1.5 text-left text-xs leading-relaxed transition disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {isBusy ? t({ en: "Sending..." }) : `${option.number}. ${option.label}`}
                           </button>

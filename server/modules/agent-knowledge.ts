@@ -185,6 +185,13 @@ const MEMORY_PREAMBLE =
 export const KNOWLEDGE_TOOLS_LINE =
   'Knowledge tools: knowledge.get {"topic":"systems"|"tools"|"business"|"project"|"checklist"|"map"} ("map" says where code lives); memory.search {"query"}; before finishing, memory.add {"kind":"lesson"|"fact","scope":"global"|"business"|"project","title","body"} for anything reusable you learned (never secrets). If you cannot call it, end your final message with up to 3 lines "LESSON: <short title> | <what to do next time>" (or FACT:), or "LESSON: none".';
 
+/**
+ * How agents write to the owner and to each other (2026-11-22, owner asked for less corporate wording). Customer-
+ * facing copy (listings, emails, the shop) follows the business profile's brand voice instead.
+ */
+export const TEAM_VOICE =
+  "[How to write] Like a friendly coworker messaging the owner: plain, casual, short. Say what you did, what you found and what you need, in everyday words. Skip corporate speak (remediation, stakeholders, leverage, deliverables, alignment, action items, circle back) and filler. Customer-facing text (listings, emails, the shop) uses the business's brand voice instead.";
+
 function bytes(text: string): number {
   return Buffer.byteLength(text, "utf8");
 }
@@ -236,6 +243,7 @@ export function buildKnowledgeBlock(db: Db, taskId: string, opts: KnowledgeBlock
     }
     const systems = systemsMax > 0 ? systemsSummary(systemsMax) : "";
     if (systems) sections.push(`[Systems]\n${systems}`);
+    if (withVoice) sections.push(TEAM_VOICE);
     sections.push(KNOWLEDGE_TOOLS_LINE);
     return sections.join("\n");
   };
@@ -248,9 +256,14 @@ export function buildKnowledgeBlock(db: Db, taskId: string, opts: KnowledgeBlock
     [0, 140, 2, 0],
     [0, 0, 0, 0],
   ];
-  for (const [businessMax, memoryMax, memoryCount, systemsMax] of attempts) {
-    const block = render(businessMax, memoryMax, memoryCount, systemsMax);
-    if (bytes(block) <= maxBytes) return block;
+  // The voice line goes first when space is tight; the goal and tools line matter more.
+  let withVoice = true;
+  for (const voice of [true, false]) {
+    withVoice = voice;
+    for (const [businessMax, memoryMax, memoryCount, systemsMax] of attempts) {
+      const block = render(businessMax, memoryMax, memoryCount, systemsMax);
+      if (bytes(block) <= maxBytes) return block;
+    }
   }
   return "";
 }
@@ -297,7 +310,8 @@ export function buildReferenceBlock(db: Db, opts: ReferenceBlockOptions): string
     }
     const systems = systemsMax > 0 ? systemsSummary(systemsMax) : "";
     if (systems) sections.push(`[Systems]\n${systems}`);
-    return sections.length > 1 ? sections.join("\n") : "";
+    sections.push(TEAM_VOICE);
+    return sections.length > 2 ? sections.join("\n") : TEAM_VOICE;
   };
   const attempts: Array<[number, number, number, number]> = [
     [900, 240, 3, 700],

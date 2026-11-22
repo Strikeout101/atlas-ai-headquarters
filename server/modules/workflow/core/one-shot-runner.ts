@@ -7,6 +7,9 @@ import { areRunsAllowed, registerOneShotAbort, RUNS_HALTED_ERROR } from "../../c
 import { createCodexCompletionDrain } from "../agents/providers/codex-completion-drain.ts";
 import { cliPath } from "./gemini-command.ts";
 
+/** Longest reply a one-shot run returns; callers trim further for their own display. */
+const ONE_SHOT_MAX_CHARS = 12000;
+
 type CreateOneShotRunnerDeps = {
   logsDir: string;
   broadcast: (event: string, payload: unknown) => void;
@@ -337,7 +340,9 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     if (exitCode !== 0) {
       const text = opts.rawOutput
         ? prettyStreamJson(rawOutput).trim() || rawOutput.trim()
-        : normalizeConversationReply(rawOutput) || prettyStreamJson(rawOutput).trim() || rawOutput.trim();
+        : normalizeConversationReply(rawOutput, ONE_SHOT_MAX_CHARS) ||
+          prettyStreamJson(rawOutput).trim() ||
+          rawOutput.trim();
       return { text, error: `${provider} exited with code ${exitCode}` };
     }
 
@@ -347,7 +352,9 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
       return { text: pretty || raw };
     }
 
-    const normalized = normalizeConversationReply(rawOutput);
+    // Callers apply their own length limits (meeting bubbles, chat, summaries); cutting here at the default 420
+    // characters left meeting notes and decision options truncated mid-sentence.
+    const normalized = normalizeConversationReply(rawOutput, ONE_SHOT_MAX_CHARS);
     if (normalized) return { text: normalized };
 
     const pretty = prettyStreamJson(rawOutput);
