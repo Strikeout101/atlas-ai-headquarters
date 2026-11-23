@@ -194,7 +194,7 @@ export function createReportWorkflowTools(deps: CreateReportWorkflowToolsDeps) {
     );
 
     if (!task.source_task_id) {
-      void archivePlanningConsolidatedReport(task.id);
+      // The hand-off is the report; the consolidated report runs only when the owner asks for it.
     }
 
     const nextCallback = crossDeptNextCallbacks.get(task.id);

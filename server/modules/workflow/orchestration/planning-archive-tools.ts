@@ -1,3 +1,5 @@
+import { scrubCliNoise } from "../../task-result.ts";
+
 type CreatePlanningArchiveToolsDeps = Record<string, any>;
 
 export function createPlanningArchiveTools(deps: CreatePlanningArchiveToolsDeps) {
@@ -175,7 +177,15 @@ export function createPlanningArchiveTools(deps: CreatePlanningArchiveToolsDeps)
           agent_name: task.agent_name,
           completed_at: task.completed_at,
           latest_report: clipArchiveText(latestReport?.content ?? "", 0),
-          result_snippet: clipArchiveText(task.result ?? "", 0),
+          // The hand-off is the task's structured result; raw output is only a fallback, scrubbed of CLI data.
+          result_snippet: clipArchiveText(
+            (
+              db.prepare("SELECT summary FROM task_handoffs WHERE task_id = ?").get(task.id) as
+                | { summary?: string }
+                | undefined
+            )?.summary || scrubCliNoise(String(task.result ?? "")),
+            0,
+          ),
         };
       });
 

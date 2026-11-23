@@ -30,7 +30,7 @@ export function buildWorkDecisionItems(db: DatabaseSync): DecisionInboxRouteItem
           id: `strategy:${row.id}`,
           kind: "strategy",
           created_at: Number(row.created_at),
-          summary: `${goalTitle.get(String(row.goal_id)) ?? "Goal"}: approve strategy v${Number(row.version ?? 1)}? ${String(row.summary ?? "").slice(0, 500)}`,
+          summary: `${goalTitle.get(String(row.goal_id)) ?? "Goal"}: approve strategy v${Number(row.version ?? 1)}?\n\n${String(row.summary ?? "").slice(0, 8000)}`,
           project_id: null,
           project_name: null,
           project_path: null,

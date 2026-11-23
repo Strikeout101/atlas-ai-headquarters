@@ -198,7 +198,7 @@ export function createReviewFinalizeTools(deps: CreateReviewFinalizeToolsDeps) {
 
       if (!currentTask.source_task_id) {
         // Generate and archive one consolidated project report via planning leader model.
-        void archivePlanningConsolidatedReport(taskId);
+        // The task's hand-off is its report; the old automatic consolidated report (an extra model call) is off.
       }
 
       const nextCallback = crossDeptNextCallbacks.get(taskId);

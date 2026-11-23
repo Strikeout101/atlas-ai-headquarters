@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { scrubCliNoise } from "../../../task-result.ts";
+import { formatHandoff, getHandoff } from "../../../work-model.ts";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
@@ -215,7 +217,7 @@ export function createTaskReportHelpers(deps: HelperDeps) {
       .all(taskId) as Array<{ kind: string; message: string; created_at: number }>;
     const taskMinutes = fetchMeetingMinutesForTask(taskId);
     const reportMessages = fetchReportMessages(taskId);
-    const taskResult = normalizeTaskText(taskRow.result);
+    const taskResult = scrubCliNoise(normalizeTaskText(taskRow.result));
     const docs: Array<Record<string, unknown>> = [];
 
     const addTextDocument = (
@@ -242,6 +244,17 @@ export function createTaskReportHelpers(deps: HelperDeps) {
         content: trimmed,
       });
     };
+
+    const handoff = getHandoff(db as any, taskId);
+    if (handoff) {
+      addTextDocument(
+        `handoff:${taskId}`,
+        "Hand-off",
+        "task_handoff",
+        formatHandoff(handoff, ""),
+        handoff.updated_at ?? null,
+      );
+    }
 
     if (taskResult) {
       addTextDocument(

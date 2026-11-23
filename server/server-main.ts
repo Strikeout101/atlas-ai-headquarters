@@ -47,6 +47,7 @@ import {
   dropRetiredWorkTables,
 } from "./modules/bootstrap/schema/work-model-migration.ts";
 import { ensureReviewSchema } from "./modules/task-review.ts";
+import { scrubStoredRunResults } from "./modules/task-result.ts";
 import { removeOfficePacks } from "./modules/bootstrap/schema/remove-office-packs.ts";
 import { applyDefaultSeeds } from "./modules/bootstrap/schema/seeds.ts";
 import { ensureModelRoutingSchema } from "./modules/model-routing.ts";
@@ -91,6 +92,12 @@ applyWorkModelMigration(db);
         .join(", ")}`,
     );
   // The old per-task autonomy queue (replaced by the work engine's step tasks).
+  // Task results and archived reports stored with raw CLI data (usage, cost, credential expiry) are cleaned once.
+  const scrubbed = scrubStoredRunResults(db);
+  if (scrubbed.results || scrubbed.archives)
+    console.log(
+      `[ATLAS] Cleaned ${scrubbed.results} task result(s) and removed ${scrubbed.archives} old report(s) with CLI data`,
+    );
   const dropped = dropRetiredWorkTables(db);
   if (dropped.length) console.log(`[ATLAS] Removed old work queue tables: ${dropped.join(", ")}`);
 }

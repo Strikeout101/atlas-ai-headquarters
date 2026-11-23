@@ -255,6 +255,7 @@ export function reviewPrompt(deps: ReviewDeps, task: Row, pick: ReviewerPick, ro
     `CHECK:\n${CHECKLIST[type].map((line) => `- ${line}`).join("\n")}\n- It does what the brief asked, completely.`,
     `TASK: ${String(task.title)}\nBRIEF:\n${String(task.description ?? "").slice(0, 6000)}`,
     handoff ? formatHandoff(handoff, "THE AGENT'S HAND-OFF:") : "The agent saved no hand-off.",
+    "The hand-off is saved with the task.handoff tool and shown above; it is never a file. If ATLAS wrote it because the agent skipped the tool, you may ask the agent to call task.handoff.",
     helpers.length ? `HELPER TASKS:\n${helpers.join("\n\n")}` : "",
     open.length
       ? `SUBTASKS STILL OPEN:\n${open.map((s) => `- ${String(s.title)} (${String(s.status)})`).join("\n")}`

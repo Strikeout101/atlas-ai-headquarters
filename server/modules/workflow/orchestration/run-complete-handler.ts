@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { cleanRunResult } from "../../task-result.ts";
 import path from "node:path";
 import { consumeModelUpgradeMarker, createModelUpgradeRequest, getCurrentTaskModelRoute } from "../../model-routing.ts";
 import { buildContextRolloverCheckpoint } from "../agents/context-rollover-checkpoint.ts";
@@ -116,8 +117,8 @@ export function createRunCompleteHandler(deps: CreateRunCompleteHandlerDeps) {
     let result: string | null = null;
     try {
       if (fs.existsSync(logPath)) {
-        const raw = fs.readFileSync(logPath, "utf8");
-        result = raw.slice(-2000);
+        // The agent's readable output; the raw stream ends with usage, cost and credential data.
+        result = cleanRunResult(fs.readFileSync(logPath, "utf8"));
       }
     } catch {
       /* ignore */
