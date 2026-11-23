@@ -19,7 +19,7 @@ export function buildWorkDecisionItems(db: DatabaseSync): DecisionInboxRouteItem
     const initiatives = db
       .prepare(
         `SELECT id, goal_id, title, status, escalation, blocked_reason, created_at, updated_at
-       FROM initiatives WHERE (status='proposed' AND EXISTS (
+       FROM initiatives WHERE (status='proposed' AND approved_at IS NULL AND EXISTS (
          SELECT 1 FROM goal_strategies s WHERE s.goal_id=initiatives.goal_id AND s.status='approved'
        )) OR (status='blocked' AND escalation='owner')`,
       )
@@ -64,7 +64,7 @@ export function buildWorkDecisionItems(db: DatabaseSync): DecisionInboxRouteItem
               ]
             : [
                 { number: 1, action: "initiative_approve", label: "Approve and start building (recommended)" },
-                { number: 2, action: "initiative_defer", label: "Leave this idea for later" },
+                { number: 2, action: "initiative_defer", label: "Not now (park this idea)" },
               ],
         };
       }),

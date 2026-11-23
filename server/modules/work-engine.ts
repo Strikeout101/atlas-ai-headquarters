@@ -290,9 +290,15 @@ export function maybeStartSynthesis(db: Db, goal: Row, now = Date.now()): string
 
 const ACTIVE_BUILD = ["approved", "in_progress", "blocked"];
 
+/** A proposed initiative the owner approved while every build slot was in use: it starts when one frees up. */
+export function isQueuedInitiative(initiative: Row): boolean {
+  return String(initiative.status) === "proposed" && initiative.approved_at != null;
+}
+
 /**
  * The owner picks an initiative to build. The VPs' plan check runs once here: a playbook whose departments are
- * staffed, the playbook's caps and the budget. No task is voted on after this.
+ * staffed, the playbook's caps and the budget. No task is voted on after this. With every build slot in use the
+ * approval is kept and the initiative waits in line (approved_at set, status still proposed); `planGoal` starts it.
  */
 export function approveInitiative(db: Db, initiativeId: string, approvedBy = "owner", now = Date.now()): Row {
   ensureWorkEngineSchema(db);
@@ -313,7 +319,6 @@ export function approveInitiative(db: Db, initiativeId: string, approvedBy = "ow
         .get(String(goal.id), ...ACTIVE_BUILD) as Row
     ).n,
   );
-  if (active >= Number(goal.initiative_slots ?? 3)) fail("goal_slots_full");
   const playbook =
     (initiative.playbook ? getPlaybook(db, String(initiative.playbook)) : null) ??
     playbookForBusiness(db, initiative.business) ??
@@ -321,6 +326,25 @@ export function approveInitiative(db: Db, initiativeId: string, approvedBy = "ow
   for (const step of playbook.steps)
     if (step.kind !== "owner_approval" && !pickStepAgent(db, step.department_id, { importance: "routine" }))
       fail(`playbook_department_unstaffed: ${step.department_id}`);
+  const slots = Number(goal.initiative_slots ?? 3);
+  if (active >= slots) {
+    if (!isQueuedInitiative(initiative)) {
+      db.prepare("UPDATE initiatives SET approved_at=?, approved_by=?, updated_at=? WHERE id=?").run(
+        now,
+        approvedBy,
+        now,
+        initiativeId,
+      );
+      note(
+        db,
+        "initiative_queued",
+        `Approved "${String(initiative.title).slice(0, 100)}". All ${slots} build slots are in use, so it starts as soon as one frees up.`,
+        now,
+        { id: initiativeId, business: initiative.business },
+      );
+    }
+    return db.prepare("SELECT * FROM initiatives WHERE id=?").get(initiativeId) as Row;
+  }
   db.prepare(
     `UPDATE initiatives SET status='approved', playbook=?, playbook_stage=NULL, step_attempts=0, blocked_reason=NULL,
        escalation=NULL, task_cap_daily=?, strategy_id=?, approved_at=?, approved_by=?,
@@ -335,6 +359,22 @@ export function approveInitiative(db: Db, initiativeId: string, approvedBy = "ow
     { id: initiativeId, business: initiative.business },
   );
   return db.prepare("SELECT * FROM initiatives WHERE id=?").get(initiativeId) as Row;
+}
+
+/** The owner says "not now" to a proposed idea: it leaves the inbox, stopped with the reason kept. */
+export function parkInitiative(db: Db, initiativeId: string, now = Date.now()): void {
+  const initiative = db.prepare("SELECT * FROM initiatives WHERE id=?").get(initiativeId) as Row | undefined;
+  if (!initiative) fail("initiative_not_found");
+  if (String(initiative.status) !== "proposed") fail("initiative_not_proposed");
+  db.prepare("UPDATE initiatives SET status='stopped', stop_reason=?, updated_at=? WHERE id=?").run(
+    "Parked by the owner (not now)",
+    now,
+    initiativeId,
+  );
+  note(db, "initiative_parked", `Parked "${String(initiative.title).slice(0, 100)}" for now.`, now, {
+    id: initiativeId,
+    business: initiative.business,
+  });
 }
 
 function stepTask(db: Db, initiativeId: string, stepKey: string): Row | undefined {
@@ -801,6 +841,19 @@ export function planGoal(db: Db, goalId: string, now = Date.now(), hooks: GoalHo
   const strategy = approvedStrategy(db, goalId);
   if (!strategy) return;
   hooks.shopSetup?.(db, goal, String(strategy.summary), now);
+  // Initiatives the owner approved while the slots were full start in the order they were approved.
+  const queued = db
+    .prepare(
+      "SELECT id FROM initiatives WHERE goal_id=? AND status='proposed' AND approved_at IS NOT NULL ORDER BY approved_at",
+    )
+    .all(goalId) as Row[];
+  for (const initiative of queued) {
+    try {
+      if (approveInitiative(db, String(initiative.id), "owner", now).status === "proposed") break; // still full
+    } catch {
+      // A playbook or staffing gap: it stays in line and the next tick tries again.
+    }
+  }
   const initiatives = db
     .prepare(
       "SELECT id FROM initiatives WHERE goal_id=? AND status IN ('approved','in_progress') ORDER BY approved_at, created_at",

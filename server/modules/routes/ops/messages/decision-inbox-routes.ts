@@ -11,7 +11,7 @@ import { readYoloModeEnabled, runYoloDecisionAutopilot } from "./decision-inbox/
 import { resolveReviewByOwner } from "../../../task-review.ts";
 import { buildWorkDecisionItems } from "./decision-inbox/work-items.ts";
 import { decideStrategy } from "../../../goal-strategy.ts";
-import { approveInitiative, resolveEscalation } from "../../../work-engine.ts";
+import { approveInitiative, parkInitiative, resolveEscalation } from "../../../work-engine.ts";
 import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../../security/auth.ts";
 
 export type { DecisionReplyBridgeInput, DecisionReplyBridgeResult };
@@ -99,9 +99,19 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
             note,
           });
         } else if (selectedOption.action === "initiative_approve") {
-          approveInitiative(db, entityId);
+          const approved = approveInitiative(db, entityId);
+          return {
+            status: 200,
+            payload: {
+              ok: true,
+              resolved: true,
+              kind: currentItem.kind,
+              action: selectedOption.action,
+              queued: approved.status === "proposed",
+            },
+          };
         } else if (selectedOption.action === "initiative_defer") {
-          return { status: 200, payload: { ok: true, resolved: false, action: "initiative_defer" } };
+          parkInitiative(db, entityId);
         } else if (selectedOption.action.startsWith("initiative_")) {
           resolveEscalation(
             db,

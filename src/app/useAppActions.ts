@@ -386,7 +386,7 @@ export function useAppActions({
         console.error("Decision reply failed:", error);
         window.alert(
           pickLang(locale, {
-            en: "Failed to send decision reply. Please try again.",
+            en: `Failed to send decision reply (${error instanceof Error ? error.message : "unknown error"}). Please try again.`,
           }),
         );
       } finally {

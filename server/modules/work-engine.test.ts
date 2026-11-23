@@ -19,6 +19,8 @@ import { saveHandoff } from "./work-model.ts";
 import {
   approveInitiative,
   ensureWorkEngineSchema,
+  isQueuedInitiative,
+  parkInitiative,
   MAX_STEP_ATTEMPTS,
   pickStepAgent,
   recordStepFailure,
@@ -321,15 +323,31 @@ describe("initiatives and playbooks", () => {
     expect(h.tasks("initiative_id=?", ids[0])).toHaveLength(3); // nothing more until the owner publishes
   });
 
-  it("keeps to the goal's slots and refuses ideas that are not proposed", async () => {
+  it("queues approvals past the goal's slots and starts them in order as slots free up", async () => {
     const h = harness();
     const { strategy, ids } = await researchedGoal(h);
     decideStrategy(h.db, String(strategy.id), { decision: "approve" }, "owner", h.now());
     for (const id of ids.slice(0, 3)) approveInitiative(h.db, id, "owner", h.now());
-    expect(() => approveInitiative(h.db, ids[3])).toThrow("goal_slots_full");
+    const queued = approveInitiative(h.db, ids[3], "owner", h.now());
+    approveInitiative(h.db, ids[4], "owner", h.now() + 1);
+    expect(queued.status).toBe("proposed");
+    expect(isQueuedInitiative(queued)).toBe(true);
+    expect(h.ledger("initiative_queued")[0]).toContain("starts as soon as one frees up");
     expect(() => approveInitiative(h.db, ids[0])).toThrow("initiative_not_proposed");
+    await h.tick();
+    expect(h.initiative(ids[3]).status).toBe("proposed"); // still full
     h.db.prepare("UPDATE initiatives SET status='stopped' WHERE id=?").run(ids[0]);
-    expect(approveInitiative(h.db, ids[3]).status).toBe("approved");
+    await h.tick();
+    expect(h.initiative(ids[3]).status).not.toBe("proposed");
+    expect(h.initiative(ids[4]).status).toBe("proposed"); // next in line
+  });
+
+  it("parks an idea the owner says not now to", async () => {
+    const h = harness();
+    const { ids } = await researchedGoal(h);
+    parkInitiative(h.db, ids[0], h.now());
+    expect(h.initiative(ids[0])).toMatchObject({ status: "stopped", stop_reason: "Parked by the owner (not now)" });
+    expect(() => parkInitiative(h.db, ids[0])).toThrow("initiative_not_proposed");
   });
 
   it("waits for the shop setup before the listing step", async () => {
