@@ -61,16 +61,16 @@ Plan: `docs/work-restructure-plan.md` (drafted 2026-11-22). Live ATLAS stays on 
 - [ ] Future compatibility migration: version the security audit chain fingerprint and worktree names (`.climpire*`, `climpire/` branches) with fallbacks for existing data. Existing names are intentionally retained for now.
 - [x] Flaky browser spec: `tests/e2e/business-settings.spec.ts` now waits up to 20s for each Settings layout. Its focused rerun passed 4/4 after a full-suite 5s loading failure, 2026-11-22.
 - [x] Phase 4 carry-overs: retired review tables dropped in phase 8; reviews and reviewer shown on Work and Behind the scenes in phase 7; Stuck review owner choices in phase 6 (2026-11-22).
-- [ ] Phase 9: verify the read-only reviewer flags with real Codex and Claude CLIs in the disposable model pass.
+- [ ] **YOU** (testing on live) Phase 9: verify the read-only reviewer flags with real Codex and Claude CLIs in the disposable model pass.
 - [x] Phase 3 carry-overs: owner decision actions (Decision Inbox), optional project on goals/initiatives, model-routing hold returning autonomous tasks to `planned`, and legacy Etsy goal title derived from its project core goal on migration (`execution-start-task.ts`, `work-model-migration.ts`), 2026-11-22.
-- [ ] Phase 9 real-model research and cross-model review. A disposable run completed one Codex market angle with 14 sources; Claude hit its five-hour account limit before its first angle. Resume after the quota resets (`scripts/qa/work-restructure-real-pass.ts`).
+- [ ] **YOU** (testing on live) Phase 9 real-model research and cross-model review. A disposable run completed one Codex market angle with 14 sources; Claude hit its five-hour account limit before its first angle. Resume after the quota resets (`scripts/qa/work-restructure-real-pass.ts`).
 - [x] Phase 4: reviews (2026-11-22, `server/modules/task-review.ts`; one reviewer with file access, structured verdict, auto-return, VP escalation; meetings only for `$` and strategy).
 - [x] Phase 5: leads and staff (2026-11-22, `server/modules/staffing.ts`; leads do important work, delegate at 3+ important waiting, hiring trigger).
 - [x] Phase 6: Decision Inbox rewrite, think-loop settings, casual voice check (2026-11-22, `server/modules/routes/ops/messages/decision-inbox/work-items.ts`, `server/modules/agent-proposals.ts`, `src/app/decision-inbox.ts`, `src/components/autonomy/AutonomyWorkspace.tsx`; see `docs/work-restructure-plan.md` section 12e). Built and verified, not deployed or committed.
 - [x] Phase 7: Goals, Initiative, new Work board, per-agent Behind the scenes; Model Director in Settings (2026-11-22, `src/components/autonomy/`, `src/components/work/`).
 - [x] Phase 8: old 2D office and upstream installer/updater removed; ATLAS names and docs updated, with the compatibility exceptions above (2026-11-22).
 - [x] Phase 9 prerequisite: migrated an isolated live DB copy twice; preserved business and integration rows, integrity OK, zero foreign-key errors, legacy work archived once, and fresh Etsy research queued. Walkthrough copy runs on ports 8820/8821 with Stop Everything active (2026-11-22, `scripts/qa/work-restructure-migration-check.ts`).
-- [ ] **YOU** walk through the isolated Phase 9 preview, then approve release commit and live Update. Back up the live DB immediately before Update, verify health and data, and resume autonomy only after your sign-off.
+- [x] **YOU** (2026-11-23: owner chose to test on live; release 46b7222 committed and pushed, live DB backed up to `backups/claw-empire.before-restructure-update-20261123-002847.sqlite`, service updated from ee2ce22, health OK, migration checked on live: integrity ok, 0 FK errors, 14 agents, the Etsy goal, 5 proposed initiatives, old strategy kept as input, old work archived, 67 messages and 3 ledger rows kept) Walk through, approve the release and update live.
 
 ---
 
