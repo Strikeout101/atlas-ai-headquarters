@@ -31,7 +31,7 @@ import { useTaskTerminals } from "./useTaskTerminals";
 import OfficeShell from "./OfficeShell";
 import OfficeAtmosphere from "./OfficeAtmosphere";
 import SceneWarmup, { useLoadingProgress, type WarmupPhase } from "./SceneWarmup";
-import { LOCALE_TEXT, pickLocale } from "../office-view/themes-locale";
+import { KICKOFF_LINES, REVIEW_LINES } from "./meeting-lines";
 
 type Language = "en";
 
@@ -454,10 +454,7 @@ export default function AtlasOffice({
       setSpeech((previous) => {
         const next = new Map(previous);
         for (const call of speaking) {
-          const pool = pickLocale(
-            language,
-            call.phase === "review" ? LOCALE_TEXT.reviewLines : LOCALE_TEXT.kickoffLines,
-          );
+          const pool = call.phase === "review" ? REVIEW_LINES : KICKOFF_LINES;
           const line = call.line?.trim() || pool[hash(`${call.fromAgentId}-${call.id}`) % pool.length];
           next.set(call.fromAgentId, { line, until: Date.now() + SPEECH_MS });
         }
@@ -504,7 +501,7 @@ export default function AtlasOffice({
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-slate-900 text-slate-100">
       <p>3D rendering is unavailable in this browser.</p>
       <button type="button" onClick={onReturnToOriginal} className="rounded border border-slate-400 px-3 py-2 text-sm">
-        Return to Original Office
+        Back to Today
       </button>
     </div>
   );

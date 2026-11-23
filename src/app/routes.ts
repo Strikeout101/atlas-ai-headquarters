@@ -35,7 +35,7 @@ export const VIEW_PATHS: Record<View, string> = {
   homelab: "/homelab",
   agents: "/team",
   skills: "/team/library",
-  model_director: "/team/models",
+  behind_scenes: "/team/behind-the-scenes",
   vp_decisions: "/team/vp-decisions",
   knowledge: "/team/knowledge",
   office: "/office",
@@ -45,6 +45,8 @@ export const VIEW_PATHS: Record<View, string> = {
 const PATH_TO_VIEW = new Map<string, View>(Object.entries(VIEW_PATHS).map(([view, path]) => [path, view as View]));
 /** Old addresses that still work. The Business page was split into Tech Services, Events and Outreach. */
 PATH_TO_VIEW.set("/business", "tech");
+/** Model routing moved to Settings > Models (work restructure, phase 7). */
+PATH_TO_VIEW.set("/team/models", "settings");
 
 /** Desktop-only views. On a phone they are left out of navigation and their addresses open Today. */
 export const PHONE_HIDDEN_VIEWS: View[] = ["office"];
@@ -101,7 +103,7 @@ export interface NavItem {
 }
 
 /** The Team area: one sidebar item, three tabs. */
-export const TEAM_VIEWS: View[] = ["agents", "skills", "model_director", "vp_decisions", "knowledge"];
+export const TEAM_VIEWS: View[] = ["agents", "skills", "behind_scenes", "vp_decisions", "knowledge"];
 
 export const NAV_ITEMS: NavItem[] = [
   {
@@ -173,7 +175,7 @@ export const NAV_ITEMS: NavItem[] = [
     section: "system",
     label: { en: "Team" },
     keywords: "agents staff employees departments hire",
-    activeFor: ["skills", "model_director", "vp_decisions", "knowledge"],
+    activeFor: ["skills", "behind_scenes", "vp_decisions", "knowledge"],
   },
   {
     view: "skills",
@@ -184,12 +186,12 @@ export const NAV_ITEMS: NavItem[] = [
     keywords: "skills knowledge learn",
   },
   {
-    view: "model_director",
+    view: "behind_scenes",
     icon: Clapperboard,
     section: "system",
     inSidebar: false,
-    label: { en: "Model Director" },
-    keywords: "models routing upgrades llm",
+    label: { en: "Behind the scenes" },
+    keywords: "agents live queue handoffs reviews models what is everyone doing",
   },
   {
     view: "office",

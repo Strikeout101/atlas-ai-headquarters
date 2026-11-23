@@ -1167,7 +1167,7 @@ describe("Etsy shop setup", () => {
       JSON.stringify({
         proposals: [
           { title: "Design a baby shower bundle", description: "x", reason: "y", project_id: "p1" },
-          { title: "Tidy the design system", description: "x", reason: "y", project_id: null },
+          { title: "Tidy the design system", description: "x", reason: "y", project_id: null, business: "ventures" },
         ],
       }),
       { projectIds: new Set(), existingTitles: [], goalProjectIds: new Set(["p1"]) },

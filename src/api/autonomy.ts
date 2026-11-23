@@ -31,11 +31,14 @@ export interface Initiative {
   difficulty_score: number;
   time_to_launch_score: number;
   budget: number;
+  /** Recorded USD expenses in minor units, including unverified entries. */
+  spent_minor?: number;
   status: "proposed" | "approved" | "in_progress" | "blocked" | "launched" | "measuring" | "stopped" | "done";
   task_limit?: number;
   time_limit_days?: number;
   launched_at?: number | null;
   stop_reason?: string | null;
+  blocked_reason?: string | null;
   playbook?: string | null;
   playbook_stage?: string | null;
 }
@@ -104,6 +107,12 @@ export interface AutonomyConfig {
   usage_threshold: number;
   failure_limit: number;
   planning_interval_minutes: number;
+  think_enabled?: number;
+  think_interval_minutes?: number;
+  think_check_interval_minutes?: number;
+  think_max_pending_per_agent?: number;
+  think_max_pending_total?: number;
+  idea_daily_start_cap?: number;
 }
 export interface LedgerEvent {
   id: string | number;

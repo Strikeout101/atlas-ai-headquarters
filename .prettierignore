@@ -4,6 +4,9 @@ coverage
 test-results
 playwright-report
 pnpm-lock.yaml
+atlas.sqlite
+atlas.sqlite-shm
+atlas.sqlite-wal
 claw-empire.sqlite
 claw-empire.sqlite-shm
 claw-empire.sqlite-wal

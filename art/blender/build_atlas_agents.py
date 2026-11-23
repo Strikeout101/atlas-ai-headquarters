@@ -7,14 +7,15 @@ Writes:
   public/portraits/rb-*.webp           headshots (see src/components/atlas-office/agentLooks.ts)
 
 Run in Blender:
-    exec(open(r"C:\\Users\\Strikeout\\Projects\\Claw-Empire-Claude\\art\\blender\\build_atlas_agents.py").read())
+    exec(open(r"C:\\Users\\Strikeout\\Projects\\atlas\\art\\blender\\build_atlas_agents.py").read())
 """
 
 import os
 
 import bpy
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 BLENDER_DIR = os.path.join(PROJECT, "art", "blender")
 exec(open(os.path.join(BLENDER_DIR, "atlas_retarget.py")).read())  # noqa: S102  (shared helpers)
 

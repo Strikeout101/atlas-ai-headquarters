@@ -197,7 +197,7 @@ describe("Ollama coding task runner", () => {
       "Implement the task",
       "C:\\project\\.climpire-worktrees\\task-1",
       "task.log",
-      "climpire-homelab/qwen-small",
+      "atlas-homelab/qwen-small",
       undefined,
       expect.objectContaining({
         OPENCODE_CONFIG_CONTENT: expect.any(String),
@@ -206,8 +206,8 @@ describe("Ollama coding task runner", () => {
     );
     const config = JSON.parse(spawnCliAgent.mock.calls[0]![7].OPENCODE_CONFIG_CONTENT);
     expect(config.snapshots).toBe(false);
-    expect(config.providers["climpire-homelab"].settings.baseURL).toBe("http://homelab:11434/v1");
-    expect(config.providers["climpire-homelab"].models["qwen-small"]).toBeDefined();
+    expect(config.providers["atlas-homelab"].settings.baseURL).toBe("http://homelab:11434/v1");
+    expect(config.providers["atlas-homelab"].models["qwen-small"]).toBeDefined();
     expect(config.permissions).toContainEqual({ action: "shell", resource: "git commit *", effect: "deny" });
     expect(config.permissions).toContainEqual({ action: "shell", resource: "git push *", effect: "deny" });
     expect(config).not.toHaveProperty("permission");
@@ -267,7 +267,7 @@ describe("Ollama coding task runner", () => {
       9001,
     );
     expect(readProvider).toHaveBeenCalledWith("selected-local");
-    expect(spawnCliAgent.mock.calls[0]![5]).toBe("climpire-selected-local/qwen-selected");
+    expect(spawnCliAgent.mock.calls[0]![5]).toBe("atlas-selected-local/qwen-selected");
   });
 
   it("ignores a late close from an older run after its replacement starts", () => {

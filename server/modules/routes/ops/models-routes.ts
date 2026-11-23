@@ -30,8 +30,8 @@ export function registerModelRoutes(ctx: RuntimeContext): void {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
-          "User-Agent": "climpire",
-          "Editor-Version": "climpire/1.0.0",
+          "User-Agent": "atlas",
+          "Editor-Version": "atlas/1.0.0",
           "Copilot-Integration-Id": "vscode-chat",
         },
         signal: AbortSignal.timeout(10_000),

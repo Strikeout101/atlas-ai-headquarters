@@ -371,7 +371,7 @@ export function createOneShotRunner(deps: CreateOneShotRunnerDeps) {
     }
 
     const lang = getPreferredLanguage();
-    return { text: "Acknowledged. Continuing to the next step." };
+    return { text: "Got it. I'll take the next step." };
   }
 
   return {

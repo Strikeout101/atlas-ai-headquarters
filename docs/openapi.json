@@ -5133,6 +5133,30 @@
               }
             }
           },
+          "400": {
+            "description": "A $ directive needs a project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "directive_project_required",
+                  "message": "A $ directive needs a project: send project_id (an existing project) or create the project first."
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -5201,29 +5225,6 @@
                 "example": {
                   "error": "conflict",
                   "message": "The request conflicts with current server state."
-                }
-              }
-            }
-          },
-          "428": {
-            "description": "Project binding required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "agent_upgrade_required"
                 }
               }
             }
@@ -16471,594 +16472,6 @@
                 "example": {
                   "error": "conflict",
                   "message": "The request conflicts with current server state."
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "too_many_requests",
-                  "message": "Rate limit exceeded."
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "internal_error",
-                  "message": "Unexpected server error."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/update-apply": {
-      "post": {
-        "tags": ["projects"],
-        "summary": "Apply update immediately",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "force": {
-                    "type": "boolean"
-                  }
-                },
-                "additionalProperties": true
-              },
-              "example": {
-                "force": true
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Update apply started",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {},
-                  "additionalProperties": true
-                },
-                "example": {
-                  "ok": true,
-                  "started": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "unauthorized",
-                  "message": "Authentication is required."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "forbidden",
-                  "message": "You do not have permission to access this resource."
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "conflict",
-                  "message": "The request conflicts with current server state."
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "too_many_requests",
-                  "message": "Rate limit exceeded."
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "internal_error",
-                  "message": "Unexpected server error."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/update-auto-config": {
-      "post": {
-        "tags": ["projects"],
-        "summary": "Toggle auto update",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  }
-                },
-                "required": ["enabled"],
-                "additionalProperties": true
-              },
-              "example": {
-                "enabled": true
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Auto-update config saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": ["ok"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "ok": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "unauthorized",
-                  "message": "Authentication is required."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "forbidden",
-                  "message": "You do not have permission to access this resource."
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "conflict",
-                  "message": "The request conflicts with current server state."
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "too_many_requests",
-                  "message": "Rate limit exceeded."
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "internal_error",
-                  "message": "Unexpected server error."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/update-auto-status": {
-      "get": {
-        "tags": ["projects"],
-        "summary": "Get auto-update daemon status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auto-update status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {},
-                  "additionalProperties": true
-                },
-                "example": {
-                  "ok": true,
-                  "enabled": true,
-                  "locked": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "unauthorized",
-                  "message": "Authentication is required."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "forbidden",
-                  "message": "You do not have permission to access this resource."
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "too_many_requests",
-                  "message": "Rate limit exceeded."
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "internal_error",
-                  "message": "Unexpected server error."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/update-status": {
-      "get": {
-        "tags": ["updates"],
-        "summary": "Get update status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Update status payload",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "example": {
-                  "ok": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "unauthorized",
-                  "message": "Authentication is required."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["error"],
-                  "additionalProperties": true
-                },
-                "example": {
-                  "error": "forbidden",
-                  "message": "You do not have permission to access this resource."
                 }
               }
             }
@@ -35707,6 +35120,427 @@
             }
           }
         }
+      }
+    },
+    "/api/work/board": {
+      "get": {
+        "tags": ["work"],
+        "summary": "Work board",
+        "description": "Tasks grouped goal → research and initiatives, then Operations, in five columns (waiting, working, in_review, needs_you, done). Needs you holds only owner decisions; done covers the last 7 days.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "columns": ["waiting", "working", "in_review", "needs_you", "done"],
+                  "counts": {
+                    "waiting": 1,
+                    "working": 1,
+                    "in_review": 0,
+                    "needs_you": 0,
+                    "done": 2
+                  },
+                  "goals": [],
+                  "operations": {
+                    "kind": "operations",
+                    "id": "operations",
+                    "title": "Operations",
+                    "cards": []
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/work/initiatives/{id}": {
+      "get": {
+        "tags": ["work"],
+        "summary": "An initiative's page",
+        "description": "The initiative, its goal, and its playbook steps as a timeline: state, task, hand-off and reviews per step.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "initiative": {
+                    "id": "i1",
+                    "title": "Wedding planner",
+                    "status": "in_progress"
+                  },
+                  "goal": {
+                    "id": "g1",
+                    "title": "Etsy Shop"
+                  },
+                  "steps": [],
+                  "other_tasks": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/work/agents": {
+      "get": {
+        "tags": ["work"],
+        "summary": "Behind the scenes",
+        "description": "One entry per agent: current task, queue, recent hand-offs, reviews in progress, model, and model fixes the VPs made.",
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "example": {
+                  "ok": true,
+                  "agents": [
+                    {
+                      "id": "lead",
+                      "name": "Iris",
+                      "status": "working",
+                      "provider": "codex",
+                      "current": null,
+                      "queue": [],
+                      "recent_handoffs": [],
+                      "reviewing": [],
+                      "model_fixes": []
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "unauthorized",
+                  "message": "Authentication is required."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "forbidden",
+                  "message": "You do not have permission to access this resource."
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "too_many_requests",
+                  "message": "Rate limit exceeded."
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                },
+                "example": {
+                  "error": "internal_error",
+                  "message": "Unexpected server error."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     }
   }

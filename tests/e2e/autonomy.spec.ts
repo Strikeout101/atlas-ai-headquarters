@@ -12,7 +12,7 @@ test.beforeAll(async ({ request }) => {
   const settings = await (await request.get("/api/settings")).json();
   expect(settings.settings.__e2eRuntimeId).toBe(runtimeId);
   // Mutation begins only after the browser-facing server proves its disposable DB marker.
-  const db = new DatabaseSync(path.join(runtimePath, "claw-empire.e2e.sqlite"));
+  const db = new DatabaseSync(path.join(runtimePath, "atlas.e2e.sqlite"));
   try {
     const now = Date.now();
     db.prepare(
@@ -46,9 +46,12 @@ test("goals, initiative edits and paused lead research persist on desktop and ph
   let form = page.getByRole("form", { name: "Add goals" });
   await expect(form.getByLabel("Project", { exact: true })).toHaveValue("");
   await form.getByLabel("Project", { exact: true }).selectOption("e2e-autonomy-project");
+  await form.getByLabel("Goal title", { exact: true }).fill("Finish seven research tasks");
   await form.getByLabel("Target", { exact: true }).fill("7");
   await form.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("completed tasks · 0 / 7")).toBeVisible();
+  const goal = page.getByRole("region", { name: "Finish seven research tasks" });
+  await expect(goal.getByText("0 / 7")).toBeVisible();
+  await expect(goal.getByText("The team will research a strategy for this goal.")).toBeVisible();
   await page.getByRole("tab", { name: /Initiatives/ }).click();
   await page.getByRole("button", { name: "Add initiatives" }).click();
   form = page.getByRole("form", { name: "Add initiatives" });

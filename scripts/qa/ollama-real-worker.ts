@@ -21,7 +21,10 @@ execFileSync("git", ["init", "--quiet", runDir], { stdio: "pipe" });
 // A diagnostic must not contend with or modify the owner's OpenCode session history.
 process.env.OPENCODE_DB = path.join(runDir, "opencode.sqlite");
 const db = new DatabaseSync(path.join(runDir, "cycle.sqlite"));
-const live = new DatabaseSync(path.join(root, "claw-empire.sqlite"), { readOnly: true });
+const live = new DatabaseSync(
+  path.join(root, fs.existsSync(path.join(root, "atlas.sqlite")) ? "atlas.sqlite" : "claw-empire.sqlite"),
+  { readOnly: true },
+);
 const evidence: Record<string, unknown> = { started_at: new Date().toISOString(), runDir };
 let child: ChildProcess | undefined;
 try {

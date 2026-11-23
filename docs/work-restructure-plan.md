@@ -1,6 +1,6 @@
 # Work restructure plan: goals, initiatives and tasks
 
-Status: **approved by the owner 2026-11-22**, open items answered (section 13). Build follows section 12. Phases 0–4 built on branch `work-restructure` (not committed yet).
+Status: **approved by the owner 2026-11-22**, open items answered (section 13). Build follows section 12. Phases 0–4 committed on `work-restructure` (75ee14d, pushed; main fast-forwarded); phases 5–8 built, not committed (phase 6 by Codex, reviewed by Claude).
 Live ATLAS is on "Stop everything" until this rebuild is done.
 
 This replaces how work is planned, run, reviewed and shown in ATLAS. It comes from a code trace on 2026-11-21 (what is wrong today) and the owner's answers to 20 questions (what it should be).
@@ -334,6 +334,54 @@ When a run succeeds, the task goes to `review` and `startReview` runs:
 Subtasks are now done only when the agent says so: its own todo events, or the new `subtask.done` tool. Delegated subtasks still close when their helper task finishes.
 
 **Meetings:** the kickoff meeting runs only for `$` directives (`DelegationOptions.directive`). Chat, @mentions and handoffs go straight to work. The research synthesis (strategy) gets a cross-model review like any task before it reaches the owner.
+
+## 12d. Phase 5 technical design (leads and seniors)
+
+`server/modules/staffing.ts` applies the owner's rules everywhere work is assigned:
+
+- **`chooseAssignee`.**
+  - Important work goes to the lead while they have fewer than 2 important tasks waiting or running, and fewer than 3 important tasks wait in the department.
+  - Otherwise, and for all routine work, it goes to the least-loaded staff member.
+  - A model preference (research angles) narrows the pool first.
+  - Used by the work engine (`pickStepAgent`) and by owner/chat delegation (`task-delegation.ts`: an important ask stays with the lead instead of always going to a subordinate).
+- **`rebalanceDepartment`.**
+  - Runs every engine tick, before tasks start.
+  - The lead keeps the most important waiting tasks (priority, then age) up to their 2 slots, minus important work already running. The rest spread evenly over the staff.
+  - Only waiting autonomy tasks that never started, first attempt, not returned by a review, not research angles. Retries and review returns stay with their agent.
+  - Each move is a ledger line.
+- **`maybeRequestHire`.**
+  - Triggers when 4+ tasks wait in a department and every member is running something.
+  - The lead files the usual `hire_agent` org request (both VPs review it), as a senior on the model the team has fewer of.
+  - At most one open request, and one a day, per department.
+
+## 12e. Phase 6 technical design (owner surfaces)
+
+The Decision Inbox combines strategy proposals, ideas ready for approval, owner-blocked initiatives, stuck reviews and existing owner approvals. It no longer infers inbox decisions from free-form agent chat, which could put meeting notes and open-ended requests in front of the owner. Work decisions are built from current database state in `decision-inbox/work-items.ts`; replies call the same decision functions used by the dedicated owner routes. Approval cards use the existing approval endpoints. Each card has 2–3 plain options with a recommendation first. A redo asks for the owner's note; spending and public approvals show the request details before a choice. The inbox reply route requires an owner session and CSRF token where applicable.
+
+The think loop's owner controls live in `autonomy_config`: on/off, 24-hour per-agent interval, 30-minute check, pending limits per agent and overall, and a separate daily start cap for ideas. Suggestions name a business and stay outside active goals. Once approved, an idea becomes an Operations task marked `operations:idea`; the common work runner starts it, with its own daily reservation count. These controls appear under Autonomy > Operating limits.
+
+Owner-facing chat and meeting prompts, fallback replies, and announcement replies use short, casual language. Customer-facing copy still follows each business's brand voice.
+
+## 12f. Phase 7 technical design (screens)
+
+- **Read models.** `server/modules/work-views.ts` (`GET /api/work/board`, `/api/work/initiatives/:id`, `/api/work/agents`), built from task rows only.
+- **Work page** (`src/components/work/WorkView.tsx`).
+  - "By goal" (default) shows goal → research and initiatives, then Operations, in five columns: Waiting, Working, In review, Needs you, Done. Needs you = a review waiting for the owner, or an initiative blocked with `escalation='owner'`.
+  - On phones the columns stack and empty ones hide.
+  - "All tasks" keeps the classic board with New task, filters and bulk hide.
+- **Initiative page** (`InitiativePanel.tsx`, `?initiative=<id>`): the playbook as a timeline, each step's state, agent and model, hand-off (files) and reviews.
+- **Behind the scenes** (Team tab, `/team/behind-the-scenes`): one card per agent with now / reviewing / up next / recent hand-offs / model / VP model fixes. It reloads with live agent updates.
+- **Model Director** moved from Team to Settings > Models; `/team/models` opens Settings.
+- **Agents without a model** show "no model yet".
+- **Autonomy:** goals and initiatives no longer need a project; schedules still do.
+
+## 12g. Phase 8 technical design (cleanup)
+
+See `docs/work-restructure-handoff.md`, Phase 8, for the full list.
+- **Removed:** the 2D office, the upstream auto-updater and the OpenClaw/AGENTS installers.
+- **Database:** defaults to `atlas.sqlite` and keeps opening `claw-empire.sqlite` while that is the only file, so a rolled-back Update still finds its data. The on-disk rename (database and folder) is `scripts/atlas-service/rename-to-atlas.ps1`, run by the owner.
+- **Old review tables:** dropped after the archive.
+- **Kept for compatibility:** the audit chain seed and the worktree folder and branch names.
 
 ## 13. Open items (answered 2026-11-22)
 

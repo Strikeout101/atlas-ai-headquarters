@@ -99,7 +99,6 @@ export default function GeneralSettingsTab({ t, form, setForm, saved, onSave }: 
             })}
           />
 
-          {/* Upstream auto-update is locked in ATLAS; updates come from the Service section below. */}
           <ToggleSettingCard
             label={t({ en: "OAuth Auto Swap" })}
             checked={form.oauthAutoSwap !== false}

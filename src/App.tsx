@@ -20,14 +20,9 @@ import type { TaskReportDetail } from "./api";
 import * as api from "./api";
 import { detectBrowserLanguage } from "./i18n";
 import { useTheme } from "./ThemeContext";
-import { ROOM_THEMES_STORAGE_KEY, UPDATE_BANNER_DISMISS_STORAGE_KEY } from "./app/constants";
-import {
-  detectRuntimeOs,
-  isForceUpdateBannerEnabled,
-  mergeSettingsWithDefaults,
-  readStoredRoomThemes,
-} from "./app/utils";
-import type { OAuthCallbackResult, RuntimeOs, RoomThemeMap, TaskPanelTab, View } from "./app/types";
+import { ROOM_THEMES_STORAGE_KEY } from "./app/constants";
+import { mergeSettingsWithDefaults, readStoredRoomThemes } from "./app/utils";
+import type { OAuthCallbackResult, RoomThemeMap, TaskPanelTab, View } from "./app/types";
 import { useRealtimeSync } from "./app/useRealtimeSync";
 import { useAppLabels } from "./app/useAppLabels";
 import AppLoadingScreen from "./app/AppLoadingScreen";
@@ -35,7 +30,6 @@ import AppMainLayout from "./app/AppMainLayout";
 import AppOverlays from "./app/AppOverlays";
 import { useAppActions } from "./app/useAppActions";
 import { useActiveMeetingTaskId } from "./app/useActiveMeetingTaskId";
-import { useUpdateStatusPolling } from "./app/useUpdateStatusPolling";
 import { useAppViewEffects } from "./app/useAppViewEffects";
 import { useViewRoute } from "./app/routes";
 import { useAppBootstrapData } from "./app/useAppBootstrapData";
@@ -82,13 +76,6 @@ export default function App() {
   const [customRoomThemes, setCustomRoomThemes] = useState<RoomThemeMap>(() => initialRoomThemes.themes);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileHeaderMenuOpen, setMobileHeaderMenuOpen] = useState(false);
-  const [runtimeOs] = useState<RuntimeOs>(() => detectRuntimeOs());
-  const [forceUpdateBanner] = useState<boolean>(() => isForceUpdateBannerEnabled());
-  const [updateStatus, setUpdateStatus] = useState<api.UpdateStatus | null>(null);
-  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(UPDATE_BANNER_DISMISS_STORAGE_KEY) ?? "";
-  });
   const [streamingMessage, setStreamingMessage] = useState<{
     message_id: string;
     agent_id: string;
@@ -133,7 +120,6 @@ export default function App() {
     setLoading,
   });
 
-  useUpdateStatusPolling(setUpdateStatus);
   useAppViewEffects({
     view,
     cliStatus,
@@ -213,11 +199,6 @@ export default function App() {
     view,
     settings,
     departments,
-    theme,
-    runtimeOs,
-    forceUpdateBanner,
-    updateStatus,
-    dismissedUpdateVersion,
   });
 
   if (loading) {
@@ -298,14 +279,6 @@ export default function App() {
       onOpenReportHistory={() => setShowReportHistory(true)}
       onOpenAnnouncement={actions.handleOpenAnnouncement}
       onOpenRoomManager={() => setShowRoomManager(true)}
-      onDismissAutoUpdateNotice={actions.handleDismissAutoUpdateNotice}
-      onDismissUpdate={() => {
-        const latest = labels.effectiveUpdateStatus?.latest_version ?? "";
-        setDismissedUpdateVersion(latest);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(UPDATE_BANNER_DISMISS_STORAGE_KEY, latest);
-        }
-      }}
     >
       <AppOverlays
         showChat={showChat}

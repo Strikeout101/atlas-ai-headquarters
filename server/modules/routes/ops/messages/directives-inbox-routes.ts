@@ -46,45 +46,11 @@ function buildSessionResetAck(text: string): string {
   return "🧹 Current conversation session was reset. Starting a new chat.";
 }
 
-const buildAgentUpgradeRequiredPayload = () => {
-  const repoRoot = process.cwd();
-  const installerPaths = {
-    mac_linux: path.join(repoRoot, "scripts", "openclaw-setup.sh"),
-    windows_powershell: path.join(repoRoot, "scripts", "openclaw-setup.ps1"),
-    agents_template: path.join(repoRoot, "templates", "AGENTS-empire.md"),
-  };
-  const agentsTargetPath = path.join(os.homedir(), ".openclaw", "workspace", "AGENTS.md");
-  const installCommands = {
-    mac_linux: "bash scripts/openclaw-setup.sh",
-    windows_powershell: "powershell -ExecutionPolicy Bypass -File .\\scripts\\openclaw-setup.ps1",
-    agents_only: "pnpm setup -- --agents-path ~/.openclaw/workspace/AGENTS.md",
-  };
-  const absoluteInstallCommands = {
-    mac_linux: `bash "${installerPaths.mac_linux}"`,
-    windows_powershell: `powershell -ExecutionPolicy Bypass -File "${installerPaths.windows_powershell}"`,
-    agents_only: `pnpm setup -- --agents-path "${agentsTargetPath}"`,
-  };
-  const recommendedInstallCommand =
-    process.platform === "win32" ? absoluteInstallCommands.windows_powershell : absoluteInstallCommands.mac_linux;
-
-  return {
-    error: "agent_upgrade_required",
-    reason: "install_first",
-    message: `OpenClaw AGENTS is outdated (HTTP 428). Install path: ${installerPaths.mac_linux} (or ${installerPaths.windows_powershell}). Target AGENTS path: ${agentsTargetPath}. Should I install it now?`,
-    required_agent_rules_version: 2,
-    required_action: "install_latest_agents_rules",
-    installer_files: ["scripts/openclaw-setup.sh", "scripts/openclaw-setup.ps1", "templates/AGENTS-empire.md"],
-    installer_absolute_paths: installerPaths,
-    agents_target_path: agentsTargetPath,
-    install_commands: installCommands,
-    install_commands_absolute: absoluteInstallCommands,
-    recommended_install_command: recommendedInstallCommand,
-    user_prompt: {
-      en: `OpenClaw AGENTS rules are outdated. Installer files: ${installerPaths.mac_linux} / ${installerPaths.windows_powershell}, target AGENTS: ${agentsTargetPath}. Should I install it now? (yes/no)`,
-    },
-    next_step_en: "If the user agrees, run installer script and retry the same directive once.",
-  };
-};
+/** A `$` directive must name a project (the old OpenClaw "install the latest AGENTS rules" reply is gone). */
+const buildProjectRequiredPayload = () => ({
+  error: "directive_project_required",
+  message: "A $ directive needs a project: send project_id (an existing project) or create the project first.",
+});
 
 export function registerDirectiveAndInboxRoutes(
   ctx: DirectiveAndInboxRouteCtx,
@@ -200,12 +166,12 @@ export function registerDirectiveAndInboxRoutes(
           body,
           idempotencyKey,
           outcome: "validation_error",
-          statusCode: 428,
-          detail: "agent_upgrade_required:install_first",
+          statusCode: 400,
+          detail: "directive_project_required",
         })
       )
         return;
-      return res.status(428).json(buildAgentUpgradeRequiredPayload());
+      return res.status(400).json(buildProjectRequiredPayload());
     }
 
     let storedMessage: StoredMessage;
@@ -480,12 +446,12 @@ export function registerDirectiveAndInboxRoutes(
           body,
           idempotencyKey,
           outcome: "validation_error",
-          statusCode: 428,
-          detail: "agent_upgrade_required:install_first",
+          statusCode: 400,
+          detail: "directive_project_required",
         })
       )
         return;
-      return res.status(428).json(buildAgentUpgradeRequiredPayload());
+      return res.status(400).json(buildProjectRequiredPayload());
     }
 
     const sessionRoute = !isDirective

@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { ensureControlStateSchema, isAutonomyAllowed } from "./control-state.ts";
-import { BUSINESSES, isBusinessKey } from "./businesses.ts";
+import { BUSINESSES, isBusinessKey, type BusinessKey } from "./businesses.ts";
+import { autonomyConfig } from "./autonomy-store.ts";
+import { defaultImportance, inferWorkType } from "./work-model.ts";
+import { ensureWorkModelSchema } from "./bootstrap/schema/work-model-migration.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { buildReferenceBlock } from "./agent-knowledge.ts";
 
@@ -12,17 +15,16 @@ import { buildReferenceBlock } from "./agent-knowledge.ts";
 
 /** Settings key. Missing or anything but `false` means on. */
 export const AUTONOMY_SETTING = "autonomyProposalsEnabled";
-const DEFAULT_THINK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-export const AUTONOMY_TICK_MS = 10 * 60 * 1000;
+const DEFAULT_THINK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const AUTONOMY_TICK_MS = 60 * 1000;
 export const MAX_PENDING_PER_AGENT = 2;
 export const MAX_PENDING_TOTAL = 12;
 export const PROPOSAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PROPOSALS_PER_THOUGHT = 2;
 const THINK_TIMEOUT_MS = 150_000;
 
-export function thinkIntervalMs(): number {
-  const raw = Number(process.env.AUTONOMY_THINK_INTERVAL_MS);
-  return Number.isFinite(raw) && raw >= 60_000 ? raw : DEFAULT_THINK_INTERVAL_MS;
+export function thinkIntervalMs(db?: DatabaseSync): number {
+  return db ? autonomyConfig(db).think_interval_minutes * 60_000 : DEFAULT_THINK_INTERVAL_MS;
 }
 
 export type ProposalStatus = "pending" | "approved" | "dismissed" | "expired";
@@ -50,6 +52,7 @@ export interface ParsedProposal {
   description: string;
   reason: string;
   project_id: string | null;
+  business: BusinessKey | null;
 }
 
 interface ThinkingContext {
@@ -57,6 +60,7 @@ interface ThinkingContext {
   projects: Array<{ id: string; name: string; core_goal: string }>;
   /** Projects with an active goal: run by the goal planner (strategy, ideas, playbook steps), not by free-time ideas. */
   goalProjects?: Array<{ id: string; name: string }>;
+  activeGoals?: Array<{ business: BusinessKey; title: string }>;
   recentTasks: Array<{ title: string; status: string }>;
   openDepartmentTasks: Array<{ title: string; status: string }>;
   pastProposals: Array<{ title: string; status: string }>;
@@ -105,6 +109,7 @@ export function ensureAgentProposalSchema(db: DatabaseSync): void {
     agent_id TEXT NOT NULL,
     department_id TEXT,
     project_id TEXT,
+    business TEXT,
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     reason TEXT NOT NULL DEFAULT '',
@@ -123,15 +128,14 @@ export function ensureAgentProposalSchema(db: DatabaseSync): void {
   if (!columnExists(db, "agent_task_proposals", "decided_by")) {
     db.exec("ALTER TABLE agent_task_proposals ADD COLUMN decided_by TEXT");
   }
+  if (!columnExists(db, "agent_task_proposals", "business")) {
+    db.exec("ALTER TABLE agent_task_proposals ADD COLUMN business TEXT");
+  }
 }
 
 export function isAutonomyEnabled(db: DatabaseSync): boolean {
   try {
-    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(AUTONOMY_SETTING) as
-      | { value: string }
-      | undefined;
-    if (!row) return true;
-    return String(row.value).replace(/"/g, "").trim() !== "false";
+    return autonomyConfig(db).think_enabled === 1;
   } catch {
     return true;
   }
@@ -158,11 +162,12 @@ export function pickAgentDueForThinking(
   now: number,
   opts: { intervalMs?: number; isAgentInMeeting?: (agentId: string) => boolean } = {},
 ): AutonomyAgent | null {
+  const config = autonomyConfig(db);
   const pendingTotal = (
     db.prepare("SELECT COUNT(*) AS n FROM agent_task_proposals WHERE status = 'pending'").get() as { n: number }
   ).n;
-  if (pendingTotal >= MAX_PENDING_TOTAL) return null;
-  const intervalMs = opts.intervalMs ?? thinkIntervalMs();
+  if (pendingTotal >= config.think_max_pending_total) return null;
+  const intervalMs = opts.intervalMs ?? thinkIntervalMs(db);
   const rows = db
     .prepare(
       `SELECT a.* FROM agents a
@@ -175,7 +180,7 @@ export function pickAgentDueForThinking(
        ORDER BY COALESCE(s.last_thought_at, 0) ASC, a.created_at ASC
        LIMIT 20`,
     )
-    .all(now - intervalMs, MAX_PENDING_PER_AGENT) as unknown as AutonomyAgent[];
+    .all(now - intervalMs, config.think_max_pending_per_agent) as unknown as AutonomyAgent[];
   return rows.find((agent) => !opts.isAgentInMeeting?.(agent.id)) ?? null;
 }
 
@@ -201,6 +206,13 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
           .all(Date.now(), Date.now()) as Array<{ id: string; name: string }>)
   ).map((row) => ({ id: String(row.id), name: String(row.name) }));
   const goalIds = new Set(goalProjects.map((project) => project.id));
+  const activeGoals = hasGoals
+    ? (db
+        .prepare(
+          "SELECT business, title FROM business_goals WHERE period_start<=? AND period_end>? ORDER BY created_at DESC LIMIT 20",
+        )
+        .all(Date.now(), Date.now()) as Array<{ business: BusinessKey; title: string }>)
+    : [];
   const projects = (
     db
       .prepare(
@@ -228,6 +240,7 @@ function gatherThinkingContext(db: DatabaseSync, agent: AutonomyAgent): Thinking
     department,
     projects,
     goalProjects,
+    activeGoals,
     recentTasks,
     openDepartmentTasks,
     pastProposals,
@@ -260,8 +273,8 @@ export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, 
     ctx.department?.description ? `Department purpose: ${ctx.department.description}` : "",
     ctx.department?.prompt ? `Department guidance: ${ctx.department.prompt}` : "",
     "",
-    "You have free time. Think about what would genuinely help the owner's business and projects right now,",
-    "and suggest at most 2 concrete tasks you could do yourself. The owner will approve or dismiss each one.",
+    "You have free time. Think about improvements to Operations outside the active goals,",
+    "and suggest at most 2 concrete tasks you could do yourself. The VPs will review them.",
     "Only suggest work that is clearly useful, specific and within your role. Suggesting nothing is fine and",
     "better than busywork. Do not repeat or overlap anything listed below.",
     "",
@@ -272,6 +285,13 @@ export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, 
     ...(ctx.goalProjects?.length
       ? [
           `Run by the goal planner, not by suggestions: ${ctx.goalProjects.map((p) => p.name).join(", ")}. Their work comes from a researched strategy, its product ideas and their playbook steps. Do not suggest tasks, products or listings for them.`,
+          "",
+        ]
+      : []),
+    ...(ctx.activeGoals?.length
+      ? [
+          "Active goals (their work belongs to the goal planner, not Operations suggestions):",
+          ...ctx.activeGoals.map((goal) => `- ${BUSINESSES[goal.business]?.label ?? goal.business}: ${goal.title}`),
           "",
         ]
       : []),
@@ -287,7 +307,7 @@ export function buildProposalPrompt(agent: AutonomyAgent, ctx: ThinkingContext, 
     ...(ctx.knowledge ? [ctx.knowledge, ""] : []),
     `Write titles and text in ${LANGUAGE_NAMES[language] ?? "English"}, plain and casual like a coworker, no corporate speak.`,
     "Reply with ONLY this JSON, no other text:",
-    '{"proposals":[{"title":"short imperative title","description":"what you would do and what the result is","reason":"why this matters now","project_id":"one of the project ids above, or null"}]}',
+    '{"proposals":[{"title":"short imperative title","description":"what you would do and what the result is","reason":"why this matters now","business":"tech, rental, or ventures","project_id":"one of the project ids above, or null"}]}',
     'If nothing is worth doing, reply {"proposals":[]}.',
     "Do not use any tools.",
   ]
@@ -345,11 +365,14 @@ export function parseProposalReply(
     if (typeof item.project_id === "string" && opts.goalProjectIds?.has(item.project_id)) continue;
     const projectId =
       typeof item.project_id === "string" && opts.projectIds.has(item.project_id) ? item.project_id : null;
+    const business = isBusinessKey(item.business) ? item.business : null;
+    if (!business && !projectId) continue;
     result.push({
       title,
       description: clean(item.description, 1500),
       reason: clean(item.reason, 400),
       project_id: projectId,
+      business,
     });
     if (result.length >= MAX_PROPOSALS_PER_THOUGHT) break;
   }
@@ -423,8 +446,8 @@ export async function runAutonomyTick(
     return { agentId: agent.id, created: 0, error: reason };
   }
   const insert = db.prepare(
-    `INSERT INTO agent_task_proposals (id, agent_id, department_id, project_id, title, description, reason, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    `INSERT INTO agent_task_proposals (id, agent_id, department_id, project_id, business, title, description, reason, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
   );
   for (const proposal of proposals) {
     insert.run(
@@ -432,6 +455,7 @@ export async function runAutonomyTick(
       agent.id,
       agent.department_id,
       proposal.project_id,
+      proposal.business,
       proposal.title,
       proposal.description,
       proposal.reason,
@@ -465,6 +489,7 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
         agent_id: string;
         department_id: string | null;
         project_id: string | null;
+        business: BusinessKey | null;
         title: string;
         description: string;
         reason: string;
@@ -491,6 +516,20 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     : undefined;
   const taskId = randomUUID();
   const departmentId = agent?.department_id ?? proposal.department_id ?? null;
+  const projectBusiness =
+    proposal.project_id && columnExists(db, "projects", "business")
+      ? (
+          db.prepare("SELECT business FROM projects WHERE id=?").get(proposal.project_id) as
+            | { business?: string }
+            | undefined
+        )?.business
+      : null;
+  const taskBusiness = isBusinessKey(projectBusiness) ? projectBusiness : proposal.business;
+  const departmentName = departmentId
+    ? (db.prepare("SELECT name FROM departments WHERE id=?").get(departmentId) as { name?: string } | undefined)?.name
+    : null;
+  const workType = inferWorkType({ title: proposal.title, description: proposal.description, departmentName });
+  const importance = defaultImportance(workType, proposal.title);
   const description = [
     proposal.description,
     proposal.reason ? `[WHY] ${proposal.reason}` : "",
@@ -499,6 +538,7 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     .filter(Boolean)
     .join("\n");
 
+  ensureWorkModelSchema(db);
   db.exec("BEGIN");
   try {
     const changed = db
@@ -512,8 +552,8 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
     }
     db.prepare(
       `INSERT INTO tasks (id, title, description, department_id, assigned_agent_id, project_id, status, priority, task_type,
-         project_path, created_at, updated_at, origin)
-       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?, 'autonomy')`,
+         project_path, created_at, updated_at, origin, business, work_type, importance, playbook_step)
+       VALUES (?, ?, ?, ?, ?, ?, 'planned', 0, 'general', ?, ?, ?, 'autonomy', ?, ?, ?, 'operations:idea')`,
     ).run(
       taskId,
       proposal.title,
@@ -524,6 +564,9 @@ export function decideProposal(db: DatabaseSync, id: string, approve: boolean, d
       project?.project_path ?? null,
       now,
       now,
+      taskBusiness,
+      workType,
+      importance,
     );
     db.exec("COMMIT");
   } catch (cause) {

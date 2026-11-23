@@ -57,6 +57,7 @@ describe("buildDirectReplyPrompt", () => {
     const built = tools.buildDirectReplyPrompt(agent, "Can you help me now?", "chat");
     expect(built.prompt).not.toContain("[Character Persona - Highest Priority]");
     expect(built.prompt).not.toContain("Keep the reply aligned with the Character Persona.");
+    expect(built.prompt).toContain("plain, casual words");
   });
 });
 
@@ -86,6 +87,7 @@ describe("buildMeetingPrompt", () => {
     });
     expect(getDeptName).toHaveBeenCalledWith("dev");
     expect(prompt).toContain("Scene Engine Team");
+    expect(prompt).toContain("plain, casual words");
     expect(prompt).not.toContain("Remotion");
   });
 });

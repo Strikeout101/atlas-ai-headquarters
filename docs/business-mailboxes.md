@@ -42,10 +42,10 @@ the worker confirm each result and finish.
 Example request file (recommended on Windows to avoid shell JSON quoting issues):
 
 ```json
-{"operation":"business.email.request","draft_id":"your-saved-draft-id"}
+{ "operation": "business.email.request", "draft_id": "your-saved-draft-id" }
 ```
 
-Run it with `node scripts/claw-agent-tool.mjs --file request.json` inside the active
+Run it with `node scripts/atlas-agent-tool.mjs --file request.json` inside the active
 task process. Credentials are managed by the server; workers must not use SMTP
 directly or read server credential files.
 

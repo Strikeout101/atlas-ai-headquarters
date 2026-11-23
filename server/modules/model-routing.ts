@@ -537,7 +537,7 @@ export function consumeModelUpgradeMarker(
   worktreePath: string | undefined,
 ): Record<string, unknown> | null {
   if (!worktreePath) return null;
-  const marker = path.join(worktreePath, ".climpire-model-upgrade.json");
+  const marker = path.join(worktreePath, ".atlas-model-upgrade.json");
   try {
     if (!fs.existsSync(marker) || fs.statSync(marker).size > 4096) return null;
     const parsed = JSON.parse(fs.readFileSync(marker, "utf8")) as Record<string, unknown>;

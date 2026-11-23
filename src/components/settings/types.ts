@@ -22,7 +22,7 @@ export type Locale = UiLanguage;
 export type TFunction = (messages: Record<Locale, string>) => string;
 
 export type LocalSettings = Omit<CompanySettings, "language"> & { language: Locale };
-export const SETTINGS_TABS = ["general", "business", "security", "cli", "oauth", "api", "gateway"] as const;
+export const SETTINGS_TABS = ["general", "business", "security", "cli", "oauth", "api", "models", "gateway"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 /** Fired on window to switch the open Settings page to a tab (the command bar uses it). */

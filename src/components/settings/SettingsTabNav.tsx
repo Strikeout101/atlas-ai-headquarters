@@ -40,6 +40,7 @@ const TAB_ITEMS: Array<{ key: SettingsTab; icon: LucideIcon; label: (t: TFunctio
     label: (t) => t({ en: "OAuth" }),
   },
   { key: "api", group: 1, icon: Cable, label: (t) => t({ en: "API" }) },
+  { key: "models", group: 1, icon: Cable, label: (t) => t({ en: "Models" }) },
   {
     key: "gateway",
     group: 2,

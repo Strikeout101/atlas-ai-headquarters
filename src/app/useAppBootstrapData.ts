@@ -7,7 +7,7 @@ import { detectBrowserLanguage } from "../i18n";
 import type { Agent, CompanySettings, CompanyStats, Department, MeetingPresence, SubTask, Task } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 import { ROOM_THEMES_STORAGE_KEY } from "./constants";
-import { mapWorkflowDecisionItemsRaw } from "./decision-inbox";
+import { mapApprovalDecisionItems, mapWorkflowDecisionItemsRaw } from "./decision-inbox";
 import type { RoomThemeMap } from "./types";
 import {
   isRoomThemeMap,
@@ -53,7 +53,7 @@ export function useAppBootstrapData({
 }: UseAppBootstrapDataParams): void {
   const fetchAll = useCallback(async () => {
     try {
-      const [sett, depts, ags, tks, sts, subs, presence, decisionItems] = await Promise.all([
+      const [sett, depts, ags, tks, sts, subs, presence, decisionItems, approvals] = await Promise.all([
         api.getSettings(),
         api.getDepartments(),
         api.getAgents(),
@@ -62,6 +62,7 @@ export function useAppBootstrapData({
         api.getActiveSubtasks(),
         api.getMeetingPresence().catch(() => []),
         api.getDecisionInbox().catch(() => []),
+        api.getPendingApprovals().catch(() => []),
       ]);
       setDepartments(depts);
       setAgents(ags);
@@ -107,7 +108,10 @@ export function useAppBootstrapData({
       }
       setSubtasks(subs);
       setMeetingPresence(presence);
-      setDecisionInboxItems(mapWorkflowDecisionItemsRaw(decisionItems ?? []));
+      setDecisionInboxItems([
+        ...mapWorkflowDecisionItemsRaw(decisionItems ?? []),
+        ...mapApprovalDecisionItems(approvals ?? []),
+      ]);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {

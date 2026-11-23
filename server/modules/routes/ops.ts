@@ -1,4 +1,5 @@
 import { registerSquareRoutes } from "./ops/square.ts";
+import { registerWorkViewRoutes } from "./ops/work-views.ts";
 import { registerFinanceRoutes } from "./ops/finance.ts";
 import { registerListingRoutes } from "./ops/listings.ts";
 import { registerEtsyRoutes } from "./ops/etsy.ts";
@@ -288,6 +289,7 @@ export function registerRoutesPartC(ctx: RuntimeContext): RouteOpsExports {
     },
   });
   registerAgentToolRoutes(app, db, runAgentOneShot);
+  registerWorkViewRoutes(app, db as any);
 
   const { normalizeSkillLearnProviders } = registerSkillRoutes(__ctx);
   registerCustomSkillRoutes(__ctx, { normalizeSkillLearnProviders });

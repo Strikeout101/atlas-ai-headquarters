@@ -303,7 +303,7 @@ test.describe("CI API ops and docs coverage", () => {
     const seed = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
     const projectsRoot = path.resolve("..");
     const repoName = path.basename(process.cwd());
-    const candidateProjectPath = path.join(projectsRoot, "climpire-ci-path-check", seed);
+    const candidateProjectPath = path.join(projectsRoot, "atlas-ci-path-check", seed);
 
     await establishApiSession(request);
 
@@ -600,9 +600,6 @@ test.describe("CI API ops and docs coverage", () => {
       "/api/sprites/register",
       "/api/subtasks",
       "/api/subtasks/{id}",
-      "/api/update-auto-status",
-      "/api/update-apply",
-      "/api/update-auto-config",
       "/api/tasks/{id}/assign",
       "/api/tasks/{id}/inject",
       "/api/tasks/{id}/resume",

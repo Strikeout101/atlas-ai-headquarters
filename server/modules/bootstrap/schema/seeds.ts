@@ -301,15 +301,12 @@ export function applyDefaultSeeds(db: DbLike): void {
     };
 
     const settingsCount = (db.prepare("SELECT COUNT(*) as c FROM settings").get() as { c: number }).c;
-    const isLegacySettingsInstall = settingsCount > 0;
     if (settingsCount === 0) {
       const insertSetting = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)");
       insertSetting.run("companyName", "ATLAS");
       insertSetting.run("ceoName", "CEO");
       insertSetting.run("autoAssign", "true");
       insertSetting.run("yoloMode", "false");
-      insertSetting.run("autoUpdateEnabled", "false");
-      insertSetting.run("autoUpdateNoticePending", "false");
       insertSetting.run("oauthAutoSwap", "true");
       insertSetting.run("language", "en");
       insertSetting.run("defaultProvider", "claude");
@@ -347,13 +344,6 @@ export function applyDefaultSeeds(db: DbLike): void {
       db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run("oauthAutoSwap", "true");
     }
 
-    const hasAutoUpdateEnabledSetting = db
-      .prepare("SELECT 1 FROM settings WHERE key = 'autoUpdateEnabled' LIMIT 1")
-      .get() as { 1: number } | undefined;
-    if (!hasAutoUpdateEnabledSetting) {
-      db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run("autoUpdateEnabled", "false");
-    }
-
     const hasYoloModeSetting = db.prepare("SELECT 1 FROM settings WHERE key = 'yoloMode' LIMIT 1").get() as
       | { 1: number }
       | undefined;
@@ -361,15 +351,8 @@ export function applyDefaultSeeds(db: DbLike): void {
       db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run("yoloMode", "false");
     }
 
-    const hasAutoUpdateNoticePendingSetting = db
-      .prepare("SELECT 1 FROM settings WHERE key = 'autoUpdateNoticePending' LIMIT 1")
-      .get() as { 1: number } | undefined;
-    if (!hasAutoUpdateNoticePendingSetting) {
-      db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
-        "autoUpdateNoticePending",
-        isLegacySettingsInstall ? "true" : "false",
-      );
-    }
+    // The upstream auto-updater was removed; drop its leftover settings.
+    db.prepare("DELETE FROM settings WHERE key IN ('autoUpdateEnabled', 'autoUpdateNoticePending')").run();
 
     const hasRoomThemesSetting = db.prepare("SELECT 1 FROM settings WHERE key = 'roomThemes' LIMIT 1").get() as
       | { 1: number }

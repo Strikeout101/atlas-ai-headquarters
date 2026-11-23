@@ -190,11 +190,15 @@ function rebuildBusinessGoals(db: DbLike): void {
   const cols = columnInfo(db, "business_goals");
   if (cols.some((c) => c.name === "initiative_slots")) return;
   const hasCurrency = cols.some((c) => c.name === "currency");
+  const hasTitle = cols.some((c) => c.name === "title");
+  const title = `SUBSTR(COALESCE(${hasTitle ? "NULLIF(TRIM(g.title),'')" : "NULL"},
+    NULLIF(TRIM(p.core_goal),''), NULLIF(TRIM(p.name),''), g.metric), 1, 160)`;
   db.exec(businessGoalsTableSql("business_goals_rebuild"));
   db.exec(`INSERT INTO business_goals_rebuild (id,business,project_id,title,metric,target,currency,period_start,period_end,
       created_at,updated_at)
-    SELECT id,business,project_id,'',metric,target,${hasCurrency ? "currency" : "'USD'"},period_start,period_end,created_at,updated_at
-    FROM business_goals`);
+    SELECT g.id,g.business,g.project_id,${title},g.metric,g.target,${hasCurrency ? "g.currency" : "'USD'"},
+      g.period_start,g.period_end,g.created_at,g.updated_at
+    FROM business_goals g LEFT JOIN projects p ON p.id=g.project_id`);
   db.exec("DROP TABLE business_goals");
   db.exec("ALTER TABLE business_goals_rebuild RENAME TO business_goals");
 }
@@ -326,7 +330,15 @@ export function archiveLegacyWork(db: DbLike, now = Date.now()): LegacyArchiveRe
  * Phase 3: the work engine creates step tasks directly, so the old per-task queue is gone. Its rows were copied to
  * `archive_20261122_*` by `archiveLegacyWork`; the tables are dropped only after that ran (or when they are empty).
  */
-export const RETIRED_WORK_TABLES = ["autonomy_work_snapshots", "autonomy_work"] as const;
+export const RETIRED_WORK_TABLES = [
+  "autonomy_work_snapshots",
+  "autonomy_work",
+  // The old team-lead review (phase 4 replaced it; phase 8 drops its tables).
+  "review_round_decision_states",
+  "project_review_decision_events",
+  "project_review_decision_states",
+  "review_revision_history",
+] as const;
 
 export function dropRetiredWorkTables(db: DbLike): string[] {
   const archived = Boolean(db.prepare("SELECT 1 FROM settings WHERE key=?").get(LEGACY_ARCHIVE_SETTING));

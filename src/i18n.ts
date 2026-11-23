@@ -1,10 +1,11 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
+import { STORAGE_KEYS } from "./storage-keys";
 
 // ATLAS is English-only. The helpers keep their shape so components can keep calling t({ en: "..." }).
 export type UiLanguage = "en";
-export const LANGUAGE_STORAGE_KEY = "climpire.language";
-export const LANGUAGE_USER_SET_STORAGE_KEY = "climpire.language.user_set";
+export const LANGUAGE_STORAGE_KEY = STORAGE_KEYS.language;
+export const LANGUAGE_USER_SET_STORAGE_KEY = STORAGE_KEYS.languageUserSet;
 
 export type LangText = { en: string };
 

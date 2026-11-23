@@ -33,10 +33,10 @@ import { registerDepartmentRoutes } from "./core/departments.ts";
 import { registerGitHubRoutes } from "./core/github-routes.ts";
 import { registerProjectRoutes } from "./core/projects.ts";
 import { registerTaskCrudRoutes } from "./core/tasks/crud.ts";
+import { registerHealthRoutes } from "./core/health.ts";
 import { registerTaskReviewRoutes } from "./core/tasks/review-routes.ts";
 import { registerTaskExecutionRoutes } from "./core/tasks/execution.ts";
 import { registerTaskSubtaskRoutes } from "./core/tasks/subtasks.ts";
-import { registerUpdateAutoRoutes } from "./core/update-auto/register.ts";
 import type { AgentRow, MeetingMinuteEntryRow, MeetingMinutesRow, MeetingReviewDecision } from "./shared/types.ts";
 import { getDiscordReceiverStatus } from "../../messenger/discord-receiver.ts";
 
@@ -226,8 +226,6 @@ export function registerRoutesPartA(ctx: RuntimeContext): Record<string, never> 
   // API ENDPOINTS
   // ===========================================================================
 
-  registerUpdateAutoRoutes(__ctx);
-
   // ---------------------------------------------------------------------------
   // Direct messenger channels
   // ---------------------------------------------------------------------------
@@ -354,6 +352,7 @@ export function registerRoutesPartA(ctx: RuntimeContext): Record<string, never> 
   // ---------------------------------------------------------------------------
   // Agents
   // ---------------------------------------------------------------------------
+  registerHealthRoutes(app, String(__ctx.dbPath ?? ""));
   registerAgentRoutes(__ctx);
 
   // ---------------------------------------------------------------------------

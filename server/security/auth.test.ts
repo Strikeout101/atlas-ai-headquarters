@@ -302,7 +302,7 @@ describe("installSecurityMiddleware", () => {
     };
     expect(agentEnvironment(parent)).toEqual({
       PATH: "tools",
-      CLAW_EMPIRE_AGENT_PROCESS: "1",
+      ATLAS_AGENT_PROCESS: "1",
       // No git credentials: the owner's credential helper is switched off and git may not prompt.
       GIT_TERMINAL_PROMPT: "0",
       GCM_INTERACTIVE: "never",

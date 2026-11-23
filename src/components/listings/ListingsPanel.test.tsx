@@ -60,7 +60,7 @@ const overview = (items: ListingPackage[], cap = 1000, used = 20): ListingsOverv
 });
 
 beforeEach(() => {
-  localStorage.setItem("climpire.language", "en");
+  localStorage.setItem("atlas.language", "en");
   vi.mocked(listingsApi.list).mockReset();
   vi.mocked(etsyApi.get).mockReset().mockRejectedValue(new Error("not connected"));
   vi.mocked(etsyApi.pushDraft)

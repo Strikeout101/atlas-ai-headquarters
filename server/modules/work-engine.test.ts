@@ -5,6 +5,7 @@ import { applyTaskSchemaMigrations } from "./bootstrap/schema/task-schema-migrat
 import { applyWorkModelMigration } from "./bootstrap/schema/work-model-migration.ts";
 import { ensureControlStateSchema, resetControlStateForTests } from "./control-state.ts";
 import { admitAutonomyTaskStart, autonomyTaskStartBlockReason } from "./autonomy-engine.ts";
+import { decideProposal } from "./agent-proposals.ts";
 import {
   decideStrategy,
   goalNeedsStrategy,
@@ -126,6 +127,40 @@ async function researchedGoal(h: ReturnType<typeof harness>, ideas = 6) {
   h.finish(String(synthesis.id));
   return { strategy, synthesis, ids };
 }
+
+describe("approved Operations ideas", () => {
+  it("starts VP-approved ideas and applies their own daily cap", async () => {
+    const h = harness();
+    h.db.exec(
+      "UPDATE business_goals SET period_end=1; UPDATE autonomy_config SET daily_start_cap=0, idea_daily_start_cap=1",
+    );
+    const suggest = (id: string) => {
+      h.db
+        .prepare(
+          `INSERT INTO agent_task_proposals(id,agent_id,department_id,business,title,status,created_at)
+         VALUES (?, 'plan-senior', 'planning', 'ventures', ?, 'pending', ?)`,
+        )
+        .run(id, `Improve operations ${id}`, h.now());
+      const result = decideProposal(h.db, id, true, { decidedBy: "vp:planning", now: h.now });
+      if (!result.ok || result.status !== "approved") throw new Error("idea approval failed");
+      return result.task_id;
+    };
+    const first = suggest("first");
+    await h.tick();
+    expect(h.tasks("id=?", first)[0]).toMatchObject({
+      status: "in_progress",
+      business: "ventures",
+      playbook_step: "operations:idea",
+    });
+    expect(h.db.prepare("SELECT COUNT(*) AS n FROM autonomy_idea_start_reservations").get()).toEqual({ n: 1 });
+    expect(h.db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations").get()).toEqual({ n: 0 });
+    h.finish(first);
+    const second = suggest("second");
+    await h.tick();
+    expect(h.tasks("id=?", second)[0].status).toBe("planned");
+    expect(h.db.prepare("SELECT COUNT(*) AS n FROM autonomy_idea_start_reservations").get()).toEqual({ n: 1 });
+  });
+});
 
 describe("the research phase", () => {
   it("splits a new goal into parallel angles on both models, then one synthesis with every angle's hand-off", async () => {

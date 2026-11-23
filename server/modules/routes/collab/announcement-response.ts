@@ -40,44 +40,37 @@ export function createAnnouncementReplyScheduler(deps: AnnouncementReplyDeps): {
     if (isUrgent)
       return pickL(
         l([
-          `${name} from ${dept} — acknowledged! I'll relay this to my team immediately! 🚨`,
-          `Urgent noted! ${dept} is on it right away.`,
-          `${name} here — confirmed! Sharing with the team ASAP.`,
+          `${name}: Got it. I'll tell the team now.`,
+          `${dept} is on it now.`,
+          `${name}: I'll share this with the team right away.`,
         ]),
         lang,
       );
     if (isGoodNews)
       return pickL(
-        l([
-          `Congratulations! ${dept} is thrilled! 🎉`,
-          `Great news! I'll share this with my team 😊`,
-          `${name} here — wonderful to hear! 👏`,
-        ]),
+        l([`Great news for ${dept}!`, `Nice! I'll share this with my team.`, `${name}: Glad to hear it.`]),
         lang,
       );
     if (isMeeting)
       return pickL(
         l([
-          `${name} from ${dept} — noted! I'll block the time 📅`,
+          `${name}: I'll be there.`,
           `Will be there! I'll let my team know too.`,
-          `${name} confirmed! I'll prepare for the meeting.`,
+          `${name}: I'll get ready for the meeting.`,
         ]),
         lang,
       );
     if (isPolicy)
       return pickL(
-        l([
-          `${name} from ${dept} — understood. I'll share with the team and align accordingly 📋`,
-          `Policy update noted! ${dept} will review and adjust.`,
-        ]),
+        l([`${name}: Got it. I'll share the change with the team.`, `${dept} will check what needs to change.`]),
         lang,
       );
     return pickL(
       l([
-        `${name} from ${dept} — acknowledged! 👍`,
-        `Noted! ${dept} will take this into account.`,
-        `${name} here — confirmed. I'll share with the team!`,
-        `Got it! We'll factor this into ${dept}'s work 📝`,
+        `${name}: Got it.`,
+        `${dept} will keep this in mind.`,
+        `${name}: I'll share this with the team.`,
+        `Got it. We'll use this in ${dept}'s work.`,
       ]),
       lang,
     );

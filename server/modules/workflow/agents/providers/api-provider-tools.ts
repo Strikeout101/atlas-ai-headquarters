@@ -359,7 +359,7 @@ export function createApiProviderTools(deps: CreateApiProviderToolsDeps) {
         else handleTaskRunComplete(taskId, 1);
         return;
       }
-      const providerKey = `climpire-${provider.id.replace(/[^a-zA-Z0-9-]/g, "-")}`;
+      const providerKey = `atlas-${provider.id.replace(/[^a-zA-Z0-9-]/g, "-")}`;
       const agentConfig = db
         .prepare(
           "SELECT a.context_window_tokens FROM tasks t JOIN agents a ON a.id = t.assigned_agent_id WHERE t.id = ?",

@@ -2,7 +2,7 @@
 Builds ATLAS floor-1 furniture from the downloaded models and exports public/models/atlas/office-furniture.glb.
 
 Run in Blender after build_atlas_shell.py:
-    exec(open(r"C:\\Users\\Strikeout\\Projects\\Claw-Empire-Claude\\art\\blender\\build_atlas_furniture.py").read())
+    exec(open(r"C:\\Users\\Strikeout\\Projects\\atlas\\art\\blender\\build_atlas_furniture.py").read())
 
 Pipeline per asset (ASSETS below):
   1. import (glb, or objects appended from a Poly Haven .blend)
@@ -24,7 +24,8 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 # Sources, by category: furniture/, electronics/, kitchen/, decor/, recreation/ (see Downloaded-Models/README.md).
 SRC = os.path.join(PROJECT, "Downloaded-Models")
 OUT = os.path.join(PROJECT, "public", "models", "atlas", "office-furniture.glb")

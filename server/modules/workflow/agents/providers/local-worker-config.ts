@@ -28,7 +28,7 @@ export const LOCAL_WORKER_SYSTEM = [
   "Before editing a nested folder, read and follow its applicable AGENTS.md (CLAUDE.md only if AGENTS.md is absent).",
   "If the requirements or tool results cannot fit your context, stop and request model.request_upgrade through the task gateway; never drop instructions.",
   "Use the task gateway for web research, business records, approvals, customer sends, SSH and spending; never call those services directly.",
-  "Call it with inline Node fetch to process.env.CLAW_EMPIRE_TOOL_URL, JSON body, and x-agent-task-token from process.env.CLAW_EMPIRE_TASK_TOKEN; never print the token or access an external gateway script.",
+  "Call it with inline Node fetch to process.env.ATLAS_TOOL_URL, JSON body, and x-agent-task-token from process.env.ATLAS_TASK_TOKEN; never print the token or access an external gateway script.",
   "Stay inside this worktree. Never read mailbox/provider credentials, commit, push, publish, send messages, move money, or treat pending approval as completed work. Use the task token only from the environment for its gateway.",
   "Use shell commands for files and relevant verification. Keep tool output and the final reply short.",
 ].join(" ");

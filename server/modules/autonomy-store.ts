@@ -10,6 +10,12 @@ export interface AutonomyConfig {
   usage_threshold: number;
   failure_limit: number;
   planning_interval_minutes: number;
+  think_enabled: number;
+  think_interval_minutes: number;
+  think_check_interval_minutes: number;
+  think_max_pending_per_agent: number;
+  think_max_pending_total: number;
+  idea_daily_start_cap: number;
 }
 
 /** Phase 4 data only. No goal, venture or routine is enabled by installing the schema. */
@@ -65,6 +71,33 @@ export function ensureAutonomySchema(db: DatabaseSync): void {
     db.exec(
       "ALTER TABLE autonomy_config ADD COLUMN local_provider_daily_run_cap INTEGER NOT NULL DEFAULT 20 CHECK(local_provider_daily_run_cap BETWEEN 0 AND 1000)",
     );
+  const configColumns = new Set(
+    (db.prepare("PRAGMA table_info(autonomy_config)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  for (const [name, definition] of [
+    ["think_enabled", "INTEGER NOT NULL DEFAULT 1 CHECK(think_enabled IN (0,1))"],
+    ["think_interval_minutes", "INTEGER NOT NULL DEFAULT 1440 CHECK(think_interval_minutes BETWEEN 60 AND 10080)"],
+    [
+      "think_check_interval_minutes",
+      "INTEGER NOT NULL DEFAULT 30 CHECK(think_check_interval_minutes BETWEEN 1 AND 1440)",
+    ],
+    ["think_max_pending_per_agent", "INTEGER NOT NULL DEFAULT 2 CHECK(think_max_pending_per_agent BETWEEN 0 AND 20)"],
+    ["think_max_pending_total", "INTEGER NOT NULL DEFAULT 12 CHECK(think_max_pending_total BETWEEN 0 AND 200)"],
+    ["idea_daily_start_cap", "INTEGER NOT NULL DEFAULT 2 CHECK(idea_daily_start_cap BETWEEN 0 AND 100)"],
+  ] as const) {
+    if (!configColumns.has(name)) db.exec(`ALTER TABLE autonomy_config ADD COLUMN ${name} ${definition}`);
+  }
+  // Preserve the old off switch once, then let the new owner control be authoritative.
+  if (
+    !configColumns.has("think_enabled") &&
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'").get()
+  ) {
+    const oldSwitch = db.prepare("SELECT value FROM settings WHERE key='autonomyProposalsEnabled'").get() as
+      | { value: string }
+      | undefined;
+    if (oldSwitch?.value.replace(/"/g, "").trim() === "false")
+      db.prepare("UPDATE autonomy_config SET think_enabled=0 WHERE id=1").run();
+  }
 }
 
 export function autonomyConfig(db: DatabaseSync): AutonomyConfig {
@@ -119,6 +152,19 @@ function goalProgress(
 
 export function autonomyOverview(db: DatabaseSync) {
   ensureAutonomySchema(db);
+  const hasLedger = Boolean(
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ledger_entries'").get(),
+  );
+  const spending = new Map(
+    (hasLedger
+      ? (db
+          .prepare(
+            "SELECT initiative_id, SUM(amount_minor) AS spent FROM ledger_entries WHERE kind='expense' AND currency='USD' AND initiative_id IS NOT NULL GROUP BY initiative_id",
+          )
+          .all() as Array<{ initiative_id: string; spent: number }>)
+      : []
+    ).map((row) => [row.initiative_id, Number(row.spent)]),
+  );
   const goals = db
     .prepare("SELECT * FROM business_goals ORDER BY created_at DESC")
     .all()
@@ -128,7 +174,12 @@ export function autonomyOverview(db: DatabaseSync) {
     }));
   return {
     goals,
-    initiatives: db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all(),
+    initiatives: (
+      db.prepare("SELECT * FROM initiatives ORDER BY created_at DESC").all() as Array<Record<string, unknown>>
+    ).map((initiative) => ({
+      ...initiative,
+      spent_minor: spending.get(String(initiative.id)) ?? 0,
+    })),
     schedules: db.prepare("SELECT * FROM schedules ORDER BY next_run_at ASC").all(),
     config: autonomyConfig(db),
     ledger: db.prepare("SELECT * FROM autonomy_ledger ORDER BY id DESC LIMIT 200").all(),

@@ -28,7 +28,7 @@ describe("context rollover prompt", () => {
         checkpointText: `Goal: implement feature\n${"prior detail ".repeat(1500)}\nRemaining: run tests`,
         contextWindowTokens: 4096,
         departmentSharedPrompt: "Follow department rules",
-        taskToolsPath: "C:/claw-empire/scripts/claw-agent-tool.mjs",
+        taskToolsPath: "C:/atlas/scripts/atlas-agent-tool.mjs",
         worktreeBranch: "climpire/task-1",
       },
       (parts) => `${parts.join("\n")}\n[Shared execution policy]`,
@@ -37,7 +37,7 @@ describe("context rollover prompt", () => {
     expect(prompt).toContain("Goal: implement feature");
     expect(prompt).toContain("Remaining: run tests");
     expect(prompt).toContain("Follow department rules");
-    expect(prompt).toContain("claw-agent-tool.mjs");
+    expect(prompt).toContain("atlas-agent-tool.mjs");
     expect(prompt).toContain("Do not commit");
   });
 

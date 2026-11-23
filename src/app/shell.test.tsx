@@ -19,7 +19,7 @@ const ALL_VIEWS: View[] = [
   "revenue",
   "outreach",
   "homelab",
-  "model_director",
+  "behind_scenes",
   "vp_decisions",
   "knowledge",
   "skills",
@@ -38,9 +38,9 @@ describe("view routes", () => {
     const sidebar = NAV_ITEMS.filter((item) => item.inSidebar !== false).map((item) => item.view);
     expect(sidebar).toContain("agents");
     expect(sidebar).not.toContain("skills");
-    expect(sidebar).not.toContain("model_director");
+    expect(sidebar).not.toContain("behind_scenes");
     const team = NAV_ITEMS.find((item) => item.view === "agents");
-    expect(team?.activeFor).toEqual(["skills", "model_director", "vp_decisions", "knowledge"]);
+    expect(team?.activeFor).toEqual(["skills", "behind_scenes", "vp_decisions", "knowledge"]);
   });
 
   it("tolerates trailing slashes and case, and sends unknown paths to Today", () => {

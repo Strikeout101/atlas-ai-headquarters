@@ -151,7 +151,7 @@ export function createHttpAgentTools(deps: CreateHttpAgentToolsDeps) {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
-            "Editor-Version": "climpire/1.0.0",
+            "Editor-Version": "atlas/1.0.0",
             "Copilot-Integration-Id": "vscode-chat",
           },
           body: JSON.stringify({

@@ -88,8 +88,9 @@ export default function AgentCard({
           <span
             className="text-[10px] font-mono px-1.5 py-0.5 rounded"
             style={{ background: "var(--th-bg-surface)", color: "var(--th-text-muted)" }}
+            title={agent.cli_provider ? undefined : "The VPs give this agent a model before its next task"}
           >
-            {agent.cli_provider}
+            {agent.cli_provider || "no model yet"}
           </span>
           {agent.personality && (
             <span

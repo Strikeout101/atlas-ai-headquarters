@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import { DEFAULT_SETTINGS, MESSENGER_CHANNELS } from "../types";
 import { LANGUAGE_STORAGE_KEY, LANGUAGE_USER_SET_STORAGE_KEY, normalizeLanguage } from "../i18n";
-import type { RoomThemeMap, RuntimeOs } from "./types";
+import type { RoomThemeMap } from "./types";
 import { ROOM_THEMES_STORAGE_KEY } from "./constants";
 
 export function isRoomTheme(value: unknown): value is RoomTheme {
@@ -239,28 +239,8 @@ export function readStoredClientLanguage(): string | null {
   return normalizeLanguage(raw);
 }
 
-export function detectRuntimeOs(): RuntimeOs {
-  if (typeof window === "undefined") return "unknown";
-  const ua = (window.navigator.userAgent || "").toLowerCase();
-  const platform = (window.navigator.platform || "").toLowerCase();
-  if (platform.includes("win") || ua.includes("windows")) return "windows";
-  if (platform.includes("mac") || ua.includes("mac os")) return "mac";
-  if (platform.includes("linux") || ua.includes("linux")) return "linux";
-  return "unknown";
-}
-
-export function isForceUpdateBannerEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("force_update_banner") === "1";
-  } catch {
-    return false;
-  }
-}
-
 export function syncClientLanguage(language: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalizeLanguage(language));
-  window.dispatchEvent(new Event("climpire-language-change"));
+  window.dispatchEvent(new Event("atlas-language-change"));
 }

@@ -111,7 +111,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
               l([
                 recentLines.length > 0
                   ? `Choose an existing project. Recent ${RECENT_EXISTING_PROJECT_LIMIT} projects:\n${recentLines.join("\n")}\nSend a number (1-${recentLines.length}) or project name/absolute path.`
-                  : "No recent existing projects found. Send an absolute project path (e.g. /Users/classys/Projects/climpire) or an existing project name.",
+                  : "No recent existing projects found. Send an absolute project path (e.g. C:/Users/you/Projects/shop) or an existing project name.",
               ]),
               lang,
             );
@@ -258,10 +258,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
         if (pendingBinding.state === "ask_new_name") {
           const newProjectName = normalizeNewProjectNameInput(ceoMessage);
           if (!newProjectName) {
-            const askNameAgain = pickL(
-              l(["Please provide the new project name again. Example: climpire-redesign"]),
-              lang,
-            );
+            const askNameAgain = pickL(l(["Please provide the new project name again. Example: shop-redesign"]), lang);
             replyRuntime.sendInCharacterAutoMessage({
               agent,
               lang,
@@ -280,7 +277,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
             newProjectName,
           });
           const askNewPath = pickL(
-            l(["Send the new project's absolute path. Example: /Users/classys/Projects/climpire-redesign"]),
+            l(["Send the new project's absolute path. Example: C:/Users/you/Projects/shop-redesign"]),
             lang,
           );
           replyRuntime.sendInCharacterAutoMessage({
@@ -298,7 +295,7 @@ export function createDirectChatHandlers(deps: DirectChatDeps) {
           const providedPath = extractAbsolutePathFromText(ceoMessage);
           if (!providedPath) {
             const askPathAgain = pickL(
-              l(["Please send it again as an absolute path. Example: /Users/classys/Projects/climpire-redesign"]),
+              l(["Please send it again as an absolute path. Example: C:/Users/you/Projects/shop-redesign"]),
               lang,
             );
             replyRuntime.sendInCharacterAutoMessage({

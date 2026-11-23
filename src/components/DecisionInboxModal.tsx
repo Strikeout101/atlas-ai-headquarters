@@ -4,7 +4,6 @@ import type { UiLanguage } from "../i18n";
 import { pickLang } from "../i18n";
 import type { Agent } from "../types";
 import AgentAvatar, { buildSpriteMap } from "./AgentAvatar";
-import MessageContent from "./MessageContent";
 import type { DecisionInboxItem } from "./chat/decision-inbox";
 import { formatDecisionInboxTime as formatTime, type DecisionInboxModalProps } from "./chat/decision-inbox-modal.meta";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
@@ -58,7 +57,7 @@ export default function DecisionInboxModal({
   const canSubmitFollowup = !!(followupItem && followupDraft.trim() && !isFollowupSubmitting);
 
   function handleOptionClick(item: DecisionInboxItem, optionNumber: number, action?: string) {
-    if (action === "add_followup_request") {
+    if (action === "add_followup_request" || action === "strategy_redo") {
       setFollowupTarget({ itemId: item.id, optionNumber });
       setFollowupDraft("");
       return;
@@ -87,6 +86,10 @@ export default function DecisionInboxModal({
     if (kind === "review_owner") {
       return t({ en: "Stuck review" });
     }
+    if (kind === "strategy") return t({ en: "Strategy" });
+    if (kind === "initiative_approval") return t({ en: "Idea to build" });
+    if (kind === "initiative_blocked") return t({ en: "Stuck initiative" });
+    if (kind === "approval") return t({ en: "Approval" });
     return t({ en: "Agent Request" });
   };
   const getKindAvatarFallback = (kind: DecisionInboxItem["kind"]) => {
@@ -182,9 +185,9 @@ export default function DecisionInboxModal({
                     ) : null}
                   </div>
 
-                  <div className="rounded-lg border border-slate-700/70 bg-slate-900/60 px-2.5 py-2 text-xs text-slate-200">
-                    <MessageContent content={item.requestContent} />
-                  </div>
+                  <p className="whitespace-pre-wrap break-words rounded-lg border border-slate-700/70 bg-slate-900/60 px-2.5 py-2 text-xs text-slate-200">
+                    {item.requestContent}
+                  </p>
 
                   <div className="mt-2 space-y-1.5">
                     {item.options.length > 0 ? (
@@ -219,15 +222,15 @@ export default function DecisionInboxModal({
         {followupItem ? (
           <div className="border-t border-slate-700/60 bg-slate-900/90 px-4 py-3">
             <p className="mb-2 text-xs font-semibold text-slate-200">
-              {t({
-                en: "Additional Follow-up Request",
-              })}
+              {followupItem.kind === "strategy"
+                ? "What should change in the strategy?"
+                : "Additional follow-up request"}
             </p>
             <textarea
               value={followupDraft}
               onChange={(event) => setFollowupDraft(event.target.value)}
               placeholder={t({
-                en: "Enter your request details.",
+                en: "Tell the team what should change.",
               })}
               rows={3}
               className="w-full resize-y rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none"

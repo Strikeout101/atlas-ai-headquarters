@@ -57,7 +57,7 @@ export function parseDecisionRequest(content: string): ParsedDecisionRequest | n
 
   const options = Array.from(deduped.values())
     .sort((a, b) => a.number - b.number)
-    .slice(0, 6);
+    .slice(0, 3);
 
   if (options.length < 2) return null;
   return { options };

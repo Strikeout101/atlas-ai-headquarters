@@ -11,7 +11,8 @@ import os
 import bpy
 from mathutils import Vector
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 SRC = os.path.join(PROJECT, "Downloaded-Models")
 # Prop categories (characters, animations, textures and HDRIs are not props).
 PROP_FOLDERS = ("furniture", "electronics", "kitchen", "decor", "recreation")

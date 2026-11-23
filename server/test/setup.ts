@@ -9,7 +9,7 @@ process.env.ETSY_MIN_INTERVAL_MS ??= "0";
 // Force isolated SQLite/log paths for server-side Vitest runs.
 const workerSuffix = process.env.VITEST_WORKER_ID || String(process.pid);
 const runtimeDir = path.resolve(process.cwd(), ".tmp", "vitest-runtime");
-const dbPath = path.join(runtimeDir, `claw-empire.vitest.${workerSuffix}.sqlite`);
+const dbPath = path.join(runtimeDir, `atlas.vitest.${workerSuffix}.sqlite`);
 const logsDir = path.join(runtimeDir, `logs-${workerSuffix}`);
 
 try {

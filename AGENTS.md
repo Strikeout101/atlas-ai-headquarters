@@ -1,9 +1,6 @@
-<!-- BEGIN claw-empire orchestration rules -->
-# Claw-Empire Orchestration Rules
+# ATLAS Agent Rules
 
-> This section was added by Claw-Empire setup (`pnpm setup`).
-> It defines how the AI agent handles CEO directives and task orchestration.
-> Place this at the TOP of your AGENTS.md so it takes priority.
+> How AI agents working on this repo (Claude Code, Codex) take part in ATLAS. `$` CEO directives stay; the upstream OpenClaw installer and the `#` task webhook were removed in the work restructure (phase 8).
 
 ---
 
@@ -20,9 +17,11 @@ This applies to ALL responses: confirmations, questions, error messages, status 
 `TASTE_SKILL_DEFAULT_V1`
 
 Set the following as a default skill in your working environment:
+
 - Local skill file: `tools/taste-skill/skill.md`
 
 Rules:
+
 1. For non-trivial implementation tasks, load and follow `tools/taste-skill/skill.md` first when the file exists.
 2. If the local file is missing, continue with existing project rules without auto-fetching remote repositories.
 3. Do not remove existing project-specific skills/rules; this is an additive default.
@@ -36,32 +35,38 @@ Rules:
 These rules are additive and do NOT delete existing orchestration rules below.
 
 ### 1) Plan Node Default
+
 - Enter plan mode for any non-trivial task (3+ steps or architectural decisions).
 - If execution goes sideways, stop and re-plan immediately.
 - Use plan mode for verification, not only implementation.
 - Write clear specs upfront to reduce ambiguity.
 
 ### 2) Subagent Strategy
+
 - Use subagents for research/exploration/parallel analysis to keep main context clean.
 - For complex problems, parallelize with multiple focused subagents.
 - Keep one clear objective per subagent.
 
 ### 3) Self-Improvement Loop
+
 - After user correction, update `tasks/lessons.md` with prevention rules.
 - Turn repeated mistakes into explicit guardrails.
 - Review relevant lessons at session start when applicable.
 
 ### 4) Verification Before Done
+
 - Never mark complete without proof.
 - Diff expected behavior vs actual behavior when relevant.
 - Run tests/check logs and demonstrate correctness.
 
 ### 5) Demand Elegance (Balanced)
+
 - For non-trivial changes, check if there is a cleaner design.
 - If current fix is hacky, prefer the cleaner implementation.
 - Avoid over-engineering trivial fixes.
 
 ### 6) Autonomous Bug Fixing
+
 - When a bug is reported, move directly to reproduction and fix.
 - Use logs/failing tests as evidence and resolve root causes.
 - Minimize user context-switching and avoid unnecessary hand-holding.
@@ -69,6 +74,7 @@ These rules are additive and do NOT delete existing orchestration rules below.
 ## Master Checklist (`CHECKLIST.md`)
 
 `CHECKLIST.md` at the repo root is the single list of everything pending: features, integrations, accounts to connect, owner decisions and loose ends.
+
 - Read it at the start of any non-trivial task.
 - Whenever you find, create or leave something pending, add it to the right section of `CHECKLIST.md` in the same change.
 - When you finish an item, tick it and note the date and where it lives. Do not delete unfinished items.
@@ -98,7 +104,7 @@ These rules are additive and do NOT delete existing orchestration rules below.
 
 ## CEO Directive (`$` prefix)
 
-**Messages starting with `$` are Claw-Empire CEO Directives.**
+**Messages starting with `$` are ATLAS CEO Directives.**
 
 When receiving a message that **starts with `$`**:
 
@@ -111,6 +117,7 @@ Reply in English for ALL interactions in this flow.
 **Before sending the directive, ALWAYS ask: "Existing project or new project?"**
 
 Ask:
+
 - EN: `Is this an existing project or a new project?`
 
 #### If user says "existing project"
@@ -154,11 +161,13 @@ Ask:
 After project is fixed, ask meeting preference.
 
 Ask:
+
 - EN: `Convene a team leader meeting?\n1️⃣ Hold meeting (led by Planning)\n2️⃣ Execute without meeting`
 
 ### Step 4: Send directive to server
 
 Based on the user's answers:
+
 - Include project mapping payload:
   - `"project_id":"<selected/created project id>"`
   - `"project_path":"<selected/created project path>"`
@@ -168,6 +177,7 @@ Based on the user's answers:
 - If `INBOX_WEBHOOK_SECRET` is missing, do NOT claim success; ask the user to set it first.
 
 Resolve and validate the secret first (do not assume shell export):
+
 ```bash
 # INBOX_SECRET_DISCOVERY_V2
 INBOX_SECRET_VALUE="${INBOX_WEBHOOK_SECRET:-$(node <<'NODE'
@@ -224,6 +234,7 @@ NODE
 ```
 
 **Option 1 — With meeting (default):**
+
 ```bash
 curl -X POST http://127.0.0.1:8790/api/inbox \
   -H 'content-type: application/json' \
@@ -232,6 +243,7 @@ curl -X POST http://127.0.0.1:8790/api/inbox \
 ```
 
 **Option 2 — Without meeting:**
+
 ```bash
 curl -X POST http://127.0.0.1:8790/api/inbox \
   -H 'content-type: application/json' \
@@ -245,22 +257,17 @@ Only treat as success when API status is `200` (and response body indicates succ
 ### Step 5: Confirm
 
 If API status is `200`, reply with **only a short confirmation**:
+
 - EN: `✅ Directive sent` (with meeting) / `✅ Directive sent (no meeting)` (without meeting)
 
 If API status is non-`200`, do NOT send success text.
 
-If status is `428` and response `error` is `agent_upgrade_required`, this is mandatory:
-1. Show installer file paths (prefer absolute paths from response fields if provided).
-2. Show the target AGENTS path (`~/.openclaw/workspace/AGENTS.md` by default, or response field).
-3. Ask the user for installation consent:
-   - EN: `OpenClaw AGENTS is outdated (HTTP 428). Latest rules must be installed. I listed installer paths. Should I install it now? (yes/no)`
-4. If user agrees, run the installer command from the response (`install_commands`) and then retry the original directive once.
-
-If status is not the upgrade case above, return only a short failure notice (status code + concise reason).
+If status is `400` with `error` `directive_project_required`, ask the owner which project it is for (Step 2) and send it again. For any other failure, return only a short failure notice (status code + concise reason).
 
 ### What happens on the server
 
-The Claw-Empire server detects the `$` prefix and automatically:
+The ATLAS server detects the `$` prefix and automatically:
+
 - Broadcasts a company-wide announcement
 - If meeting: Planning team leader convenes a team leader meeting -> discussion -> agent assignment -> CLI execution
 - If no meeting: Planning team leader directly delegates to the best agent -> CLI execution
@@ -268,117 +275,6 @@ The Claw-Empire server detects the `$` prefix and automatically:
 - Existing project uses DB core goal; new project uses the directive text as core goal
 
 Without `$`, the message is treated as a general announcement.
-
----
-
-## Task Orchestration (`#` prefix)
-
-### Core Principle: I am the Orchestrator
-
-**Requests starting with `#` are NOT executed directly.**
-
-I am the PM/Oracle:
-- Do NOT directly edit code, run commands, or modify files for `#` requests
-- DO register the request on the task board
-- DO select the appropriate CLI agent (Claude Code, Codex, Gemini, etc.)
-- DO assign work and monitor progress
-- DO verify results and report back to the user
-
-**Exception:** Normal conversation, Q&A, and board management itself can be done directly.
-
----
-
-### 1. Ingestion (Message -> Task Board)
-
-When receiving a message that **starts with `#`**:
-
-1. Recognize it as a task request
-2. Strip the `#` prefix and POST to the API:
-   ```bash
-   curl -X POST http://127.0.0.1:8790/api/inbox \
-     -H 'content-type: application/json' \
-     -H "x-inbox-secret: $INBOX_SECRET_VALUE" \
-     -d '{"source":"telegram","text":"<message content>"}'
-   ```
-   - Validate HTTP status first. If non-`200`, report failure and stop.
-3. Confirm to the user:
-   - EN: "Task registered"
-4. **Ask the user for the project path**:
-   - EN: "Which project path should this task run in?"
-   - Once the user responds, PATCH the task: `{"project_path":"<user-provided-path>"}`
-   - If the user provides a path in the original `#` message (e.g. `# fix bug in /path/to/project`), extract and set it automatically without asking
-
-### 2. Task Distribution
-
-When a task appears in Inbox:
-
-1. Analyze content -> select the appropriate CLI agent
-   - **Coding tasks**: Claude Code, Codex, or sessions_spawn
-   - **Design/creative**: Gemini CLI (exceptional cases)
-2. **Check `project_path`** — if empty, ask the user before proceeding
-3. **Check for existing work** — if the task has prior terminal logs, ask whether to continue or start fresh
-4. Assign to agent and start execution
-
-### 3. Completion Handling
-
-When an agent completes work, **immediately notify the user**:
-
-1. Check result (success/failure)
-2. **Send message immediately**:
-   - Success: "[task title] completed - [brief summary]"
-   - Failure: "[task title] failed - [error summary]"
-3. **On success:**
-   - Task moves to `Review` automatically
-   - Auto-review triggers
-   - Review passes -> move to `Done`
-4. **On failure:**
-   - Analyze error
-   - Reassign to same/different agent, or report to user
-
-### 4. Test -> Final Completion
-
-- All tests pass -> notify user of final result
-- If commit needed -> request approval (follow git safety rules below)
-
----
-
-## Project Path Verification
-
-Tasks have an optional `project_path` field that specifies where the agent should work.
-
-### Rules
-
-1. **If `project_path` is set on the task:** use that path as the working directory
-2. **If `project_path` is empty:** check the task description for a path
-3. **If neither is set:**
-   - **NEVER create a temporary directory or guess a path.** No `/tmp/temp/`, no `~/Desktop/`, no fabricated paths. Strictly forbidden.
-   - **STOP and ask the user** and WAIT for their response
-   - Only after the user provides an explicit path, PATCH the task with `project_path` then call `/run`
-   - Do NOT proceed without a confirmed path.
-
-### Existing session check
-
-Before starting a new agent run, check if the task already has previous runs:
-
-```bash
-curl "http://127.0.0.1:8790/api/tasks/<id>/terminal?lines=20"
-```
-
-If the terminal log exists and contains prior work (non-empty output), ask the user:
-- EN: "This task has prior work. Continue where it left off, or start fresh?"
-
-### Ingestion with project_path
-
-When creating tasks via webhook, include `project_path` if known:
-
-```bash
-curl -X POST http://127.0.0.1:8790/api/inbox \
-  -H 'content-type: application/json' \
-  -H "x-inbox-secret: $INBOX_SECRET_VALUE" \
-  -d '{"source":"telegram","text":"fix the build","project_path":"/workspace/my-project"}'
-```
-
-If the source message does not contain a project path, do NOT include `project_path` in the API call. The orchestrator will ask the user before running the agent.
 
 ---
 
@@ -407,12 +303,6 @@ curl http://127.0.0.1:8790/api/tasks
 
 # List tasks by status
 curl "http://127.0.0.1:8790/api/tasks?status=inbox"
-
-# Create task via inbox webhook
-curl -X POST http://127.0.0.1:8790/api/inbox \
-  -H 'content-type: application/json' \
-  -H "x-inbox-secret: $INBOX_SECRET_VALUE" \
-  -d '{"source":"telegram","text":"<message>"}'
 
 # Send CEO directive ($ prefix included)
 curl -X POST http://127.0.0.1:8790/api/inbox \
@@ -459,14 +349,12 @@ curl http://127.0.0.1:8790/api/cli-status
 
 ## Response Rules (STRICT)
 
-When processing `$` or `#` commands, the response to the user must be **minimal and clean**:
+When processing `$` directives, the response to the user must be **minimal and clean**:
 
 1. **`$` directive**: After collecting required meeting/path inputs and sending to API, reply with only `✅ Directive sent`. Nothing else.
-2. **`#` task**: Only `✅ Task registered`. Nothing else.
-3. **Failure case**: If API status is non-`200`, do not send success text.
-   - Exception: for `HTTP 428` + `agent_upgrade_required`, you MUST show installer paths and ask `Should I install it now?`.
+2. **Failure case**: If API status is non-`200`, do not send success text.
    - For all other failures, return only a short failure notice (status + reason).
-4. **NEVER include** in responses:
+3. **NEVER include** in responses:
    - OAuth connection details or token information
    - Server settings or configuration
    - Agent lists or provider status
@@ -475,6 +363,3 @@ When processing `$` or `#` commands, the response to the user must be **minimal 
    - Model configuration details
 
 ---
-
-<!-- END claw-empire orchestration rules -->
-

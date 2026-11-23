@@ -1,3 +1,4 @@
+import { STORAGE_KEYS } from "../storage-keys";
 export const MAX_LIVE_MESSAGES = 600;
 export const MAX_LIVE_SUBTASKS = 2000;
 export const MAX_LIVE_SUBAGENTS = 600;
@@ -8,5 +9,4 @@ export const MAX_SUBAGENT_STREAM_TAIL_CHARS = 16_000;
 export const MAX_SUBAGENT_STREAM_TRACKED_TASKS = 180;
 export const MAX_CODEX_THREAD_BINDINGS = 2000;
 export const CODEX_THREAD_BINDING_TTL_MS = 30 * 60 * 1000;
-export const UPDATE_BANNER_DISMISS_STORAGE_KEY = "climpire_update_banner_dismissed";
-export const ROOM_THEMES_STORAGE_KEY = "climpire_room_themes";
+export const ROOM_THEMES_STORAGE_KEY = STORAGE_KEYS.roomThemes;

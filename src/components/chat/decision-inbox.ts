@@ -1,10 +1,18 @@
 import type { Agent, Message } from "../../types";
 import { parseDecisionRequest } from "./decision-request";
 import type { DecisionOption } from "./decision-request";
+import type { PendingApproval } from "../../api/approvals";
 
 export interface DecisionInboxItem {
   id: string;
-  kind: "agent_request" | "task_timeout_resume" | "review_owner";
+  kind:
+    | "agent_request"
+    | "task_timeout_resume"
+    | "review_owner"
+    | "strategy"
+    | "initiative_approval"
+    | "initiative_blocked"
+    | "approval";
   agentId: string | null;
   agentName: string;
   agentNameKo: string;
@@ -15,6 +23,7 @@ export interface DecisionInboxItem {
   taskId?: string | null;
   projectId?: string | null;
   projectName?: string | null;
+  approval?: PendingApproval;
 }
 
 const DECISION_REPLY_RE = /\[Decision Reply\]/i;

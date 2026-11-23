@@ -35,7 +35,7 @@ export type DecisionInboxRouteOption = {
 
 export type DecisionInboxRouteItem = {
   id: string;
-  kind: "task_timeout_resume" | "review_owner";
+  kind: "task_timeout_resume" | "review_owner" | "strategy" | "initiative_approval" | "initiative_blocked";
   created_at: number;
   summary: string;
   agent_id?: string | null;
@@ -55,7 +55,7 @@ export type DecisionInboxRouteItem = {
 export type DecisionInboxReplyResult = {
   ok: boolean;
   resolved: boolean;
-  kind: "task_timeout_resume" | "review_owner";
+  kind: "task_timeout_resume" | "review_owner" | "strategy" | "initiative_approval" | "initiative_blocked";
   action: string;
   started_task_ids?: string[];
   task_id?: string;
@@ -234,28 +234,6 @@ export async function saveSettingsPatch(patch: Record<string, unknown>): Promise
 
 export async function saveRoomThemes(roomThemes: Record<string, RoomTheme>): Promise<void> {
   await put("/api/settings", { roomThemes });
-}
-
-export interface UpdateStatus {
-  current_version: string;
-  latest_version: string | null;
-  update_available: boolean;
-  release_url: string | null;
-  checked_at: number;
-  enabled: boolean;
-  repo: string;
-  error: string | null;
-}
-
-export async function getUpdateStatus(refresh?: boolean): Promise<UpdateStatus> {
-  const q = refresh ? "?refresh=1" : "";
-  const j = await request<UpdateStatus & { ok?: boolean }>(`/api/update-status${q}`);
-  const { ok: _ok, ...status } = j;
-  return status;
-}
-
-export async function setAutoUpdateEnabled(enabled: boolean): Promise<void> {
-  await post("/api/update-auto-config", { enabled });
 }
 
 // OAuth

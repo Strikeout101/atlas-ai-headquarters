@@ -562,7 +562,8 @@ test.describe("CI coverage gap expansion", () => {
           option_number: 1,
         },
       });
-      expect(badDecisionReplyRes.status()).toBe(404);
+      // A local bootstrap session can read the inbox, but cannot make owner decisions.
+      expect(badDecisionReplyRes.status()).toBe(403);
     } finally {
       ws.close();
       await request.put("/api/settings", { data: restoreSettings });

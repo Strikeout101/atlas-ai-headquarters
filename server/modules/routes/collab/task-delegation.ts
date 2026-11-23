@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { AgentRow } from "./direct-chat.ts";
 import type { DelegationOptions } from "./project-resolution.ts";
+import { chooseAssignee } from "../../staffing.ts";
+import { defaultImportance, inferWorkType } from "../../work-model.ts";
 import type { Lang } from "../../../types/lang.ts";
 import type { L10n } from "./language-policy.ts";
 import type { RuntimeContext } from "../../../types/runtime-context.ts";
@@ -133,8 +135,17 @@ export function createTaskDelegationHandler(deps: TaskDelegationDeps) {
         department_id: leaderDeptId,
         project_id: selectedProject.id,
       });
-      const subordinate = findBestSubordinate(leaderDeptId, teamLeader.id, projectCandidateAgentIds);
-      const manualFallbackToLeader = Array.isArray(projectCandidateAgentIds) && subordinate === null;
+      const bestSubordinate = findBestSubordinate(leaderDeptId, teamLeader.id, projectCandidateAgentIds);
+      const manualFallbackToLeader = Array.isArray(projectCandidateAgentIds) && bestSubordinate === null;
+      // Leads do important work themselves (up to 2 at a time, plan section 5); routine work goes to the senior.
+      const importance = defaultImportance(
+        inferWorkType({ title: ceoMessage, departmentName: leaderDeptName }),
+        ceoMessage,
+      );
+      const leadTakesIt =
+        importance === "important" &&
+        chooseAssignee(db as any, leaderDeptId, { importance, exclude: [] })?.id === teamLeader.id;
+      const subordinate = leadTakesIt ? null : bestSubordinate;
 
       const taskId = randomUUID();
       const t = nowMs();

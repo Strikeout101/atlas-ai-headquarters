@@ -1,9 +1,10 @@
+import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
-import { DEFAULT_DB_PATH } from "../config/runtime.ts";
+import { resolveDbPath } from "../config/runtime.ts";
 import { decryptMessengerTokenForRuntime } from "../messenger/token-crypto.ts";
 import {
   MESSENGER_CHANNELS,
@@ -143,7 +144,7 @@ function hasOwn(obj: object, key: string): boolean {
 }
 
 function readPersistedMessengerChannels(): PersistedMessengerChannels | null {
-  const dbPath = process.env.DB_PATH ?? DEFAULT_DB_PATH;
+  const dbPath = resolveDbPath((file) => fs.existsSync(file));
   let db: DatabaseSync | null = null;
   try {
     db = new DatabaseSync(dbPath);

@@ -1,4 +1,4 @@
-CLAW-EMPIRE SETUP INFORMATION
+ATLAS SETUP INFORMATION
 Updated: 2026-11-11
 
 Fill in what you know. Leave unknown items blank. Do not put passwords, API keys,
@@ -54,7 +54,7 @@ Any opt-out or do-not-contact list location:
 5. HOMELAB SSH ACCESS
 
 Host inventory: name, IP/DNS, OS, and purpose for each host:
-How the Claw-Empire PC reaches the hosts (LAN, Tailscale, VPN, jump host):
+How the ATLAS PC reaches the hosts (LAN, Tailscale, VPN, jump host):
 SSH port and login username for each host:
 Authentication method and location of an existing SSH key (path only):
 Whether a dedicated agent login should be created on each host:

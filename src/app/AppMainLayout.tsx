@@ -13,10 +13,10 @@ import {
   Wrench,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
-import OfficeView from "../components/OfficeView";
-import ReferenceOfficeView from "../components/ReferenceOfficeView";
 import Dashboard from "../components/Dashboard";
 import TaskBoard from "../components/TaskBoard";
+import WorkView from "../components/work/WorkView";
+import BehindTheScenes from "../components/work/BehindTheScenes";
 import AgentManager from "../components/AgentManager";
 import SkillsLibrary from "../components/SkillsLibrary";
 import SettingsPanel from "../components/SettingsPanel";
@@ -37,7 +37,7 @@ import PhoneTabBar from "./PhoneTabBar";
 import NavigationDrawer from "./NavigationDrawer";
 import { usePendingApprovals } from "./usePendingApprovals";
 import { useReadyDrafts } from "./useReadyDrafts";
-import { decidePendingApproval, type PendingApproval, type UpdateStatus } from "../api";
+import { decidePendingApproval, type PendingApproval } from "../api";
 import type {
   Agent,
   CeoOfficeCall,
@@ -58,22 +58,8 @@ import BusinessWorkspace from "../components/BusinessWorkspace";
 import HomelabWorkspace from "../components/HomelabWorkspace";
 import { EmergencyBanner } from "../components/control/EmergencyControls";
 import ListingsPanel from "../components/listings/ListingsPanel";
-import ModelDirectorWorkspace from "../components/ModelDirectorWorkspace";
 
 const AtlasOffice = lazy(() => import("../components/atlas-office/AtlasOffice"));
-
-type OfficeRenderer = "reference" | "original" | "atlas";
-const OFFICE_RENDERER_STORAGE_KEY = "atlas.officeRenderer";
-
-function readStoredOfficeRenderer(): OfficeRenderer {
-  try {
-    const stored = window.localStorage.getItem(OFFICE_RENDERER_STORAGE_KEY);
-    if (stored === "reference" || stored === "original" || stored === "atlas") return stored;
-  } catch {
-    // Fall through to the default view.
-  }
-  return "reference";
-}
 
 interface AppMainLayoutLabels {
   uiLanguage: string;
@@ -85,22 +71,6 @@ interface AppMainLayoutLabels {
   tasksPrimaryLabel: string;
   agentStatusLabel: string;
   decisionLabel: string;
-  autoUpdateNoticeVisible: boolean;
-  autoUpdateNoticeTitle: string;
-  autoUpdateNoticeHint: string;
-  autoUpdateNoticeActionLabel: string;
-  autoUpdateNoticeContainerClass: string;
-  autoUpdateNoticeTextClass: string;
-  autoUpdateNoticeHintClass: string;
-  autoUpdateNoticeButtonClass: string;
-  effectiveUpdateStatus: UpdateStatus | null;
-  updateBannerVisible: boolean;
-  updateReleaseUrl: string;
-  updateTitle: string;
-  updateHint: string;
-  updateReleaseLabel: string;
-  updateDismissLabel: string;
-  updateTestModeHint: string;
 }
 
 interface AppMainLayoutProps {
@@ -168,8 +138,6 @@ interface AppMainLayoutProps {
   onOpenReportHistory: () => void;
   onOpenAnnouncement: () => void;
   onOpenRoomManager: () => void;
-  onDismissAutoUpdateNotice: () => Promise<void>;
-  onDismissUpdate: () => void;
   children?: ReactNode;
 }
 
@@ -229,19 +197,8 @@ export default function AppMainLayout({
   onOpenReportHistory,
   onOpenAnnouncement,
   onOpenRoomManager,
-  onDismissAutoUpdateNotice,
-  onDismissUpdate,
   children,
 }: AppMainLayoutProps) {
-  const [officeRenderer, setOfficeRendererState] = useState<OfficeRenderer>(readStoredOfficeRenderer);
-  const setOfficeRenderer = useCallback((next: OfficeRenderer) => {
-    setOfficeRendererState(next);
-    try {
-      window.localStorage.setItem(OFFICE_RENDERER_STORAGE_KEY, next);
-    } catch {
-      // Storage can be unavailable (private mode); the choice then lasts for this session only.
-    }
-  }, []);
   const [executiveDesktopOpen, setExecutiveDesktopOpen] = useState(false);
   // Phones get the dashboard only: no Office in navigation, and its address opens Today instead.
   const phone = usePhoneLayout();
@@ -580,138 +537,29 @@ export default function AppMainLayout({
             </div>
           )}
 
-          {labels.autoUpdateNoticeVisible && (
-            <div className={labels.autoUpdateNoticeContainerClass}>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className={labels.autoUpdateNoticeTextClass}>
-                  <div className="font-medium">{labels.autoUpdateNoticeTitle}</div>
-                  <div className={labels.autoUpdateNoticeHintClass}>{labels.autoUpdateNoticeHint}</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void onDismissAutoUpdateNotice();
-                    }}
-                    className={labels.autoUpdateNoticeButtonClass}
-                  >
-                    {labels.autoUpdateNoticeActionLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {labels.updateBannerVisible && labels.effectiveUpdateStatus && (
-            <div className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2.5 sm:px-4 lg:px-6">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 text-xs text-amber-100">
-                  <div className="font-medium">{labels.updateTitle}</div>
-                  <div className="mt-0.5 text-[11px] text-amber-200/90">{labels.updateHint}</div>
-                  {labels.updateTestModeHint && (
-                    <div className="mt-0.5 text-[11px] text-amber-300/90">{labels.updateTestModeHint}</div>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <a
-                    href={labels.updateReleaseUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-amber-300/40 bg-amber-200/10 px-2.5 py-1 text-[11px] text-amber-100 transition hover:bg-amber-200/20"
-                  >
-                    {labels.updateReleaseLabel}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={onDismissUpdate}
-                    className="rounded-md border border-slate-500/40 bg-slate-700/30 px-2.5 py-1 text-[11px] text-slate-100 transition hover:bg-slate-700/50"
-                  >
-                    {labels.updateDismissLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className={phone ? "px-3 pt-3 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]" : "p-3 sm:p-4 lg:p-6"}>
             {view === "office" && !phone && (
-              <div className={officeRenderer === "atlas" ? "fixed inset-0 z-[45] bg-slate-900" : ""}>
+              <div className="fixed inset-0 z-[45] bg-slate-900">
                 <div
-                  className={
-                    officeRenderer === "atlas"
-                      ? "absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-lg bg-slate-900/85 p-2"
-                      : "mb-3 flex flex-wrap items-center gap-2"
-                  }
+                  className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-lg bg-slate-900/85 p-2"
                   role="group"
-                  aria-label="Office renderer"
+                  aria-label="Office"
                 >
                   <button
                     type="button"
-                    aria-pressed={officeRenderer === "reference"}
-                    onClick={() => setOfficeRenderer("reference")}
-                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition active:scale-[0.98] ${officeRenderer === "reference" ? "border-slate-400 bg-slate-700 text-white" : "border-slate-500/40 text-[var(--th-text-secondary)] hover:bg-slate-500/10"}`}
+                    onClick={() => {
+                      setExecutiveDesktopOpen(true);
+                      setView("dashboard");
+                    }}
+                    className="rounded-md border border-slate-400 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-700 active:scale-[0.98]"
                   >
-                    AI Office Map
+                    Open desktop
                   </button>
-                  <button
-                    type="button"
-                    aria-pressed={officeRenderer === "original"}
-                    onClick={() => setOfficeRenderer("original")}
-                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition active:scale-[0.98] ${officeRenderer === "original" ? "border-slate-400 bg-slate-700 text-white" : "border-slate-500/40 text-white hover:bg-slate-500/10"}`}
-                  >
-                    Original Office
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={officeRenderer === "atlas"}
-                    onClick={() => setOfficeRenderer("atlas")}
-                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition active:scale-[0.98] ${officeRenderer === "atlas" ? "border-slate-400 bg-slate-700 text-white" : "border-slate-500/40 text-[var(--th-text-secondary)] hover:bg-slate-500/10"}`}
-                  >
-                    ATLAS Office
-                  </button>
-                  {officeRenderer === "atlas" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExecutiveDesktopOpen(true);
-                        setView("dashboard");
-                      }}
-                      className="rounded-md border border-slate-400 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-700 active:scale-[0.98]"
-                    >
-                      Open desktop
-                    </button>
-                  )}
                 </div>
-                {officeRenderer === "atlas" ? (
-                  <Suspense fallback={<div className="min-h-[400px] rounded-lg bg-slate-900" />}>
-                    <AtlasOffice
-                      agents={officePresentation.agents}
-                      departments={officePresentation.departments}
-                      tasks={tasks}
-                      subAgents={subAgents}
-                      meetingPresence={meetingPresence}
-                      activeMeetingTaskId={activeMeetingTaskId}
-                      unreadAgentIds={unreadAgentIds}
-                      crossDeptDeliveries={crossDeptDeliveries}
-                      onCrossDeptDeliveryProcessed={onCrossDeptDeliveryProcessed}
-                      ceoOfficeCalls={ceoOfficeCalls}
-                      onCeoOfficeCallProcessed={onCeoOfficeCallProcessed}
-                      onOpenActiveMeetingMinutes={onOpenActiveMeetingMinutes}
-                      language={uiLanguage}
-                      pose={officePose}
-                      onSelectAgent={onSelectAgent}
-                      onSelectDepartment={onSelectDepartment}
-                      onReturnToOriginal={() => setOfficeRenderer("original")}
-                      onEnterDesktop={() => {
-                        setExecutiveDesktopOpen(true);
-                        setView("dashboard");
-                      }}
-                    />
-                  </Suspense>
-                ) : officeRenderer === "reference" ? (
-                  <ReferenceOfficeView
-                    departments={officePresentation.departments}
+                <Suspense fallback={<div className="min-h-[400px] rounded-lg bg-slate-900" />}>
+                  <AtlasOffice
                     agents={officePresentation.agents}
+                    departments={officePresentation.departments}
                     tasks={tasks}
                     subAgents={subAgents}
                     meetingPresence={meetingPresence}
@@ -722,31 +570,17 @@ export default function AppMainLayout({
                     ceoOfficeCalls={ceoOfficeCalls}
                     onCeoOfficeCallProcessed={onCeoOfficeCallProcessed}
                     onOpenActiveMeetingMinutes={onOpenActiveMeetingMinutes}
-                    customDeptThemes={officePresentation.roomThemes}
-                    themeHighlightTargetId={activeRoomThemeTargetId}
+                    language={uiLanguage}
+                    pose={officePose}
                     onSelectAgent={onSelectAgent}
                     onSelectDepartment={onSelectDepartment}
+                    onReturnToOriginal={() => setView("dashboard")}
+                    onEnterDesktop={() => {
+                      setExecutiveDesktopOpen(true);
+                      setView("dashboard");
+                    }}
                   />
-                ) : (
-                  <OfficeView
-                    departments={officePresentation.departments}
-                    agents={officePresentation.agents}
-                    tasks={tasks}
-                    subAgents={subAgents}
-                    meetingPresence={meetingPresence}
-                    activeMeetingTaskId={activeMeetingTaskId}
-                    unreadAgentIds={unreadAgentIds}
-                    crossDeptDeliveries={crossDeptDeliveries}
-                    onCrossDeptDeliveryProcessed={onCrossDeptDeliveryProcessed}
-                    ceoOfficeCalls={ceoOfficeCalls}
-                    onCeoOfficeCallProcessed={onCeoOfficeCallProcessed}
-                    onOpenActiveMeetingMinutes={onOpenActiveMeetingMinutes}
-                    customDeptThemes={officePresentation.roomThemes}
-                    themeHighlightTargetId={activeRoomThemeTargetId}
-                    onSelectAgent={onSelectAgent}
-                    onSelectDepartment={onSelectDepartment}
-                  />
-                )}
+                </Suspense>
               </div>
             )}
 
@@ -781,22 +615,28 @@ export default function AppMainLayout({
             {view === "autonomy" && <AutonomyWorkspace departments={departments} />}
 
             {view === "tasks" && (
-              <TaskBoard
-                tasks={tasks}
-                agents={agents}
-                departments={departments}
-                subtasks={subtasks}
-                onCreateTask={onCreateTask}
-                onUpdateTask={onUpdateTask}
-                onDeleteTask={onDeleteTask}
-                onAssignTask={onAssignTask}
-                onRunTask={onRunTask}
-                onStopTask={onStopTask}
-                onPauseTask={onPauseTask}
-                onResumeTask={onResumeTask}
-                onOpenTerminal={onOpenTerminal}
-                onOpenMeetingMinutes={onOpenMeetingMinutes}
-                onOpenDetails={openTask}
+              <WorkView
+                refreshKey={tasks}
+                onOpenTask={openTask}
+                allTasks={
+                  <TaskBoard
+                    tasks={tasks}
+                    agents={agents}
+                    departments={departments}
+                    subtasks={subtasks}
+                    onCreateTask={onCreateTask}
+                    onUpdateTask={onUpdateTask}
+                    onDeleteTask={onDeleteTask}
+                    onAssignTask={onAssignTask}
+                    onRunTask={onRunTask}
+                    onStopTask={onStopTask}
+                    onPauseTask={onPauseTask}
+                    onResumeTask={onResumeTask}
+                    onOpenTerminal={onOpenTerminal}
+                    onOpenMeetingMinutes={onOpenMeetingMinutes}
+                    onOpenDetails={openTask}
+                  />
+                }
               />
             )}
 
@@ -842,7 +682,7 @@ export default function AppMainLayout({
             )}
             {view === "homelab" && <HomelabWorkspace agents={agents} />}
             {TEAM_VIEWS.includes(view) && <TeamTabs current={view} onChange={setView} />}
-            {view === "model_director" && <ModelDirectorWorkspace />}
+            {view === "behind_scenes" && <BehindTheScenes refreshKey={agents} onOpenTask={openTask} />}
             {view === "vp_decisions" && <VpDecisions />}
             {view === "knowledge" && <KnowledgeTab />}
 

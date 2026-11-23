@@ -23,7 +23,7 @@ function renderBoth() {
 }
 
 beforeEach(() => {
-  localStorage.setItem("climpire.language", "en");
+  localStorage.setItem("atlas.language", "en");
   resetControlStoreForTests();
   api.getControlState.mockReset().mockResolvedValue(stateOf("running"));
   api.setControlMode.mockReset();

@@ -1,7 +1,7 @@
 import type { Agent, AgentRole, Department } from "../../types";
 
 /**
- * ATLAS floor plan, matching the AI Office Map (reference-map-geometry.ts) in metres.
+ * ATLAS floor plan, in metres (it started from the old 2D office map, now removed).
  * x runs west → east, z runs north (back wall) → south (window wall). y is up.
  * Rendering, collision, agent seats and interactions all read from this file.
  */
@@ -90,7 +90,7 @@ export const GLASS_WALLS: FloorRect[] = [...CONFERENCE_WALLS, ...EXECUTIVE_WALLS
 const LOWER_GLASS_WALLS: FloorRect[] = CONFERENCE_WALLS;
 export const GLASS_WALLS_BY_FLOOR: Record<FloorId, FloorRect[]> = { director: GLASS_WALLS, lower: LOWER_GLASS_WALLS };
 
-/** Workstations: north row then south row, west to east, as on the AI Office Map. */
+/** Workstations: north row then south row, west to east, west to east. */
 export const DESK_WIDTH = 1.7;
 export const DESK_DEPTH = 0.8;
 export const DESKS: FloorPoint[] = [

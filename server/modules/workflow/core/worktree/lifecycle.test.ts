@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Real git repositories: a few seconds each, longer while the whole suite runs in parallel.
+vi.setConfig({ testTimeout: 20_000 });
 import { createWorktreeLifecycleTools } from "./lifecycle.ts";
 
 function runGit(cwd: string, args: string[]): string {
@@ -18,7 +21,7 @@ function initRepo(basePrefix: string): string {
     runGit(dir, ["checkout", "-B", "main"]);
   }
   runGit(dir, ["config", "user.name", "Claw-Empire Test"]);
-  runGit(dir, ["config", "user.email", "claw-empire-test@example.local"]);
+  runGit(dir, ["config", "user.email", "atlas-test@example.local"]);
   fs.writeFileSync(path.join(dir, "README.md"), "seed\n", "utf8");
   runGit(dir, ["add", "."]);
   runGit(dir, ["commit", "-m", "seed"]);

@@ -13,7 +13,7 @@ test.beforeAll(async ({ request }) => {
   await request.get("/api/auth/session");
   const settings = await (await request.get("/api/settings")).json();
   expect(settings.settings.__e2eRuntimeId).toBe(runtimeId);
-  const db = new DatabaseSync(path.join(runtimePath, "claw-empire.e2e.sqlite"));
+  const db = new DatabaseSync(path.join(runtimePath, "atlas.e2e.sqlite"));
   try {
     configureLoginStore(db);
     ownerCookie = createSessionToken("password");
@@ -36,7 +36,6 @@ test("service panel explains dev mode, and a manual backup is saved and restore-
   await openGeneral(page);
   await page.locator("summary").filter({ hasText: "Not running as a service" }).click();
   await expect(page.getByText(/atlas-service.ps1 install/)).toBeVisible();
-  await expect(page.getByText("Auto Update (Global)")).toHaveCount(0);
 
   await page
     .locator("summary")
@@ -59,10 +58,9 @@ test("service panel explains dev mode, and a manual backup is saved and restore-
   await page.screenshot({ path: ".tmp/e2e-backups-phone.png", fullPage: false });
 });
 
-test("upstream updates stay locked and agents cannot reach system routes", async ({ page, request }) => {
+test("the upstream updater is gone and agents cannot reach system routes", async ({ page, request }) => {
   await openGeneral(page);
-  const status = await (await page.request.get("/api/update-status")).json();
-  expect(status).toMatchObject({ enabled: false, error: "upstream_updates_disabled_in_atlas" });
+  expect((await page.request.get("/api/update-status")).status()).toBe(404);
   const anonymous = await request.get("/api/backups");
   expect([401, 403]).toContain(anonymous.status());
   const agent = await request.get("/api/system/service", { headers: { "x-agent-task-token": "not-a-real-token" } });

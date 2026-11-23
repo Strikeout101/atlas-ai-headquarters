@@ -6,6 +6,9 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Real git repositories: a few seconds each, longer while the whole suite runs in parallel.
+vi.setConfig({ testTimeout: 20_000 });
 import { applyBaseSchema } from "./bootstrap/schema/base-schema.ts";
 import { applyTaskSchemaMigrations } from "./bootstrap/schema/task-schema-migrations.ts";
 import { SESSION_COOKIE_NAME } from "../config/runtime.ts";

@@ -17,7 +17,7 @@ test.beforeAll(async ({ request }) => {
   await request.get("/api/auth/session");
   const settings = await (await request.get("/api/settings")).json();
   expect(settings.settings.__e2eRuntimeId).toBe(runtimeId);
-  const db = new DatabaseSync(path.join(runtimePath, "claw-empire.e2e.sqlite"));
+  const db = new DatabaseSync(path.join(runtimePath, "atlas.e2e.sqlite"));
   try {
     const now = Date.now();
     const insert = db.prepare(

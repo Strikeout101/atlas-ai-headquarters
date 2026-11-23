@@ -282,9 +282,9 @@ export function createCliRuntimeTools(deps: CliRuntimeDeps) {
       | { assigned_agent_id: string | null }
       | undefined;
     if (assigned?.assigned_agent_id) {
-      cleanEnv.CLAW_EMPIRE_TASK_TOKEN = createAgentTaskToken(taskId, assigned.assigned_agent_id);
-      cleanEnv.CLAW_EMPIRE_TOOL_URL = `http://127.0.0.1:${PORT}/api/agent-tools`;
-      cleanEnv.CLAW_EMPIRE_TOOLS_CLI = path.join(process.cwd(), "scripts", "claw-agent-tool.mjs");
+      cleanEnv.ATLAS_TASK_TOKEN = createAgentTaskToken(taskId, assigned.assigned_agent_id);
+      cleanEnv.ATLAS_TOOL_URL = `http://127.0.0.1:${PORT}/api/agent-tools`;
+      cleanEnv.ATLAS_TOOLS_CLI = path.join(process.cwd(), "scripts", "atlas-agent-tool.mjs");
     }
     if (extraEnv) Object.assign(cleanEnv, extraEnv);
     if (!cleanEnv.TERM) cleanEnv.TERM = "dumb";

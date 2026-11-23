@@ -173,12 +173,6 @@ export function registerAgentCrudRoutes(ctx: RuntimeContext): void {
         db.prepare("UPDATE task_report_archives SET generated_by_agent_id = NULL WHERE generated_by_agent_id = ?").run(
           id,
         );
-        db.prepare("UPDATE project_review_decision_states SET planner_agent_id = NULL WHERE planner_agent_id = ?").run(
-          id,
-        );
-        db.prepare("UPDATE review_round_decision_states SET planner_agent_id = NULL WHERE planner_agent_id = ?").run(
-          id,
-        );
         db.prepare("DELETE FROM agents WHERE id = ?").run(id);
       });
 

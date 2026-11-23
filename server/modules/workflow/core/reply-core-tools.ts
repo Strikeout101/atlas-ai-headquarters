@@ -156,16 +156,16 @@ export function createReplyCoreTools(deps: CreateReplyCoreToolsDeps) {
     const name = agent ? getAgentDisplayName(agent, lang) : "";
     switch (kind) {
       case "opening":
-        return `${name}: Kickoff noted. Please share concise feedback in order.`;
+        return `${name}: Got it. What should we tackle first?`;
       case "feedback":
-        return `${name}: We have identified key gaps and a top-priority validation item before execution.`;
+        return `${name}: I found a few gaps. Let's check the biggest one first.`;
       case "summary":
-        return `${name}: I will consolidate all leader feedback and proceed with the agreed next step.`;
+        return `${name}: I'll pull the feedback together and take the next step.`;
       case "approval":
-        return `${name}: Decision noted. We will proceed according to the current meeting conclusion.`;
+        return `${name}: Got it. I'll go with that decision.`;
       case "direct":
       default:
-        return `${name}: Acknowledged. Proceeding with the requested direction.`;
+        return `${name}: Got it. I'll get started.`;
     }
   }
 

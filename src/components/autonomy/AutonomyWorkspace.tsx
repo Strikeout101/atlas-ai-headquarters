@@ -27,6 +27,7 @@ import { useI18n } from "../../i18n";
 import { currencyDigits, parseMoney } from "../revenue/money";
 import PlaybooksPanel from "./PlaybooksPanel";
 import GoalMilestones from "./GoalMilestones";
+import GoalsOverview from "./GoalsOverview";
 
 const inputClass = "mt-1 min-h-[40px] w-full min-w-0 rounded-lg border px-3 py-2 text-sm";
 const inputStyle = {
@@ -162,6 +163,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
       row.period_start = new Date(String(row.period_start)).getTime();
       row.period_end = new Date(String(row.period_end)).getTime();
     }
+    if (resource !== "schedules") row.project_id = row.project_id || null;
     if (resource === "initiatives") {
       for (const key of [...scoreFields, "budget", "task_limit", "time_limit_days"]) row[key] = Number(row[key]);
       row.goal_id = row.goal_id || null;
@@ -304,7 +306,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 style={{ borderColor: "var(--th-border)", background: "var(--th-card-bg)" }}
                 aria-label={`${editing ? "Edit" : "Add"} ${resource}`}
               >
-                {!projects.length && (
+                {!projects.length && resource === "schedules" && (
                   <p className="text-sm">
                     {t({
                       en: "Create a project with an absolute path in Work before adding autonomous work.",
@@ -331,13 +333,15 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                   <Field label={t({ en: "Project" })}>
                     <select
                       name="project_id"
-                      required
+                      required={resource === "schedules"}
                       value={projectId}
                       onChange={(event) => setProjectId(event.target.value)}
                       className={inputClass}
                       style={inputStyle}
                     >
-                      <option value="">{t({ en: "Choose a project" })}</option>
+                      <option value="">
+                        {resource === "schedules" ? t({ en: "Choose a project" }) : t({ en: "No project (optional)" })}
+                      </option>
                       {projects.map((project) => (
                         <option key={project.id} value={project.id}>
                           {project.name} — {project.project_path}
@@ -347,6 +351,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                   </Field>
                   {resource === "goals" && (
                     <>
+                      {textField("title", t({ en: "Goal title" }), "", "text", { maxLength: 200 })}
                       <Field label={t({ en: "Metric" })}>
                         <select
                           name="metric"
@@ -441,7 +446,7 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                           style={inputStyle}
                         >
                           {data.goals
-                            .filter((goal) => goal.business === business && goal.project_id === projectId)
+                            .filter((goal) => goal.business === business)
                             .map((goal) => (
                               <option key={goal.id} value={goal.id}>
                                 {goal.title ? `${goal.title} · ` : ""}
@@ -604,7 +609,11 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <button type="submit" className="ax-btn-primary" disabled={busy || !projects.length}>
+                  <button
+                    type="submit"
+                    className="ax-btn-primary"
+                    disabled={busy || (resource === "schedules" && !projects.length)}
+                  >
                     {t({ en: "Save" })}
                   </button>
                   <button type="button" className="ax-btn-secondary" onClick={() => setFormOpen(false)} disabled={busy}>
@@ -613,7 +622,21 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 </div>
               </form>
             )}
-            {!data[resource].length ? (
+            {resource === "goals" ? (
+              <GoalsOverview
+                data={data}
+                busy={busy}
+                onEdit={(goal) => edit(goal)}
+                milestones={(goal) => (
+                  <GoalMilestones
+                    goalId={goal.id}
+                    milestones={(data.milestones ?? []).filter((milestone) => milestone.goal_id === goal.id)}
+                    busy={busy}
+                    mutate={mutate}
+                  />
+                )}
+              />
+            ) : !data[resource].length ? (
               <p className="py-8 text-sm" style={{ color: "var(--th-text-muted)" }}>
                 {t({
                   en: "Nothing here yet. Add an item to guide autonomous work.",
@@ -624,61 +647,15 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                 {data[resource].map((row) => (
                   <li key={row.id} className="flex min-w-0 flex-wrap items-start justify-between gap-3 py-4">
                     <div className="min-w-0 flex-1">
-                      <p className="break-words text-sm font-medium">
-                        {"metric" in row
-                          ? `${row.title ? `${row.title} · ` : ""}${pretty(row.metric)} · ${row.progress === null ? t({ en: "Not measured yet" }) : `${row.progress} / ${row.target}`}`
-                          : row.title}
-                      </p>
+                      <p className="break-words text-sm font-medium">{row.title}</p>
                       <p className="mt-1 break-words text-xs" style={{ color: "var(--th-text-muted)" }}>
-                        {BUSINESS_NAMES[row.business]}
-                        {"metric" in row &&
-                        ["verified_revenue", "revenue", "profit", "verified_profit"].includes(row.metric)
-                          ? ` · ${row.currency ?? "USD"}`
-                          : ""}{" "}
-                        · {projects.find((project) => project.id === row.project_id)?.name ?? row.project_id}
+                        {BUSINESS_NAMES[row.business]}·{" "}
+                        {projects.find((project) => project.id === row.project_id)?.name ?? row.project_id}
                         {"status" in row && row.status ? ` · ${row.status}` : ""}
                         {"enabled" in row
                           ? ` · ${row.enabled ? "Enabled" : "Paused"} · ${row.cron ? `${row.cron} (${row.timezone ?? "America/New_York"})` : `every ${row.interval_minutes} min`} · ${row.consecutive_failures} failures · next ${new Date(row.next_run_at).toLocaleString(locale)}`
                           : ""}
                       </p>
-                      {"metric" in row && (
-                        <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
-                          {new Date(row.period_start).toLocaleDateString(locale)} –{" "}
-                          {new Date(row.period_end).toLocaleDateString(locale)}
-                          {row.progress_scope === "business" ? ` · ${t({ en: "Business-wide records" })}` : ""}
-                        </p>
-                      )}
-                      {"metric" in row &&
-                        (() => {
-                          const strategy = (data.strategies ?? []).find((item) => item.goal_id === row.id);
-                          return strategy ? (
-                            <details className="mt-2 text-xs">
-                              <summary className="cursor-pointer">
-                                {t({ en: "Strategy" })} · {new Date(strategy.created_at).toLocaleDateString(locale)}
-                              </summary>
-                              <p
-                                className="mt-1 whitespace-pre-wrap break-words"
-                                style={{ color: "var(--th-text-muted)" }}
-                              >
-                                {strategy.summary}
-                              </p>
-                            </details>
-                          ) : (
-                            <p className="mt-2 text-xs" style={{ color: "var(--th-text-muted)" }}>
-                              {t({
-                                en: "No strategy yet: agents research one for this goal while ATLAS is running.",
-                              })}
-                            </p>
-                          );
-                        })()}
-                      {"metric" in row && (
-                        <GoalMilestones
-                          goalId={row.id}
-                          milestones={(data.milestones ?? []).filter((m) => m.goal_id === row.id)}
-                          busy={busy}
-                          mutate={mutate}
-                        />
-                      )}
                       {"demand_score" in row && (row.playbook_stage || row.stop_reason) && (
                         <p className="mt-2 break-words text-xs">
                           {row.playbook_stage ? `Playbook step: ${pretty(row.playbook_stage)}` : ""}
@@ -747,6 +724,17 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
               }}
             >
               <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Free-time ideas">
+                  <select
+                    name="think_enabled"
+                    defaultValue={data.config.think_enabled ?? 1}
+                    className={inputClass}
+                    style={inputStyle}
+                  >
+                    <option value={1}>On</option>
+                    <option value={0}>Off</option>
+                  </select>
+                </Field>
                 {(
                   [
                     ["daily_start_cap", "Daily autonomous starts", 0, 100, 1],
@@ -754,6 +742,11 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                     ["usage_threshold", "Subscription usage ceiling (0–1)", 0, 1, 0.01],
                     ["failure_limit", "Pause schedule after failures", 1, 20, 1],
                     ["planning_interval_minutes", "Planning interval (minutes)", 1, 10080, 1],
+                    ["think_interval_minutes", "Hours between each agent's ideas (minutes)", 60, 10080, 60],
+                    ["think_check_interval_minutes", "Check for free time every (minutes)", 1, 1440, 1],
+                    ["think_max_pending_per_agent", "Pending ideas per agent", 0, 20, 1],
+                    ["think_max_pending_total", "Pending ideas overall", 0, 200, 1],
+                    ["idea_daily_start_cap", "Daily idea task starts", 0, 100, 1],
                   ] as const
                 ).map(([key, title, min, max, step]) => (
                   <Field key={key} label={title}>
@@ -764,7 +757,19 @@ export default function AutonomyWorkspace({ departments }: { departments: Depart
                       min={min}
                       max={max}
                       step={step}
-                      defaultValue={data.config[key] ?? (key === "local_provider_daily_run_cap" ? 20 : undefined)}
+                      defaultValue={
+                        data.config[key] ??
+                        (
+                          {
+                            local_provider_daily_run_cap: 20,
+                            think_interval_minutes: 1440,
+                            think_check_interval_minutes: 30,
+                            think_max_pending_per_agent: 2,
+                            think_max_pending_total: 12,
+                            idea_daily_start_cap: 2,
+                          } as Record<string, number>
+                        )[key]
+                      }
                       className={inputClass}
                       style={inputStyle}
                     />

@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import * as api from "../api";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import type { Agent, CompanyStats, Task } from "../types";
-import { mapWorkflowDecisionItemsRaw } from "./decision-inbox";
+import { mapApprovalDecisionItems, mapWorkflowDecisionItemsRaw } from "./decision-inbox";
 import { areAgentListsEquivalent, areTaskListsEquivalent } from "./utils";
 
 type UseLiveSyncSchedulerParams = {
@@ -30,15 +30,14 @@ export function useLiveSyncScheduler({
       return;
     }
     liveSyncInFlightRef.current = true;
-    Promise.all([api.getTasks(), api.getAgents(), api.getStats(), api.getDecisionInbox()])
-      .then(([nextTasks, nextAgents, nextStats, nextDecisionItems]) => {
+    Promise.all([api.getTasks(), api.getAgents(), api.getStats(), api.getDecisionInbox(), api.getPendingApprovals()])
+      .then(([nextTasks, nextAgents, nextStats, nextDecisionItems, approvals]) => {
         setTasks((prev) => (areTaskListsEquivalent(prev, nextTasks) ? prev : nextTasks));
         setAgents((prev) => (areAgentListsEquivalent(prev, nextAgents) ? prev : nextAgents));
         setStats(nextStats);
-        setDecisionInboxItems((prev) => {
-          const preservedAgentRequests = prev.filter((item) => item.kind === "agent_request");
+        setDecisionInboxItems(() => {
           const workflowItems = mapWorkflowDecisionItemsRaw(nextDecisionItems);
-          const merged = [...workflowItems, ...preservedAgentRequests];
+          const merged = [...workflowItems, ...mapApprovalDecisionItems(approvals)];
           const deduped = new Map<string, DecisionInboxItem>();
           for (const entry of merged) deduped.set(entry.id, entry);
           return Array.from(deduped.values()).sort((a, b) => b.createdAt - a.createdAt);

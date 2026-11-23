@@ -475,26 +475,8 @@ export function registerProjectRoutes({
       )
       .all(id);
 
-    const decisionEvents = db
-      .prepare(
-        `
-    SELECT
-      id,
-      snapshot_hash,
-      event_type,
-      summary,
-      selected_options_json,
-      note,
-      task_id,
-      meeting_id,
-      created_at
-    FROM project_review_decision_events
-    WHERE project_id = ?
-    ORDER BY created_at DESC, id DESC
-    LIMIT 300
-  `,
-      )
-      .all(id);
+    // The project review gate and its decision log were removed (work restructure, phase 4).
+    const decisionEvents: unknown[] = [];
 
     const assignedAgents = db
       .prepare(

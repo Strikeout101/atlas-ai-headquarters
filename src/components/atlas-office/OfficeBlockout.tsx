@@ -22,7 +22,7 @@ import {
 } from "./layout";
 
 /**
- * Phase 1 blockout of the AI Office Map floor plan: simple shapes in the final positions.
+ * Phase 1 blockout of the office floor plan: simple shapes in the final positions.
  * Later phases replace these with Blender-made models; positions come from layout.ts.
  */
 
@@ -309,7 +309,13 @@ export function OfficeSignage({ floor = "director" }: { floor?: FloorId }) {
         <torusGeometry args={[0.55, 0.035, 12, 48]} />
         <meshStandardMaterial color={COLORS.neon} emissive={COLORS.neon} emissiveIntensity={2.4} />
       </mesh>
-      <RoomSign label="ATLAS AI HQ" position={[-7.8, 1.15, FLOOR.minZ + 0.016]} width={2.2} height={0.46} doubleSided={false} />
+      <RoomSign
+        label="ATLAS AI HQ"
+        position={[-7.8, 1.15, FLOOR.minZ + 0.016]}
+        width={2.2}
+        height={0.46}
+        doubleSided={false}
+      />
       {[1.0, 6.3].map((x) => (
         <Box
           key={x}
@@ -373,7 +379,11 @@ export default function OfficeBlockout({ arcadeOn, floor = "director" }: { arcad
       {!director && (
         <>
           <Footprint rect={nook.sofa} height={0.42} color={COLORS.fabric} />
-          <Box position={[nook.sofa.x, 0.7, nook.sofa.z - 0.36]} size={[nook.sofa.width, 0.55, 0.18]} color={COLORS.fabric} />
+          <Box
+            position={[nook.sofa.x, 0.7, nook.sofa.z - 0.36]}
+            size={[nook.sofa.width, 0.55, 0.18]}
+            color={COLORS.fabric}
+          />
           <Footprint rect={nook.coffeeTable} height={0.4} color={COLORS.black} roughness={0.35} />
           <Chair x={nook.armchairWest.x} z={nook.armchairWest.z} color={COLORS.white} />
           <Chair x={nook.armchairEast.x} z={nook.armchairEast.z} color={COLORS.white} />
@@ -401,7 +411,11 @@ export default function OfficeBlockout({ arcadeOn, floor = "director" }: { arcad
       {/* Corner sofa (north-west) and the arcade beside it, facing east */}
       <Footprint rect={f.cornerSofa} height={0.42} color={COLORS.fabric} />
       <Footprint rect={f.cornerSofaChaise} height={0.42} color={COLORS.fabric} />
-      <Box position={[FLOOR.minX + 0.1, 0.6, f.cornerSofa.z]} size={[0.18, 0.4, f.cornerSofa.depth]} color={COLORS.fabric} />
+      <Box
+        position={[FLOOR.minX + 0.1, 0.6, f.cornerSofa.z]}
+        size={[0.18, 0.4, f.cornerSofa.depth]}
+        color={COLORS.fabric}
+      />
       <Footprint rect={f.arcade} height={1.8} color="#1d2f45" />
       <Box
         position={[f.arcade.x + 0.41, 1.3, f.arcade.z]}

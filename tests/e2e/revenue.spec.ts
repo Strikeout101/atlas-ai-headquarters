@@ -12,7 +12,7 @@ test.beforeAll(async ({ request }) => {
   const settings = await (await request.get("/api/settings")).json();
   expect(settings.settings.__e2eRuntimeId).toBe(runtimeId);
   // All payment rows below are disposable fixtures. No Square credentials or network calls exist in this spec.
-  const db = new DatabaseSync(path.join(runtimePath, "claw-empire.e2e.sqlite"));
+  const db = new DatabaseSync(path.join(runtimePath, "atlas.e2e.sqlite"));
   try {
     const now = Date.now();
     db.prepare(

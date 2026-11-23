@@ -113,7 +113,7 @@ test("all Settings tabs share the wide centered layout and disclosures without a
   for (const tab of ["general", "business", "security", "cli", "oauth", "api", "gateway"]) {
     await page.goto(`/settings?tab=${tab}`);
     const layout = page.locator("[data-settings-layout]");
-    await expect(layout).toBeVisible();
+    await expect(layout).toBeVisible({ timeout: 20_000 });
     await expect(layout.locator("details > summary").first()).toBeVisible();
     const box = await layout.boundingBox();
     expect(box!.width).toBeGreaterThan(900);

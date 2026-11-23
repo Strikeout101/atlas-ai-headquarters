@@ -11,7 +11,7 @@ import { DatabaseSync } from "node:sqlite";
  * Old automatic copies are pruned after `keep_days`, but the newest three are always kept and nothing is pruned
  * after a failed backup. Manual backups in `backups/` are never touched.
  */
-export const AUTO_BACKUP_PATTERN = /^claw-empire-\d{4}-\d{2}-\d{2}-\d{6}\.sqlite$/;
+export const AUTO_BACKUP_PATTERN = /^(?:atlas|claw-empire)-\d{4}-\d{2}-\d{2}-\d{6}\.sqlite$/;
 const ALWAYS_KEEP = 3;
 const RETRY_AFTER_FAILURE_MS = 60 * 60 * 1000;
 const CHECKED_TABLES = ["tasks", "agents", "business_contacts", "deals", "ledger_entries", "projects"];
@@ -110,7 +110,7 @@ export function saveBackupSettings(db: DatabaseSync, input: unknown, now = Date.
 const pad = (value: number, size = 2) => String(value).padStart(size, "0");
 export function backupFileName(now: number): string {
   const d = new Date(now);
-  return `claw-empire-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.sqlite`;
+  return `atlas-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.sqlite`;
 }
 
 function sha256File(file: string): string {

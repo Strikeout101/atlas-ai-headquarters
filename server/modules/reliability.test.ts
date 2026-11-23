@@ -23,7 +23,6 @@ import {
 } from "./db-backups.ts";
 import { registerSystemRoutes } from "./routes/ops/system.ts";
 import { requestServiceAction, serviceOverview } from "./service-status.ts";
-import { upstreamUpdatesLocked } from "./routes/core/update-auto/upstream-lock.ts";
 // The supervisor is plain JavaScript run by Node directly; its logic is tested here with fake processes.
 // @ts-expect-error -- no type declarations for the .mjs script
 import * as supervisor from "../../scripts/atlas-service/supervisor.mjs";
@@ -185,14 +184,6 @@ describe("system routes", () => {
   it("reports when ATLAS is not running as a service", () => {
     expect(serviceOverview(tempDir(), {}).managed).toBe(false);
     expect(() => requestServiceAction("restart", {})).toThrow("service_not_running");
-  });
-});
-
-describe("upstream updater lock", () => {
-  it("stays locked unless ATLAS_ALLOW_UPSTREAM_UPDATE=1", () => {
-    expect(upstreamUpdatesLocked({})).toBe(true);
-    expect(upstreamUpdatesLocked({ ATLAS_ALLOW_UPSTREAM_UPDATE: "true" })).toBe(true);
-    expect(upstreamUpdatesLocked({ ATLAS_ALLOW_UPSTREAM_UPDATE: "1" })).toBe(false);
   });
 });
 

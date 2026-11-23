@@ -2,7 +2,7 @@
 Builds the ATLAS floor-1 building shell in Blender and exports it to public/models/atlas/office-shell.glb.
 
 Run inside Blender (Scripting tab, or the MCP `execute_blender_code` tool):
-    exec(open(r"C:\\Users\\Strikeout\\Projects\\Claw-Empire-Claude\\art\\blender\\build_atlas_shell.py").read())
+    exec(open(r"C:\\Users\\Strikeout\\Projects\\atlas\\art\\blender\\build_atlas_shell.py").read())
 
 Coordinates mirror src/components/atlas-office/layout.ts. That file uses three.js axes
 (x east, y up, z south); Blender is z-up, so a layout point (x, z) at height y becomes (x, -z, y) here.
@@ -19,7 +19,8 @@ import bmesh
 import bpy
 import numpy as np
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 TEX = os.path.join(PROJECT, "Downloaded-Models", "textures")
 # "director" is the Director's floor; "lower" is the floor below it, the same plan without the executive office.
 # Headless: set ATLAS_SHELL_VARIANT=lower and run blender -b --factory-startup --python build_atlas_shell.py

@@ -89,7 +89,7 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
         /* proceed */
       }
 
-      const mergeMsg = `Merge climpire task ${taskId.slice(0, 8)} (branch ${info.branchName})`;
+      const mergeMsg = `Merge ATLAS task ${taskId.slice(0, 8)} (branch ${info.branchName})`;
       execFileSync("git", ["merge", info.branchName, "--no-ff", "-m", mergeMsg], {
         cwd: projectPath,
         stdio: "pipe",
@@ -206,7 +206,7 @@ export function createWorktreeMergeTools(deps: CreateWorktreeMergeToolsDeps) {
         timeout: 5000,
       });
 
-      const mergeMsg = `Merge climpire task ${taskId.slice(0, 8)} (branch ${info.branchName})`;
+      const mergeMsg = `Merge ATLAS task ${taskId.slice(0, 8)} (branch ${info.branchName})`;
       execFileSync("git", ["merge", info.branchName, "--no-ff", "-m", mergeMsg], {
         cwd: projectPath,
         stdio: "pipe",

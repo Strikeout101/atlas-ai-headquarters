@@ -1,4 +1,4 @@
-export const DEFERRED_RUNTIME_FN_TAG = Symbol.for("climpire.deferredRuntimeFnName");
+export const DEFERRED_RUNTIME_FN_TAG = Symbol.for("atlas.deferredRuntimeFnName");
 
 type RuntimeRecord = Record<string, any>;
 

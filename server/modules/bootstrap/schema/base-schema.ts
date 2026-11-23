@@ -159,16 +159,6 @@ CREATE TABLE IF NOT EXISTS meeting_minute_entries (
   created_at INTEGER DEFAULT (unixepoch()*1000)
 );
 
-CREATE TABLE IF NOT EXISTS review_revision_history (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  normalized_note TEXT NOT NULL,
-  raw_note TEXT NOT NULL,
-  first_round INTEGER NOT NULL,
-  created_at INTEGER DEFAULT (unixepoch()*1000),
-  UNIQUE(task_id, normalized_note)
-);
-
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -251,44 +241,6 @@ CREATE TABLE IF NOT EXISTS task_report_archives (
   updated_at INTEGER DEFAULT (unixepoch()*1000)
 );
 
-CREATE TABLE IF NOT EXISTS project_review_decision_states (
-  project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-  snapshot_hash TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'collecting'
-    CHECK(status IN ('collecting','ready','failed')),
-  planner_summary TEXT,
-  planner_agent_id TEXT REFERENCES agents(id),
-  planner_agent_name TEXT,
-  created_at INTEGER DEFAULT (unixepoch()*1000),
-  updated_at INTEGER DEFAULT (unixepoch()*1000)
-);
-
-CREATE TABLE IF NOT EXISTS project_review_decision_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  snapshot_hash TEXT,
-  event_type TEXT NOT NULL
-    CHECK(event_type IN ('planning_summary','representative_pick','followup_request','start_review_meeting')),
-  summary TEXT NOT NULL,
-  selected_options_json TEXT,
-  note TEXT,
-  task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
-  meeting_id TEXT REFERENCES meeting_minutes(id) ON DELETE SET NULL,
-  created_at INTEGER DEFAULT (unixepoch()*1000)
-);
-
-CREATE TABLE IF NOT EXISTS review_round_decision_states (
-  meeting_id TEXT PRIMARY KEY REFERENCES meeting_minutes(id) ON DELETE CASCADE,
-  snapshot_hash TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'collecting'
-    CHECK(status IN ('collecting','ready','failed')),
-  planner_summary TEXT,
-  planner_agent_id TEXT REFERENCES agents(id),
-  planner_agent_name TEXT,
-  created_at INTEGER DEFAULT (unixepoch()*1000),
-  updated_at INTEGER DEFAULT (unixepoch()*1000)
-);
-
 CREATE TABLE IF NOT EXISTS skill_learning_history (
   id TEXT PRIMARY KEY,
   job_id TEXT NOT NULL,
@@ -308,12 +260,6 @@ CREATE TABLE IF NOT EXISTS skill_learning_history (
 
 CREATE INDEX IF NOT EXISTS idx_subtasks_task ON subtasks(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_report_archives_root ON task_report_archives(root_task_id, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_project_review_decision_states_updated
-  ON project_review_decision_states(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_project_review_decision_events_project
-  ON project_review_decision_events(project_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_review_round_decision_states_updated
-  ON review_round_decision_states(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_dept ON tasks(department_id);
@@ -326,7 +272,6 @@ CREATE INDEX IF NOT EXISTS idx_task_interrupt_injections_task
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_type, receiver_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_meeting_minutes_task ON meeting_minutes(task_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_meeting_minute_entries_meeting ON meeting_minute_entries(meeting_id, seq ASC);
-CREATE INDEX IF NOT EXISTS idx_review_revision_history_task ON review_revision_history(task_id, first_round DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_provider ON oauth_accounts(provider, status, priority, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_oauth_active_accounts_provider ON oauth_active_accounts(provider, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_skill_learning_history_provider_status_updated

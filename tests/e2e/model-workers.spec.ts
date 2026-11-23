@@ -45,7 +45,8 @@ for (const width of [1440, 375]) {
       if (route.request().method() === "PUT") config = { ...config, ...route.request().postDataJSON() };
       await route.fulfill({ json: config });
     });
-    await page.goto("/team/models");
+    await page.goto("/settings?tab=models");
+    await expect(page.getByRole("tab", { name: "Models", selected: true })).toBeVisible({ timeout: 15_000 });
     await page.getByLabel("technical director", { exact: true }).selectOption("technical");
     await page.getByLabel("design director", { exact: true }).selectOption("design");
     await page.getByLabel("Ollama host", { exact: true }).selectOption("precision");
@@ -54,7 +55,9 @@ for (const width of [1440, 375]) {
     await page.getByRole("button", { name: "Save director settings" }).click();
     await expect.poll(() => config.localRouting.enabled).toBe(true);
     await page.reload();
-    await expect(page.getByLabel("technical director", { exact: true })).toHaveValue("technical");
+    // Settings loads its data before showing a tab; wait for Models to be open, then for the saved values.
+    await expect(page.getByRole("tab", { name: "Models", selected: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel("technical director", { exact: true })).toHaveValue("technical", { timeout: 15_000 });
     await expect(page.getByLabel("design director", { exact: true })).toHaveValue("design");
     await expect(page.getByLabel("Local model", { exact: true })).toHaveValue("qwen-routine");
     await expect(page.getByRole("heading", { name: "Worker performance" })).toBeVisible();

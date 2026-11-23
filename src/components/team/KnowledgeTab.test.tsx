@@ -41,7 +41,7 @@ const memory = (overrides: Partial<AgentMemory> = {}): AgentMemory => ({
 });
 
 beforeEach(() => {
-  localStorage.setItem("climpire.language", "en");
+  localStorage.setItem("atlas.language", "en");
   for (const fn of Object.values(knowledgeApi)) vi.mocked(fn).mockReset();
   vi.mocked(knowledgeApi.memories).mockResolvedValue({
     ok: true,

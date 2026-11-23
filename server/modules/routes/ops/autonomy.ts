@@ -21,7 +21,7 @@ const RESOURCES = {
   goals: {
     table: "business_goals",
     singular: "goal",
-    fields: ["business", "project_id", "metric", "target", "currency", "period_start", "period_end"],
+    fields: ["business", "project_id", "title", "metric", "target", "currency", "period_start", "period_end"],
   },
   initiatives: {
     table: "initiatives",
@@ -81,14 +81,20 @@ function numeric(value: unknown, field: string, min: number, max: number, intege
 }
 function validate(db: DatabaseSync, resource: Resource, row: Body): void {
   if (!isBusinessKey(row.business)) fail("invalid_business");
-  const projectId = boundedText(row.project_id, "project_id", 128);
+  // Goals and initiatives belong to a business; a project (code workspace) is optional. Schedules still need one.
+  const optionalProject =
+    resource !== "schedules" && (row.project_id === null || row.project_id === undefined || row.project_id === "");
+  const projectId = optionalProject ? null : boundedText(row.project_id, "project_id", 128);
   row.project_id = projectId;
-  const project = db.prepare("SELECT project_path FROM projects WHERE id=?").get(projectId) as
-    | { project_path: string }
-    | undefined;
-  if (!project || !project.project_path?.trim() || !path.isAbsolute(project.project_path.trim()))
-    fail("project_requires_absolute_path");
+  if (projectId !== null) {
+    const project = db.prepare("SELECT project_path FROM projects WHERE id=?").get(projectId) as
+      | { project_path: string }
+      | undefined;
+    if (!project || !project.project_path?.trim() || !path.isAbsolute(project.project_path.trim()))
+      fail("project_requires_absolute_path");
+  }
   if (resource === "goals") {
+    row.title = boundedText(row.title, "title", 200, true);
     const metric = boundedText(row.metric, "metric", 80);
     row.metric = metric;
     row.currency = typeof row.currency === "string" ? row.currency.trim().toUpperCase() : "USD";
@@ -101,8 +107,8 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
     if (
       row.id &&
       db
-        .prepare("SELECT 1 FROM initiatives WHERE goal_id=? AND (business!=? OR project_id!=?) LIMIT 1")
-        .get(String(row.id), String(row.business), projectId)
+        .prepare("SELECT 1 FROM initiatives WHERE goal_id=? AND business!=? LIMIT 1")
+        .get(String(row.id), String(row.business))
     )
       fail("goal_has_linked_initiatives");
     return;
@@ -120,8 +126,7 @@ function validate(db: DatabaseSync, resource: Resource, row: Body): void {
       const goal = db
         .prepare("SELECT business,project_id FROM business_goals WHERE id=?")
         .get(boundedText(row.goal_id, "goal_id", 128)) as Body | undefined;
-      if (!goal || goal.business !== row.business || goal.project_id !== projectId)
-        fail("goal_business_or_project_mismatch");
+      if (!goal || goal.business !== row.business) fail("goal_business_or_project_mismatch");
     }
     return;
   }
@@ -430,6 +435,12 @@ export function registerAutonomyRoutes(
       "usage_threshold",
       "failure_limit",
       "planning_interval_minutes",
+      "think_enabled",
+      "think_interval_minutes",
+      "think_check_interval_minutes",
+      "think_max_pending_per_agent",
+      "think_max_pending_total",
+      "idea_daily_start_cap",
     ];
     if (Object.keys(body).some((key) => !fields.includes(key))) return res.status(400).json({ error: "unknown_field" });
     if (!Object.keys(body).length) return res.status(400).json({ error: "no_fields" });
@@ -440,6 +451,12 @@ export function registerAutonomyRoutes(
       numeric(next.usage_threshold, "usage_threshold", 0, 1);
       numeric(next.failure_limit, "failure_limit", 1, 20, true);
       numeric(next.planning_interval_minutes, "planning_interval_minutes", 1, 10080, true);
+      numeric(next.think_enabled, "think_enabled", 0, 1, true);
+      numeric(next.think_interval_minutes, "think_interval_minutes", 60, 10080, true);
+      numeric(next.think_check_interval_minutes, "think_check_interval_minutes", 1, 1440, true);
+      numeric(next.think_max_pending_per_agent, "think_max_pending_per_agent", 0, 20, true);
+      numeric(next.think_max_pending_total, "think_max_pending_total", 0, 200, true);
+      numeric(next.idea_daily_start_cap, "idea_daily_start_cap", 0, 100, true);
       db.exec("SAVEPOINT autonomy_config_mutation");
       try {
         db.prepare(`UPDATE autonomy_config SET ${fields.map((field) => `${field}=?`).join(",")} WHERE id=1`).run(

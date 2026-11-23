@@ -138,10 +138,10 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
       return { ok: false, error: "task_changed_during_model_routing" };
     const admissionBlock = automaticStartBlockReason(db, taskId) || autonomyTaskStartBlockReason(db as any, taskId);
     if (admissionBlock) {
-      db.prepare("UPDATE tasks SET status='pending',updated_at=? WHERE id=? AND status='in_progress'").run(
-        nowMs(),
-        taskId,
-      );
+      // Autonomous work is picked up again from planned; pending is a manual inbox state the work engine never scans.
+      db.prepare(
+        "UPDATE tasks SET status=CASE WHEN origin='autonomy' THEN 'planned' ELSE 'pending' END,started_at=NULL,updated_at=? WHERE id=? AND status='in_progress'",
+      ).run(nowMs(), taskId);
       db.prepare("UPDATE agents SET status='idle',current_task_id=NULL WHERE id=? AND current_task_id=?").run(
         execAgent.id,
         taskId,
@@ -338,7 +338,7 @@ export function createExecutionStartTaskTools(deps: CreateExecutionStartTaskTool
               deptConstraint,
               deptPromptBlock,
               workTypeInstructions(workType, worktreePath),
-              `If your current model cannot finish this task, write .climpire-model-upgrade.json in the working folder with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The VPs will decide; your work is kept for resume.`,
+              `If your current model cannot finish this task, write .atlas-model-upgrade.json in the working folder with {"reason":"at least ten characters","model":"optional configured model ID"}, then end this run. The VPs will decide; your work is kept for resume.`,
               interruptPromptBlock,
               continuationInstruction,
               runInstruction,

@@ -8,7 +8,7 @@ import { applyBaseSchema } from "../../bootstrap/schema/base-schema.ts";
 import { applyTaskSchemaMigrations } from "../../bootstrap/schema/task-schema-migrations.ts";
 import { applyWorkModelMigration } from "../../bootstrap/schema/work-model-migration.ts";
 import { ensureModelRoutingSchema } from "../../model-routing.ts";
-import { resetControlStateForTests } from "../../control-state.ts";
+import { ensureControlStateSchema, resetControlStateForTests, setControlMode } from "../../control-state.ts";
 import { createProjectContextTools } from "../core/project-context-tools.ts";
 import { createExecutionStartTaskTools } from "./execution-start-task.ts";
 
@@ -20,7 +20,7 @@ afterEach(() => {
   resetControlStateForTests();
 });
 
-function setup() {
+function setup(runDirector = vi.fn(async () => ({ text: "{}" }))) {
   resetControlStateForTests();
   const db = new DatabaseSync(":memory:");
   dbs.push(db);
@@ -94,7 +94,7 @@ function setup() {
     handleTaskRunComplete: () => {},
     notifyCeo: () => {},
     startProgressTimer: () => {},
-    runAgentOneShot: vi.fn(async () => ({ text: "{}" })),
+    runAgentOneShot: runDirector,
   } as never);
   const agent = (id: string) => db.prepare("SELECT * FROM agents WHERE id = ?").get(id);
   return { db, project, tools, spawned, createWorktree, agent };
@@ -155,5 +155,27 @@ describe("one start path for every task (work restructure, phase 2)", () => {
     const result = await tools.startTaskExecutionForAgent("research", agent("lead"), "planning", "Planning");
     expect(result).toEqual({ ok: false, error: "the owner stopped everything" });
     expect(spawned).toEqual([]);
+  });
+
+  it("requeues autonomous work if the owner pauses it while model routing is in flight", async () => {
+    let dbRef: DatabaseSync;
+    const runDirector = vi.fn(async () => {
+      setControlMode(dbRef, "autonomy_paused", 1);
+      return { text: '{"model":"codex-a","reason":"fits the task"}' };
+    });
+    const { db, tools, spawned, agent } = setup(runDirector);
+    dbRef = db;
+    ensureControlStateSchema(db);
+    db.exec(`INSERT INTO agents (id,name,role,department_id,cli_provider) VALUES ('vp','VP','vp','planning','codex');
+      INSERT INTO settings(key,value) VALUES ('modelRoutingCandidates','{"codex":["codex-a","codex-b"]}');
+      UPDATE tasks SET origin='autonomy',assigned_agent_id='lead' WHERE id='research';`);
+    const result = await tools.startTaskExecutionForAgent("research", agent("lead"), "planning", "Planning");
+    expect(runDirector).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ ok: false, error: "the owner paused autonomy" });
+    expect(spawned).toEqual([]);
+    expect(db.prepare("SELECT status,started_at FROM tasks WHERE id='research'").get()).toEqual({
+      status: "planned",
+      started_at: null,
+    });
   });
 });

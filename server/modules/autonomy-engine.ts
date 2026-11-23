@@ -21,7 +21,8 @@ export function ensureAutonomyEngineSchema(db: DatabaseSync): void {
   ensureAgentProposalSchema(db);
   ensurePlaybookSchema(db);
   db.exec(`CREATE TABLE IF NOT EXISTS autonomy_engine_state(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS autonomy_start_reservations(work_id TEXT PRIMARY KEY,day TEXT NOT NULL,created_at INTEGER NOT NULL);`);
+    CREATE TABLE IF NOT EXISTS autonomy_start_reservations(work_id TEXT PRIMARY KEY,day TEXT NOT NULL,created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS autonomy_idea_start_reservations(work_id TEXT PRIMARY KEY,day TEXT NOT NULL,created_at INTEGER NOT NULL);`);
 }
 
 /**
@@ -128,23 +129,23 @@ export function admitAutonomyTaskStart(db: DatabaseSync, taskId: string, now = D
   const source = autonomyTaskStartBlockReason(db, taskId, now);
   if (source) return source;
   if (isResearchPhaseTask(task)) return null;
+  const idea = task.playbook_step === "operations:idea";
   const key = `task:${taskId}`;
   db.exec("BEGIN IMMEDIATE");
   try {
-    if (db.prepare("SELECT 1 FROM autonomy_start_reservations WHERE work_id=?").get(key)) {
+    const tableName = idea ? "autonomy_idea_start_reservations" : "autonomy_start_reservations";
+    if (db.prepare(`SELECT 1 FROM ${tableName} WHERE work_id=?`).get(key)) {
       db.exec("COMMIT");
       return null;
     }
     const day = autonomyDay(now),
       config = autonomyConfig(db);
-    const count = Number(
-      (db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations WHERE day=?").get(day) as Row).n,
-    );
-    if (count >= config.daily_start_cap) {
+    const count = Number((db.prepare(`SELECT COUNT(*) AS n FROM ${tableName} WHERE day=?`).get(day) as Row).n);
+    if (count >= (idea ? config.idea_daily_start_cap : config.daily_start_cap)) {
       db.exec("ROLLBACK");
-      return "Daily autonomous task start cap reached";
+      return idea ? "Daily idea task start cap reached" : "Daily autonomous task start cap reached";
     }
-    db.prepare("INSERT INTO autonomy_start_reservations(work_id,day,created_at) VALUES(?,?,?)").run(key, day, now);
+    db.prepare(`INSERT INTO ${tableName}(work_id,day,created_at) VALUES(?,?,?)`).run(key, day, now);
     db.exec("COMMIT");
     return null;
   } catch (error) {

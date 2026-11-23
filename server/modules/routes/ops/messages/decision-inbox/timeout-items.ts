@@ -45,7 +45,7 @@ export function buildTimeoutResumeDecisionItems(deps: TextFns): TimeoutResumeDec
     task_id: row.task_id,
     task_title: row.task_title,
     options: [
-      { number: 1, action: "resume_timeout_task", label: t("Resume Task") },
+      { number: 1, action: "resume_timeout_task", label: t("Resume from where it stopped (recommended)") },
       { number: 2, action: "keep_inbox", label: t("Keep in Inbox") },
     ],
   }));
@@ -80,7 +80,7 @@ export function buildReviewOwnerDecisionItems(deps: TextFns): ReviewOwnerDecisio
     task_id: String(row.task_id),
     task_title: String(row.task_title),
     options: [
-      { number: 1, action: "review_retry", label: "One more go with the review's list" },
+      { number: 1, action: "review_retry", label: "One more go with the review's list (recommended)" },
       { number: 2, action: "review_accept", label: "Accept it as is" },
       { number: 3, action: "review_drop", label: "Drop the task" },
     ],

@@ -56,7 +56,7 @@ const account: GitHubAccount = {
 };
 
 beforeEach(() => {
-  localStorage.setItem("climpire.language", "en");
+  localStorage.setItem("atlas.language", "en");
   vi.mocked(policiesApi.list).mockReset().mockResolvedValue(policies);
   vi.mocked(policiesApi.update).mockReset();
   for (const fn of Object.values(githubAccountsApi)) vi.mocked(fn).mockReset();

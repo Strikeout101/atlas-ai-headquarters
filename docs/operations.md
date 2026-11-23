@@ -20,7 +20,7 @@ How it works (`scripts/atlas-service/supervisor.mjs`):
 
 - Each release is a git worktree of one commit in `%LOCALAPPDATA%\ATLAS\releases`, with its own packages and built
   web app. The last three are kept.
-- The server runs from the release, but its data stays in the repo folder: `claw-empire.sqlite`, `logs\`,
+- The server runs from the release, but its data stays in the repo folder: `atlas.sqlite` (or `claw-empire.sqlite` until the rename below), `logs\`,
   `knowledge\`, `backups\` and `.env`.
 - It restarts after a crash (waiting 2s, then 4s, 8s ... up to a minute) and when `/api/health` fails three checks in a
   row.
@@ -39,7 +39,7 @@ browser-test runtime (`pnpm dev:e2e`, ports 8810/8811, its own database) instead
 Settings > General > Backups.
 
 - Every day at the chosen hour (default 3 AM), and at startup if the day's backup was missed, ATLAS copies the
-  database to `backups\auto\claw-empire-<date>-<time>.sqlite`.
+  database to `backups\auto\atlas-<date>-<time>.sqlite (older ones: claw-empire-<date>-<time>.sqlite)`.
 - Each copy is restore-tested: opened on its own, integrity-checked, and its row counts compared with the live
   database. A copy that fails is reported and never replaces or prunes good ones.
 - Copies older than the retention (default 30 days) are deleted, but the newest three are always kept. Manual
@@ -51,7 +51,7 @@ Settings > General > Backups.
 ### Restoring a backup
 
 ```powershell
-.\scripts\atlas-service\restore-backup.ps1 -Backup .\backups\auto\claw-empire-2026-11-18-030000.sqlite
+.\scripts\atlas-service\restore-backup.ps1 -Backup .\backups\auto\atlas-2026-11-18-030000.sqlite
 ```
 
 The script checks the backup, stops the service, saves the current database as
@@ -60,6 +60,9 @@ deleted. Close a dev server window yourself first; the script refuses while one 
 
 ## Updates from upstream
 
-ATLAS is a fork of claw-empire. The inherited auto-updater (which pulls upstream releases) is locked so it can never
-overwrite this fork: it does not check upstream and refuses to apply updates unless `ATLAS_ALLOW_UPSTREAM_UPDATE=1`
-is set in `.env`. Upstream changes are merged by hand in git.
+The upstream auto-updater ATLAS inherited has been removed, so nothing checks or pulls
+upstream releases. Upstream changes are merged by hand in git.
+
+## Renaming to ATLAS on disk
+
+`scripts/atlas-service/rename-to-atlas.ps1` renames the database file (`claw-empire.sqlite` → `atlas.sqlite`) and the repo folder (`claw-empire` → `atlas`). It's a dry run by default; add `-Apply` to do it. With `-Apply` it stops the service and removes its login task, backs up the database, renames, then installs the task again from the new folder. Close editors, terminals and agent sessions that have the folder open first. Until then ATLAS keeps working with `claw-empire.sqlite`.

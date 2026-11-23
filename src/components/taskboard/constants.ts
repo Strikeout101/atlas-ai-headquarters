@@ -1,10 +1,11 @@
+import { STORAGE_KEYS } from "../../storage-keys";
 import type { TaskStatus, TaskType } from "../../types";
 import type { UiLanguage } from "../../i18n";
 
 export type Locale = UiLanguage;
 export type TFunction = (messages: Record<Locale, string>) => string;
 
-const TASK_CREATE_DRAFTS_STORAGE_KEY = "climpire.taskCreateDrafts";
+const TASK_CREATE_DRAFTS_STORAGE_KEY = STORAGE_KEYS.taskCreateDrafts;
 
 export const HIDEABLE_STATUSES = ["done", "pending", "cancelled"] as const;
 export type HideableStatus = (typeof HIDEABLE_STATUSES)[number];

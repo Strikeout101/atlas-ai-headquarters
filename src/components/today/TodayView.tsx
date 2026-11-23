@@ -111,8 +111,9 @@ export default function TodayView({
     [tasks],
   );
 
-  const needsYouCount = approvals.length + decisionItems.length + inReview.length + readyDrafts.length;
-  const shownDecisions = decisionItems.slice(0, NEEDS_YOU_LIMIT);
+  const workflowDecisions = decisionItems.filter((item) => item.kind !== "approval");
+  const needsYouCount = approvals.length + workflowDecisions.length + inReview.length + readyDrafts.length;
+  const shownDecisions = workflowDecisions.slice(0, NEEDS_YOU_LIMIT);
   const shownReviews = inReview.slice(0, Math.max(0, NEEDS_YOU_LIMIT - shownDecisions.length));
 
   const agentFor = (task: Task): Agent | undefined =>
@@ -313,7 +314,7 @@ export default function TodayView({
               ))}
               {needsYouCount > shownDecisions.length + shownReviews.length && (
                 <li className="flex justify-end gap-2 px-5 py-2.5">
-                  {decisionItems.length > shownDecisions.length && (
+                  {workflowDecisions.length > shownDecisions.length && (
                     <button
                       type="button"
                       onClick={onOpenDecisionInbox}

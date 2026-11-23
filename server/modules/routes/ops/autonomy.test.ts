@@ -71,14 +71,48 @@ describe("autonomy owner API", () => {
       .send({ daily_start_cap: 99 })
       .expect(403);
   });
-  it("requires an explicit existing project with an absolute path and validates goal periods", async () => {
+  it("takes a goal without a project, refuses a bad one, and validates goal periods", async () => {
     const { create } = harness();
-    for (const project_id of [undefined, "missing", "relative"])
-      await create("goals", { ...goal, project_id }).expect(400);
+    // Goals belong to a business; a project (code workspace) is optional but must be real when given.
+    for (const project_id of ["missing", "relative"]) await create("goals", { ...goal, project_id }).expect(400);
+    const noProject = await create("goals", { ...goal, project_id: undefined }).expect(201);
+    expect(noProject.body.item.project_id).toBeNull();
+    await create("schedules", {
+      business: "ventures",
+      title: "Needs a folder",
+      kind: "research",
+      interval_minutes: 60,
+      next_run_at: 1,
+      enabled: 0,
+      department_id: null,
+    }).expect(400);
     await create("goals", { ...goal, business: "unknown" }).expect(400);
     await create("goals", { ...goal, period_end: 0 }).expect(400);
     await create("goals", { ...goal, target: -1 }).expect(400);
     await create("goals", goal).expect(201);
+  });
+  it("keeps a goal title and shows only recorded USD expenses against an initiative's USD budget", async () => {
+    const { create, patch, db } = harness();
+    const created = await create("goals", { ...goal, title: "Reach Etsy sales", project_id: null }).expect(201);
+    const goalId = created.body.item.id as string;
+    expect(created.body.item.title).toBe("Reach Etsy sales");
+    expect((await patch(`goals/${goalId}`, { title: "Reach Etsy sales monthly" }).expect(200)).body.item.title).toBe(
+      "Reach Etsy sales monthly",
+    );
+    const initiative = await create("initiatives", {
+      business: "ventures",
+      project_id: null,
+      goal_id: goalId,
+      title: "Budget workbook",
+      description: "",
+      budget: 30,
+    }).expect(201);
+    db.exec("CREATE TABLE ledger_entries (initiative_id TEXT, kind TEXT, currency TEXT, amount_minor INTEGER)");
+    const insert = db.prepare("INSERT INTO ledger_entries VALUES (?, 'expense', ?, ?)");
+    insert.run(initiative.body.item.id, "USD", 1250);
+    insert.run(initiative.body.item.id, "EUR", 900);
+    const listed = autonomyOverview(db).initiatives as Array<{ id: string; spent_minor: number }>;
+    expect(listed.find((item) => item.id === initiative.body.item.id)?.spent_minor).toBe(1250);
   });
   it("validates scores and linked goals and records budget without authorizing a spend", async () => {
     const { create, patch, db } = harness();
@@ -140,6 +174,11 @@ describe("autonomy owner API", () => {
       { daily_start_cap: 1.1 },
       { failure_limit: 0 },
       { planning_interval_minutes: 0 },
+      { think_enabled: 2 },
+      { think_interval_minutes: 59 },
+      { think_check_interval_minutes: 0 },
+      { think_max_pending_per_agent: -1 },
+      { idea_daily_start_cap: 101 },
       { id: 2 },
     ])
       await patch("config", body).expect(400);
@@ -150,12 +189,24 @@ describe("autonomy owner API", () => {
       usage_threshold: 0.7,
       failure_limit: 2,
       local_provider_daily_run_cap: 7,
+      think_enabled: 0,
+      think_interval_minutes: 2880,
+      think_check_interval_minutes: 60,
+      think_max_pending_per_agent: 3,
+      think_max_pending_total: 15,
+      idea_daily_start_cap: 1,
     }).expect(200);
     expect(autonomyConfig(db)).toMatchObject({
       daily_start_cap: 0,
       usage_threshold: 0.7,
       failure_limit: 2,
       local_provider_daily_run_cap: 7,
+      think_enabled: 0,
+      think_interval_minutes: 2880,
+      think_check_interval_minutes: 60,
+      think_max_pending_per_agent: 3,
+      think_max_pending_total: 15,
+      idea_daily_start_cap: 1,
     });
   });
   it("builds an honest digest with full counts when recent-event display is capped", async () => {

@@ -12,13 +12,12 @@ export type View =
   | "revenue"
   | "outreach"
   | "homelab"
-  | "model_director"
+  | "behind_scenes"
   | "vp_decisions"
   | "knowledge"
   | "skills"
   | "settings";
 export type TaskPanelTab = "terminal" | "minutes";
-export type RuntimeOs = "windows" | "mac" | "linux" | "unknown";
 
 export interface OAuthCallbackResult {
   provider: string | null;

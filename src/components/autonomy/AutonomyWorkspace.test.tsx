@@ -40,6 +40,87 @@ beforeEach(() => {
 });
 
 describe("autonomy planning", () => {
+  it("shows each goal's strategy, progress and initiatives with recorded USD spend", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAutonomy).mockResolvedValue({
+      ...overview,
+      goals: [
+        {
+          id: "g1",
+          business: "ventures",
+          project_id: null,
+          title: "Reach Etsy sales",
+          metric: "verified_revenue",
+          currency: "USD",
+          target: 500,
+          progress: 125,
+          period_start: 1,
+          period_end: Date.now() + 86400000,
+          initiative_slots: 2,
+        },
+      ],
+      strategies: [
+        {
+          id: "s1",
+          goal_id: "g1",
+          summary: "Test one printable niche before scaling.",
+          created_at: 1,
+          task_id: null,
+          version: 2,
+          status: "approved",
+        },
+      ],
+      initiatives: [
+        {
+          id: "i1",
+          business: "ventures",
+          project_id: "",
+          goal_id: "g1",
+          title: "Budget workbook",
+          description: "",
+          demand_score: 60,
+          revenue_score: 70,
+          cost_score: 20,
+          difficulty_score: 10,
+          time_to_launch_score: 10,
+          budget: 30,
+          spent_minor: 1250,
+          status: "blocked",
+          playbook_stage: "mockups",
+          blocked_reason: "Missing source file",
+        },
+        {
+          id: "i2",
+          business: "ventures",
+          project_id: "",
+          goal_id: "g1",
+          title: "Checklist printable",
+          description: "",
+          demand_score: 60,
+          revenue_score: 70,
+          cost_score: 20,
+          difficulty_score: 10,
+          time_to_launch_score: 10,
+          budget: 10,
+          spent_minor: 0,
+          status: "proposed",
+        },
+      ],
+    });
+    render(<AutonomyWorkspace departments={[]} />);
+    const goal = await screen.findByRole("region", { name: "Reach Etsy sales" });
+    expect(within(goal).getByText("$125.00 / $500.00")).toBeVisible();
+    expect(within(goal).getByText("Test one printable niche before scaling.")).toBeVisible();
+    expect(within(goal).getByText("Missing source file")).toBeVisible();
+    expect(within(goal).getAllByText(/Recorded USD spend/)[0]).toHaveTextContent("$12.50 / $30.00");
+    expect(within(goal).getByText("Checklist printable")).toBeVisible();
+    expect(within(goal).getAllByRole("link", { name: "View steps and reviews" })[0]).toHaveAttribute(
+      "href",
+      "/work?initiative=i1",
+    );
+    await user.click(within(goal).getByRole("button", { name: "Edit goal" }));
+    expect(screen.getByRole("form", { name: "Edit goals" })).toHaveFormValues({ title: "Reach Etsy sales" });
+  });
   it("shows the per-host invocation limit and persists the owner's cap including zero", async () => {
     const user = userEvent.setup();
     vi.mocked(saveAutonomyConfig).mockResolvedValue({ ok: true });
@@ -47,10 +128,15 @@ describe("autonomy planning", () => {
     await user.click(await screen.findByText("Operating limits"));
     const cap = screen.getByLabelText("Daily local provider invocations (per host)");
     expect(cap).toHaveValue(20);
+    expect(screen.getByLabelText("Check for free time every (minutes)")).toHaveValue(30);
+    expect(screen.getByLabelText("Daily idea task starts")).toHaveValue(2);
     fireEvent.change(cap, { target: { value: "0" } });
+    await user.selectOptions(screen.getByLabelText("Free-time ideas"), "0");
     await user.click(screen.getByRole("button", { name: "Save limits" }));
     await waitFor(() =>
-      expect(saveAutonomyConfig).toHaveBeenCalledWith(expect.objectContaining({ local_provider_daily_run_cap: 0 })),
+      expect(saveAutonomyConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ local_provider_daily_run_cap: 0, think_enabled: 0, idea_daily_start_cap: 2 }),
+      ),
     );
     expect(screen.getByText(/Autonomous paid API calls remain blocked/)).toBeVisible();
   });
@@ -59,6 +145,7 @@ describe("autonomy planning", () => {
     render(<AutonomyWorkspace departments={[]} />);
     await user.click(await screen.findByRole("button", { name: "Add goals" }));
     const form = screen.getByRole("form", { name: "Add goals" });
+    fireEvent.change(within(form).getByLabelText("Goal title"), { target: { value: "Revenue goal" } });
     await user.selectOptions(within(form).getByLabelText("Project"), "project-1");
     await user.selectOptions(within(form).getByLabelText("Metric"), "verified_revenue");
     await user.selectOptions(within(form).getByLabelText("Currency (financial goals)"), "JPY");
@@ -137,6 +224,7 @@ describe("autonomy planning", () => {
     render(<AutonomyWorkspace departments={[]} />);
     await user.click(await screen.findByRole("button", { name: "Add goals" }));
     const form = screen.getByRole("form", { name: "Add goals" });
+    fireEvent.change(within(form).getByLabelText("Goal title"), { target: { value: "Revenue goal" } });
     await user.selectOptions(within(form).getByLabelText("Project"), "project-1");
     await user.click(within(form).getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Settings > Security");

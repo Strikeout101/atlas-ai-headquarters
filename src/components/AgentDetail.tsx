@@ -587,15 +587,17 @@ export default function AgentDetail({
                     })}
                   >
                     🔧{" "}
-                    {agent.cli_provider === "api" && agent.api_model
-                      ? `API: ${agent.api_model}`
-                      : agent.cli_model &&
-                          CLI_MODEL_OVERRIDE_PROVIDERS.includes(agent.cli_provider) &&
-                          agent.cli_provider !== "api"
-                        ? `${CLI_LABELS[agent.cli_provider] ?? agent.cli_provider} · ${agent.cli_model}${agent.cli_provider === "codex" && agent.cli_reasoning_level ? ` (${agent.cli_reasoning_level})` : ""}`
-                        : agent.cli_provider === "codex" && agent.cli_reasoning_level
-                          ? `${CLI_LABELS[agent.cli_provider] ?? agent.cli_provider} · (${agent.cli_reasoning_level})`
-                          : (CLI_LABELS[agent.cli_provider] ?? agent.cli_provider)}
+                    {!agent.cli_provider
+                      ? t({ en: "No model yet (the VPs set one before its next task)" })
+                      : agent.cli_provider === "api" && agent.api_model
+                        ? `API: ${agent.api_model}`
+                        : agent.cli_model &&
+                            CLI_MODEL_OVERRIDE_PROVIDERS.includes(agent.cli_provider) &&
+                            agent.cli_provider !== "api"
+                          ? `${CLI_LABELS[agent.cli_provider] ?? agent.cli_provider} · ${agent.cli_model}${agent.cli_provider === "codex" && agent.cli_reasoning_level ? ` (${agent.cli_reasoning_level})` : ""}`
+                          : agent.cli_provider === "codex" && agent.cli_reasoning_level
+                            ? `${CLI_LABELS[agent.cli_provider] ?? agent.cli_provider} · (${agent.cli_reasoning_level})`
+                            : (CLI_LABELS[agent.cli_provider] ?? agent.cli_provider)}
                     <Pencil size={10} strokeWidth={1.75} className="ml-0.5 inline text-slate-500" />
                   </button>
                 )}

@@ -3,7 +3,7 @@
  * and field) is docs/agent-tools.md, which agents read with knowledge.get {"topic":"tools"}.
  */
 export function taskToolsScriptPath(cwd: string = process.cwd()): string {
-  return `${cwd.replace(/\\/g, "/")}/scripts/claw-agent-tool.mjs`;
+  return `${cwd.replace(/\\/g, "/")}/scripts/atlas-agent-tool.mjs`;
 }
 
 export function buildTaskToolsLine(scriptPath: string = taskToolsScriptPath()): string {

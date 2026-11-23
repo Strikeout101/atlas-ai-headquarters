@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { STORAGE_KEYS } from "./storage-keys";
 
 export type ThemeMode = "dark" | "light";
 
-const THEME_STORAGE_KEY = "climpire_theme";
+const THEME_STORAGE_KEY = STORAGE_KEYS.theme;
 
 interface ThemeContextValue {
   theme: ThemeMode;

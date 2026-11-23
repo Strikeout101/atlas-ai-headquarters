@@ -22,7 +22,7 @@ Rules of thumb:
 | `package.json`                               | Scripts: `test:api`, `test:web`, `test:e2e`, `lint`, `openapi:check`, `dev`, `dev:e2e`                   |
 | `.env` (private), `.env.example`             | Settings and secrets / template                                                                          |
 | `knowledge/` (private), `knowledge.example/` | Systems registry (`systems.md`: hosts, accounts, ports) / template                                       |
-| `claw-empire.sqlite` (private)               | The live database. Never edit it by hand; back up first (`backups/`)                                     |
+| `atlas.sqlite` (private)                     | The live database (`claw-empire.sqlite` until the owner runs `rename-to-atlas.ps1`). Back up first       |
 | `logs/`, `backups/`, `.tmp/` (private)       | Task and server logs; database backups; scratch and test runtimes                                        |
 | `public/`                                    | Static assets: 3D models (`models/atlas`), sprites, portraits, office map art, `atlas.svg` icon          |
 | `templates/AGENTS-empire.md`                 | AGENTS.md template installed for OpenClaw                                                                |
@@ -48,13 +48,15 @@ Rules of thumb:
 
 | File                            | What it does                                                                                                                                        |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `autonomy-store.ts`             | Tables: goals, initiatives, schedules, autonomy work, ledger, config                                                                                |
+| `autonomy-store.ts`             | Tables: goals, initiatives, schedules, ledger, and owner controls for the think loop and autonomous starts                                          |
 | `autonomy-planner.ts`           | VP beat: decides escalated (blocked) steps, re-scores ideas, adds variant tasks for launched initiatives                                            |
-| `autonomy-engine.ts`            | Start admission for autonomous tasks: usage gate, daily start cap (research exempt), pause controls                                                 |
+| `autonomy-engine.ts`            | Start admission for autonomous tasks: usage gate, daily start cap (research exempt), separate idea cap, pause controls                              |
+| `staffing.ts`                   | Leads and seniors: who takes a task (lead up to 2 important, routine to senior), rebalancing waiting work, hiring trigger                           |
+| `work-views.ts`                 | Read models for the Work board (goal → initiative, five columns), an initiative's step timeline, and per-agent Behind the scenes                    |
 | `task-review.ts`                | Reviews: reviewer pick (work type, other model), read-only review run, JSON verdict, auto-return, VP/owner escalation, `task_reviews`               |
 | `work-engine.ts`                | The step runner: research phase, owner approvals, playbook steps with hand-offs, retries/escalation, caps, schedules → tasks                        |
 | `autonomous-provider-budget.ts` | Caps autonomous local-provider invocations, including retries/resumes; blocks autonomous paid/unclassified APIs until an enforceable budget exists. |
-| `agent-proposals.ts`            | Think loop: idle agents suggest tasks                                                                                                               |
+| `agent-proposals.ts`            | Think loop: idle agents suggest Operations work; approved ideas become runnable tasks                                                               |
 | `finance-store.ts`              | Deals, ledger entries (verified money), spend requests                                                                                              |
 | `square-sync.ts`                | Read-only Square payment sync into the ledger                                                                                                       |
 | `listings.ts`                   | Etsy and itch.io listing packages, revisions of live Etsy listings, and the listing-fee budget                                                      |
@@ -118,27 +120,27 @@ Rules of thumb:
 
 ### server/modules/routes/ (HTTP API)
 
-| Path                                                                                 | What it is                                                                                          |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `core/tasks/`                                                                        | Task CRUD, run, stop, pause, resume, subtasks, auto-assign                                          |
-| `core/agents/`, `core/departments.ts`, `core/projects/`                              | Agents (spawn, process inspector), departments, projects (folder picker, paths)                     |
-| `core/github-routes.ts`, `core/update-auto/`                                         | GitHub import; the upstream updater (locked)                                                        |
-| `collab/`                                                                            | CEO chat, directives, delegation between departments, meetings coordination, report routing         |
-| `ops/agent-tools.ts`                                                                 | **Agent tool gateway** (`/api/agent-tools`): everything agents can call (see `docs/agent-tools.md`) |
-| `ops/approvals.ts`, `ops/approval-settings.ts`, `ops/vp-reviews.ts`                  | Approvals feed (Today), approval settings, VP decision log                                          |
-| `ops/autonomy.ts`, `ops/agent-proposals.ts`, `ops/org-requests.ts`                   | Goals, initiatives, schedules; suggested tasks; hiring requests                                     |
-| `ops/business*.ts`                                                                   | Business records (contacts, tickets, quotes, drafts), email, mailboxes, profiles, social accounts   |
-| `ops/finance.ts`, `ops/square.ts`, `ops/listings.ts`                                 | Deals, ledger, spend; Square; listing packages                                                      |
-| `ops/etsy.ts`, `ops/studio.ts`                                                       | Etsy connection, listing push/publish, shop listings and adopt; image studio and media library      |
-| `ops/knowledge.ts`                                                                   | Knowledge pages and memories (owner)                                                                |
-| `ops/system.ts`                                                                      | Service and backups (owner)                                                                         |
-| `ops/control.ts`                                                                     | Emergency controls                                                                                  |
-| `ops/homelab.ts`, `ops/ssh-approvals.ts`                                             | Homelab hosts and SSH approvals                                                                     |
-| `ops/model-routing.ts`, `ops/models-routes.ts`, `ops/api-providers.ts`, `ops/oauth/` | Models, API providers, provider sign-ins                                                            |
-| `ops/messages/`                                                                      | Chat, announcements, decision inbox, directives webhook (`/api/inbox`)                              |
-| `ops/task-reports/`, `ops/terminal/`, `ops/worktrees-and-usage.ts`                   | Reports, terminal logs, worktrees and usage                                                         |
-| `ops/skills/`, `ops/custom-skills.ts`, `ops/web-search.ts`                           | Skills library (global installs); web search settings                                               |
-| `ops/settings-stats.ts`, `ops/api-docs.ts`                                           | Settings and stats; Swagger page                                                                    |
+| Path                                                                                 | What it is                                                                                                                |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `core/tasks/`                                                                        | Task CRUD, run, stop, pause, resume, subtasks, auto-assign                                                                |
+| `core/agents/`, `core/departments.ts`, `core/projects/`                              | Agents (spawn, process inspector), departments, projects (folder picker, paths)                                           |
+| `core/github-routes.ts`                                                              | GitHub import                                                                                                             |
+| `collab/`                                                                            | CEO chat, directives, delegation between departments, meetings coordination, report routing                               |
+| `ops/agent-tools.ts`                                                                 | **Agent tool gateway** (`/api/agent-tools`): everything agents can call (see `docs/agent-tools.md`)                       |
+| `ops/approvals.ts`, `ops/approval-settings.ts`, `ops/vp-reviews.ts`                  | Approvals feed (Today), approval settings, VP decision log                                                                |
+| `ops/autonomy.ts`, `ops/agent-proposals.ts`, `ops/org-requests.ts`                   | Goals, initiatives, schedules; suggested tasks; hiring requests                                                           |
+| `ops/business*.ts`                                                                   | Business records (contacts, tickets, quotes, drafts), email, mailboxes, profiles, social accounts                         |
+| `ops/finance.ts`, `ops/square.ts`, `ops/listings.ts`                                 | Deals, ledger, spend; Square; listing packages                                                                            |
+| `ops/etsy.ts`, `ops/studio.ts`                                                       | Etsy connection, listing push/publish, shop listings and adopt; image studio and media library                            |
+| `ops/knowledge.ts`                                                                   | Knowledge pages and memories (owner)                                                                                      |
+| `ops/system.ts`                                                                      | Service and backups (owner)                                                                                               |
+| `ops/control.ts`                                                                     | Emergency controls                                                                                                        |
+| `ops/homelab.ts`, `ops/ssh-approvals.ts`                                             | Homelab hosts and SSH approvals                                                                                           |
+| `ops/model-routing.ts`, `ops/models-routes.ts`, `ops/api-providers.ts`, `ops/oauth/` | Models, API providers, provider sign-ins                                                                                  |
+| `ops/messages/`                                                                      | Chat, announcements, decision inbox (work decisions in `decision-inbox/work-items.ts`), directives webhook (`/api/inbox`) |
+| `ops/task-reports/`, `ops/terminal/`, `ops/worktrees-and-usage.ts`                   | Reports, terminal logs, worktrees and usage                                                                               |
+| `ops/skills/`, `ops/custom-skills.ts`, `ops/web-search.ts`                           | Skills library (global installs); web search settings                                                                     |
+| `ops/settings-stats.ts`, `ops/api-docs.ts`                                           | Settings and stats; Swagger page                                                                                          |
 
 ### server/modules/workflow/ (how tasks run)
 
@@ -170,7 +172,7 @@ Rules of thumb:
 | `i18n.ts`                                                                    | Text helper (`t({ en })`); English only                                                            |
 | `types/`                                                                     | Shared web types                                                                                   |
 | `components/today/`                                                          | Today page: approvals waiting, digest                                                              |
-| `components/autonomy/`                                                       | Goals (with milestones), initiatives, schedules                                                    |
+| `components/autonomy/`                                                       | `GoalsOverview.tsx` (progress, strategy, initiative cards and spend); milestones and schedules     |
 | `components/revenue/`, `components/listings/`                                | Revenue, ledger, income streams; listings                                                          |
 | `components/work/`, `components/taskboard/`                                  | Work views and the task board (task drawer, create modal)                                          |
 | `components/team/`                                                           | Team area: knowledge, VP decisions, model director                                                 |
@@ -180,7 +182,7 @@ Rules of thumb:
 | `components/agent-manager/`, `components/agent-detail/`                      | Agent and department editors                                                                       |
 | `components/project-manager/`                                                | Projects                                                                                           |
 | `components/skills-library/`, `components/skill-history/`                    | Skills                                                                                             |
-| `components/atlas-office/`, `components/office-view/`                        | 3D office and the older 2D office (parked)                                                         |
+| `components/atlas-office/`                                                   | The 3D ATLAS office (parked); the old 2D office was removed in phase 8                             |
 | `components/dashboard/`, `components/terminal-panel/`, `components/command/` | Dashboard widgets, terminal view, Ctrl+K command palette                                           |
 | `styles/`                                                                    | CSS                                                                                                |
 
@@ -189,10 +191,10 @@ Rules of thumb:
 | Path                                     | What it is                                                                                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `atlas-service/`                         | The Windows service: `supervisor.mjs`, `atlas-service.ps1` (install, update, status), `restore-backup.ps1`, `run-hidden.vbs`, `db-tool.mjs` |
-| `claw-agent-tool.mjs`                    | The command-line tool agents use to call the agent tool gateway                                                                             |
+| `atlas-agent-tool.mjs`                   | The command-line tool agents use to call the agent tool gateway                                                                             |
 | `run-e2e.mjs`, `prepare-e2e-runtime.mjs` | Browser tests in an isolated runtime (ports 8810/8811, own DB)                                                                              |
 | `openapi-contract.mjs`                   | `openapi:sync` / `openapi:check`                                                                                                            |
-| `qa/`                                    | Real-provider checks (autonomy cycle, local worker) and office QA scripts                                                                   |
+| `qa/`                                    | Real-provider and local-worker checks; work-restructure migration and disposable real-model passes                                          |
 | `setup.mjs`, `openclaw-setup.*`          | First-time setup and OpenClaw AGENTS install                                                                                                |
 | Others                                   | Upstream helpers (office map assets, staff cleanup, skill migration, audit log check)                                                       |
 

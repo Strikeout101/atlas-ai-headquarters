@@ -1,11 +1,10 @@
 import { useCallback, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as api from "../api";
-import { buildDecisionInboxItems } from "../components/chat/decision-inbox";
 import type { DecisionInboxItem } from "../components/chat/decision-inbox";
 import { LANGUAGE_USER_SET_STORAGE_KEY, normalizeLanguage, pickLang } from "../i18n";
 import type { Agent, CliStatusMap, CompanySettings, CompanyStats, Department, Message, Task } from "../types";
-import { mapWorkflowDecisionItemsLocalized } from "./decision-inbox";
+import { mapApprovalDecisionItems, mapWorkflowDecisionItemsLocalized } from "./decision-inbox";
 import { mergeSettingsWithDefaults, syncClientLanguage } from "./utils";
 import type { ProjectMetaPayload } from "./types";
 
@@ -223,7 +222,6 @@ export function useAppActions({
     async (nextInput: CompanySettings) => {
       const previousSettings = settings;
       const nextSettings = mergeSettingsWithDefaults(nextInput);
-      const autoUpdateChanged = Boolean(nextSettings.autoUpdateEnabled) !== Boolean(settings.autoUpdateEnabled);
       const saveRequestSeq = (settingsSaveRequestSeqRef.current += 1);
       const attemptedSnapshot = JSON.stringify(nextSettings);
       setSettings(nextSettings);
@@ -233,13 +231,6 @@ export function useAppActions({
       }
       try {
         await api.saveSettings(nextSettings);
-        if (autoUpdateChanged) {
-          try {
-            await api.setAutoUpdateEnabled(Boolean(nextSettings.autoUpdateEnabled));
-          } catch (syncErr) {
-            console.error("Auto update runtime sync failed:", syncErr);
-          }
-        }
       } catch (error) {
         const isLatestRequest = settingsSaveRequestSeqRef.current === saveRequestSeq;
         const currentSnapshot = JSON.stringify(settingsRef.current);
@@ -252,16 +243,6 @@ export function useAppActions({
     },
     [settings, setSettings],
   );
-
-  const handleDismissAutoUpdateNotice = useCallback(async () => {
-    if (!settings.autoUpdateNoticePending) return;
-    setSettings((prev) => ({ ...prev, autoUpdateNoticePending: false }));
-    try {
-      await api.saveSettingsPatch({ autoUpdateNoticePending: false });
-    } catch (error) {
-      console.error("Failed to persist auto-update notice dismissal:", error);
-    }
-  }, [settings.autoUpdateNoticePending, setSettings]);
 
   const handleOpenChat = useCallback(
     (agent: Agent) => {
@@ -287,13 +268,12 @@ export function useAppActions({
       const silent = options?.silent === true;
       if (!silent) setDecisionInboxLoading(true);
       try {
-        const [allMessages, workflowDecisionItems] = await Promise.all([
-          api.getMessages({ limit: 500 }),
+        const [workflowDecisionItems, approvals] = await Promise.all([
           api.getDecisionInbox(),
+          api.getPendingApprovals(),
         ]);
-        const agentDecisionItems = buildDecisionInboxItems(allMessages, agents);
         const workflowItems = mapWorkflowDecisionItemsLocalized(workflowDecisionItems, settings.language);
-        const merged = [...workflowItems, ...agentDecisionItems];
+        const merged = [...workflowItems, ...mapApprovalDecisionItems(approvals)];
         const deduped = new Map<string, DecisionInboxItem>();
         for (const item of merged) deduped.set(item.id, item);
         setDecisionInboxItems(Array.from(deduped.values()).sort((a, b) => b.createdAt - a.createdAt));
@@ -303,7 +283,7 @@ export function useAppActions({
         if (!silent) setDecisionInboxLoading(false);
       }
     },
-    [agents, settings.language, setDecisionInboxLoading, setDecisionInboxItems],
+    [settings.language, setDecisionInboxLoading, setDecisionInboxItems],
   );
 
   const handleOpenDecisionInbox = useCallback(() => {
@@ -353,15 +333,26 @@ export function useAppActions({
             task_id: item.taskId ?? undefined,
           });
           setDecisionInboxItems((prev) => prev.filter((entry) => entry.id !== item.id));
+        } else if (item.kind === "approval" && item.approval) {
+          if (option.action === "approval_hold") return;
+          if (option.action === "approval_approve" && item.approval.kind === "ssh_command") {
+            if (!item.approval.command) throw new Error("Review this command in Homelab before approving it.");
+            const where = item.approval.target_name ?? item.approval.target_host ?? item.approval.target_id;
+            if (!window.confirm(`Approve this exact SSH command on ${where}?\n\n${item.approval.command}`)) return;
+          }
+          await api.decidePendingApproval(item.approval, option.action === "approval_approve");
+          setDecisionInboxItems((prev) => prev.filter((entry) => entry.id !== item.id));
+          scheduleLiveSync(40);
+          await loadDecisionInbox();
         } else {
           const selectedAction = option.action ?? "";
           let payload: { note?: string; target_task_id?: string; selected_option_numbers?: number[] } | undefined;
-          if (selectedAction === "add_followup_request") {
+          if (selectedAction === "add_followup_request" || selectedAction === "strategy_redo") {
             const note = payloadInput?.note?.trim() ?? "";
-            if (!note) {
+            if (!note || (selectedAction === "strategy_redo" && note.length < 5)) {
               window.alert(
                 pickLang(locale, {
-                  en: "Additional request is empty.",
+                  en: "Please add a short note about what should change.",
                 }),
               );
               return;
@@ -447,7 +438,6 @@ export function useAppActions({
     handlePauseTask,
     handleResumeTask,
     handleSaveSettings,
-    handleDismissAutoUpdateNotice,
     handleOpenChat,
     loadDecisionInbox,
     handleOpenDecisionInbox,

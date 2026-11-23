@@ -28,7 +28,7 @@ const startSkillLearningMock = vi.mocked(startSkillLearning);
 const getAvailableLearnedSkillsMock = vi.mocked(getAvailableLearnedSkills);
 const getCustomSkillsMock = vi.mocked(getCustomSkills);
 const unlearnSkillMock = vi.mocked(unlearnSkill);
-const LANGUAGE_STORAGE_KEY = "climpire.language";
+const LANGUAGE_STORAGE_KEY = "atlas.language";
 type TestLocale = "en";
 
 const UI_TEXT: Record<

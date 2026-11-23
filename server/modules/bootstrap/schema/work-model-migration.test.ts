@@ -92,6 +92,8 @@ describe("work model migration", () => {
     const db = legacyDb();
     applyWorkModelMigration(db);
 
+    expect(db.prepare("SELECT title FROM business_goals WHERE id='g1'").get()).toEqual({ title: "Reach $2,000" });
+
     const tables = (
       db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>
     ).map((t) => t.name);

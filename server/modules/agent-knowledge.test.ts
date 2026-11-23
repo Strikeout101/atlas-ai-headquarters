@@ -259,7 +259,7 @@ describe("knowledge block", () => {
       checkpointText: `Goal: rewrite\n${"detail ".repeat(400)}\nRemaining: tests`,
       contextWindowTokens: 4096,
       departmentSharedPrompt: "Follow department rules",
-      taskToolsPath: "C:/claw-empire/scripts/claw-agent-tool.mjs",
+      taskToolsPath: "C:/atlas/scripts/atlas-agent-tool.mjs",
       worktreeBranch: "climpire/t-rental",
       knowledge: (maxBytes: number) => buildCompactKnowledgeBlock(db, "t-rental", maxBytes),
     };

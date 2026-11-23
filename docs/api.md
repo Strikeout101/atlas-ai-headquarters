@@ -1,6 +1,6 @@
 # API Contract Baseline
 
-This document defines a contributor-facing API baseline for Claw-Empire.
+This document defines a contributor-facing API baseline for ATLAS.
 It is intentionally compact and focused on frequently used endpoints.
 Current baseline target: `v1.2.4` (local snapshot, 2026-03-07).
 
@@ -231,10 +231,6 @@ or
 | GET    | `/api/github/repos/:owner/:repo/branches` | Remote GitHub branch list                                        |
 | POST   | `/api/github/clone`                       | Clone repository                                                 |
 | GET    | `/api/github/clone/:cloneId`              | Clone progress/status polling                                    |
-| GET    | `/api/update-status`                      | Update status                                                    |
-| GET    | `/api/update-auto-status`                 | Auto-update daemon status and lock state                         |
-| POST   | `/api/update-auto-config`                 | Toggle auto update                                               |
-| POST   | `/api/update-apply`                       | Trigger update apply flow immediately                            |
 
 ### Service and Backups
 
@@ -247,7 +243,7 @@ or
 | POST   | `/api/backups/run`                       | Back up now                                                                            |
 | POST   | `/api/backups/test-folder`               | Check a folder can be written to                                                       |
 
-All need the owner password session (CSRF for changes); agent task tokens are refused. The inherited upstream update routes (`/api/update-*`) are locked unless `ATLAS_ALLOW_UPSTREAM_UPDATE=1`. See docs/operations.md.
+All need the owner password session (CSRF for changes); agent task tokens are refused. See docs/operations.md.
 
 ### Accounts and Approvals
 

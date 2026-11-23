@@ -235,9 +235,9 @@ describe("model director routing", () => {
 
   it("accepts a request marker from the worktree and removes only that marker", () => {
     const db = database();
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "climpire-model-request-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-model-request-"));
     dirs.push(dir);
-    const marker = path.join(dir, ".climpire-model-upgrade.json");
+    const marker = path.join(dir, ".atlas-model-upgrade.json");
     fs.writeFileSync(marker, JSON.stringify({ reason: "The task needs a stronger model", model: "strong" }));
     const request = consumeModelUpgradeMarker(db, "task-1", dir);
     expect(request?.status).toBe("pending");

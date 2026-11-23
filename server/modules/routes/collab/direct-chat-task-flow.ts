@@ -135,14 +135,11 @@ export function createDirectTaskFlow(deps: TaskFlowDeps) {
     lang: Lang,
   ): void {
     if (agent.role === "team_leader" && agent.department_id) {
-      const taskAck = deps.pickL(
-        deps.l(["Project confirmed. I will escalate this into a task and proceed now."]),
-        lang,
-      );
+      const taskAck = deps.pickL(deps.l(["Got the project. I'll start the task now."]), lang);
       deps.sendInCharacterAutoMessage({
         agent,
         lang,
-        scenario: "Project binding has been confirmed. Confirm task escalation and immediate execution.",
+        scenario: "The project is confirmed. Tell the owner you'll start the task now in a casual sentence.",
         fallback: taskAck,
         options: taskOptions,
       });

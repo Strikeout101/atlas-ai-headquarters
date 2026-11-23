@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const runtimeDir = path.resolve(process.cwd(), ".tmp", "e2e-runtime");
 const logsDir = path.join(runtimeDir, "logs");
-const dbPath = path.join(runtimeDir, "claw-empire.e2e.sqlite");
+const dbPath = path.join(runtimeDir, "atlas.e2e.sqlite");
 
 fs.mkdirSync(runtimeDir, { recursive: true });
 

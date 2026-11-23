@@ -7,7 +7,7 @@ rotation change from rest:  R_target = R_source(t) * R_source_rest^-1 * R_target
 target's own bone lengths (forward kinematics), plus the hips' movement scaled by leg length.
 
 Run in Blender:
-    exec(open(r"C:\\Users\\Strikeout\\Projects\\Claw-Empire-Claude\\art\\blender\\build_atlas_director_avaturn.py").read())
+    exec(open(r"C:\\Users\\Strikeout\\Projects\\atlas\\art\\blender\\build_atlas_director_avaturn.py").read())
 Writes public/models/atlas/director.glb (replacing the Quaternius-based Director).
 """
 
@@ -16,7 +16,8 @@ import os
 import bpy
 from mathutils import Matrix
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 AVATAR = os.path.join(PROJECT, "Downloaded-Models", "characters", "director", "NewCEO.glb")
 UAL_GLB = os.path.join(PROJECT, "Downloaded-Models", "animations", "Universal Animation Library[Standard]",
                        "Unreal-Godot", "UAL1_Standard.glb")

@@ -8,13 +8,13 @@ const TABS: Array<{ view: View; icon: LucideIcon; label: { en: string } }> = [
   { view: "knowledge", icon: Brain, label: { en: "Knowledge" } },
   { view: "skills", icon: BookOpen, label: { en: "Library" } },
   {
-    view: "model_director",
+    view: "behind_scenes",
     icon: Clapperboard,
-    label: { en: "Model Director" },
+    label: { en: "Behind the scenes" },
   },
 ];
 
-/** Tabs across the Team area: agents and departments, the skills library, and model routing. */
+/** Tabs across the Team area: agents and departments, VP decisions, knowledge, the skills library and what every agent is doing. */
 export default function TeamTabs({ current, onChange }: { current: View; onChange: (view: View) => void }) {
   const { t } = useI18n();
   return (

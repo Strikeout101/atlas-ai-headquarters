@@ -9,7 +9,7 @@ test.beforeAll(async ({ request }) => {
   await request.get("/api/auth/session");
   const settings = await (await request.get("/api/settings")).json();
   expect(settings.settings.__e2eRuntimeId).toBe(runtimeId);
-  const db = new DatabaseSync(path.resolve(".tmp/e2e-runtime/claw-empire.e2e.sqlite"));
+  const db = new DatabaseSync(path.resolve(".tmp/e2e-runtime/atlas.e2e.sqlite"));
   try {
     const vp = db.prepare("SELECT id,name FROM agents WHERE role='vp' AND cli_provider='codex'").get() as {
       id: string;

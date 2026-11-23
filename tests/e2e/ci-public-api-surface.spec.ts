@@ -183,9 +183,7 @@ test.describe("CI public API surface", () => {
       );
       expect(pathCheckJson.normalized_path).toBe(projectPath);
 
-      const pathSuggestionsRes = await request.get(
-        `/api/projects/path-suggestions?q=${encodeURIComponent("climpire")}`,
-      );
+      const pathSuggestionsRes = await request.get(`/api/projects/path-suggestions?q=${encodeURIComponent("atlas")}`);
       const pathSuggestionsJson = await expectOkJson<{ ok: boolean; paths: string[] }>(
         pathSuggestionsRes,
         "GET /api/projects/path-suggestions",

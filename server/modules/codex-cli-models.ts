@@ -91,7 +91,7 @@ export function discoverCodexCliModels(timeoutMs = 10_000): Promise<CodexCliMode
         id: 1,
         method: "initialize",
         params: {
-          clientInfo: { name: "claw_empire", title: "Claw Empire", version: "2.0.4" },
+          clientInfo: { name: "atlas", title: "ATLAS", version: "2.0.4" },
           capabilities: { experimentalApi: false },
         },
       })}\n`,

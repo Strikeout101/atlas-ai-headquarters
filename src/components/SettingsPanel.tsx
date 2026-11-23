@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import ModelDirectorWorkspace from "./ModelDirectorWorkspace";
 import type { CliModelInfo, CliStatusMap, CompanySettings } from "../types";
 import * as api from "../api";
 import type { DeviceCodeStart, OAuthConnectProvider, OAuthStatus } from "../api";
@@ -134,7 +135,7 @@ export default function SettingsPanel({
     setForm(settings as LocalSettings);
     const syncedLocale = normalizeLanguage((settings as LocalSettings).language);
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, syncedLocale);
-    window.dispatchEvent(new Event("climpire-language-change"));
+    window.dispatchEvent(new Event("atlas-language-change"));
   }, [settings]);
 
   useEffect(() => {
@@ -191,7 +192,7 @@ export default function SettingsPanel({
   function handleSave() {
     const nextLocale = normalizeLanguage(form.language);
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLocale);
-    window.dispatchEvent(new Event("climpire-language-change"));
+    window.dispatchEvent(new Event("atlas-language-change"));
     persistSettings(form);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -464,6 +465,8 @@ export default function SettingsPanel({
       )}
 
       {tab === "api" && <ApiSettingsTab t={t} localeTag={localeTag} apiState={apiState} />}
+
+      {tab === "models" && <ModelDirectorWorkspace />}
 
       {tab === "gateway" && (
         <GatewaySettingsTab t={t} form={form} setForm={setForm} persistSettings={persistSettings} />

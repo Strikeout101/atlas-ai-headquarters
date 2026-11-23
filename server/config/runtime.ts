@@ -110,6 +110,20 @@ function resolveDefaultDataRoot(): string {
 }
 
 export const DEFAULT_DATA_ROOT = resolveDefaultDataRoot();
-export const DEFAULT_DB_PATH = path.join(DEFAULT_DATA_ROOT, "claw-empire.sqlite");
+export const DEFAULT_DB_PATH = path.join(DEFAULT_DATA_ROOT, "atlas.sqlite");
 export const DEFAULT_LOGS_DIR = path.join(DEFAULT_DATA_ROOT, "logs");
+/** The database's name before the rename to ATLAS (work restructure, phase 8). Still used while it is the only one. */
+export const PREVIOUS_DB_PATH = path.join(DEFAULT_DATA_ROOT, "claw-empire.sqlite");
 export const LEGACY_DB_PATH = path.join(process.cwd(), "climpire.sqlite");
+
+/**
+ * Which database file to open: DB_PATH if set, else atlas.sqlite, else the pre-rename claw-empire.sqlite.
+ * Never renames a live file here: an Update that rolls back to an older build must still find its database.
+ * The rename itself is done by scripts/atlas-service/rename-to-atlas.ps1 with the service stopped.
+ */
+export function resolveDbPath(exists: (file: string) => boolean): string {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  if (exists(DEFAULT_DB_PATH)) return DEFAULT_DB_PATH;
+  if (exists(PREVIOUS_DB_PATH)) return PREVIOUS_DB_PATH;
+  return DEFAULT_DB_PATH;
+}

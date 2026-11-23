@@ -30,7 +30,7 @@ const run = {
   started_at: Date.now(),
   finished_at: Date.now(),
   status: "ok" as const,
-  file: "C:/atlas/backups/auto/claw-empire-2026-11-18-030000.sqlite",
+  file: "C:/atlas/backups/auto/atlas-2026-11-18-030000.sqlite",
   size_bytes: 2 << 20,
   sha256: "x",
   check_detail: "integrity ok",

@@ -111,46 +111,23 @@ export function createConversationContextTools(deps: CreateConversationContextTo
       )
       .get(taskId) as { message: string } | undefined;
 
-    const reviewNotes = db
-      .prepare(
-        `
-    SELECT raw_note
-    FROM review_revision_history
-    WHERE task_id = ?
-    ORDER BY first_round DESC, id DESC
-    LIMIT 6
-  `,
-      )
-      .all(taskId) as Array<{ raw_note: string }>;
+    // The last review that asked for changes (task-review.ts), so a resumed run knows what to fix.
+    let reviewItems: string[] = [];
+    try {
+      const lastChanges = db
+        .prepare(
+          "SELECT items_json FROM task_reviews WHERE task_id = ? AND status = 'changes' ORDER BY created_at DESC LIMIT 1",
+        )
+        .get(taskId) as { items_json: string } | undefined;
+      reviewItems = lastChanges ? (JSON.parse(lastChanges.items_json) as string[]) : [];
+    } catch {
+      reviewItems = []; // reviews not set up in this database
+    }
 
-    const latestMeetingNotes = db
-      .prepare(
-        `
-    SELECT e.speaker_name, e.content
-    FROM meeting_minute_entries e
-    JOIN meeting_minutes m ON m.id = e.meeting_id
-    WHERE m.task_id = ?
-      AND m.meeting_type = 'review'
-    ORDER BY m.started_at DESC, m.created_at DESC, e.seq DESC
-    LIMIT 4
-  `,
-      )
-      .all(taskId) as Array<{ speaker_name: string; content: string }>;
-
-    const unresolvedLines = reviewNotes
-      .map((row) => row.raw_note.replace(/\s+/g, " ").trim())
+    const unresolvedLines = reviewItems
+      .map((item) => String(item).replace(/\s+/g, " ").trim())
       .filter(Boolean)
       .slice(0, 6);
-
-    const meetingLines = latestMeetingNotes
-      .map((row) => {
-        const clipped = summarizeForMeetingBubble(row.content, 140);
-        if (!clipped) return "";
-        return `${row.speaker_name}: ${clipped}`;
-      })
-      .filter(Boolean)
-      .reverse()
-      .slice(0, 4);
 
     const memoBlock = extractLatestProjectMemoBlock(taskRow?.description ?? "", 900);
     const normalizedResult = normalizeStreamChunk(taskRow?.result ?? "", { dropCliNoise: true }).trim();
@@ -160,12 +137,8 @@ export function createConversationContextTools(deps: CreateConversationContextTo
     if (latestHandoff?.message) lines.push(latestHandoff.message);
     if (latestRunSummary?.message) lines.push(`Last run: ${latestRunSummary.message}`);
     if (unresolvedLines.length > 0) {
-      lines.push("Unresolved checklist:");
+      lines.push("The last review asked for:");
       lines.push(...unresolvedLines.map((line) => `- ${line}`));
-    }
-    if (meetingLines.length > 0) {
-      lines.push("Latest review meeting highlights:");
-      lines.push(...meetingLines.map((line) => `- ${line}`));
     }
     if (memoBlock) {
       lines.push("Latest project memo excerpt:");

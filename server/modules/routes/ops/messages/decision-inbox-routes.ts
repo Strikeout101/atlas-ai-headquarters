@@ -9,6 +9,10 @@ import { handleTimeoutResumeDecisionReply } from "./decision-inbox/timeout-reply
 import { buildReviewOwnerDecisionItems, buildTimeoutResumeDecisionItems } from "./decision-inbox/timeout-items.ts";
 import { readYoloModeEnabled, runYoloDecisionAutopilot } from "./decision-inbox/yolo-mode.ts";
 import { resolveReviewByOwner } from "../../../task-review.ts";
+import { buildWorkDecisionItems } from "./decision-inbox/work-items.ts";
+import { decideStrategy } from "../../../goal-strategy.ts";
+import { approveInitiative, resolveEscalation } from "../../../work-engine.ts";
+import { hasValidCsrfToken, requireOwnerSession, shouldRequireCsrf } from "../../../../security/auth.ts";
 
 export type { DecisionReplyBridgeInput, DecisionReplyBridgeResult };
 
@@ -40,7 +44,11 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
 
   function getDecisionInboxItems(): DecisionInboxRouteItem[] {
     const text = { db, nowMs, getPreferredLanguage, pickL, l };
-    const items = [...buildReviewOwnerDecisionItems(text), ...buildTimeoutResumeDecisionItems(text)];
+    const items = [
+      ...buildWorkDecisionItems(db),
+      ...buildReviewOwnerDecisionItems(text),
+      ...buildTimeoutResumeDecisionItems(text),
+    ];
     items.sort((a, b) => b.created_at - a.created_at);
     return items;
   }
@@ -79,6 +87,36 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
         appendTaskLog(taskId, "error", `Owner's review decision failed: ${String(error)}`),
       );
       return { status: 200, payload: { ok: true, task_id: taskId, action } };
+    }
+
+    if (["strategy", "initiative_approval", "initiative_blocked"].includes(currentItem.kind)) {
+      const entityId = decisionId.slice(decisionId.indexOf(":") + 1);
+      const note = typeof body.note === "string" ? body.note.trim() : "";
+      try {
+        if (selectedOption.action === "strategy_approve" || selectedOption.action === "strategy_redo") {
+          decideStrategy(db, entityId, {
+            decision: selectedOption.action === "strategy_approve" ? "approve" : "redo",
+            note,
+          });
+        } else if (selectedOption.action === "initiative_approve") {
+          approveInitiative(db, entityId);
+        } else if (selectedOption.action === "initiative_defer") {
+          return { status: 200, payload: { ok: true, resolved: false, action: "initiative_defer" } };
+        } else if (selectedOption.action.startsWith("initiative_")) {
+          resolveEscalation(
+            db,
+            entityId,
+            { action: selectedOption.action.slice("initiative_".length) as "retry" | "skip" | "stop", notes: note },
+            "owner",
+          );
+        } else return { status: 400, payload: { error: "unknown_decision_action" } };
+        return {
+          status: 200,
+          payload: { ok: true, resolved: true, kind: currentItem.kind, action: selectedOption.action },
+        };
+      } catch (error) {
+        return { status: 400, payload: { error: error instanceof Error ? error.message : "decision_failed" } };
+      }
     }
 
     let status = 200;
@@ -164,6 +202,9 @@ export function registerDecisionInboxRoutes(ctx: RuntimeContext): DecisionInboxR
   });
 
   app.post("/api/decision-inbox/:id/reply", (req, res) => {
+    if (!requireOwnerSession(req, res)) return;
+    if (shouldRequireCsrf(req) && !hasValidCsrfToken(req))
+      return res.status(403).json({ error: "csrf_token_required" });
     const decisionId = String(req.params.id || "");
     const result = applyDecisionReply(decisionId, (req.body ?? {}) as Record<string, unknown>);
     runYoloAutopilot();

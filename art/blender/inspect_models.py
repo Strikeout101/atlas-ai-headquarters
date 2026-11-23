@@ -9,7 +9,8 @@ import os
 import bpy
 from mathutils import Vector
 
-PROJECT = r"C:\Users\Strikeout\Projects\Claw-Empire-Claude"
+import os
+PROJECT = os.environ.get("ATLAS_PROJECT", r"C:\Users\Strikeout\Projects\atlas")
 SRC = os.path.join(PROJECT, "Downloaded-Models")
 THUMBS = os.path.join(PROJECT, ".tmp", "thumbs")
 scene = bpy.data.scenes["ATLAS_Staging"]

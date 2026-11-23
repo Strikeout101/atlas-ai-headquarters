@@ -357,8 +357,6 @@ export interface CompanySettings {
   ceoName: string;
   autoAssign: boolean;
   yoloMode?: boolean;
-  autoUpdateEnabled: boolean;
-  autoUpdateNoticePending?: boolean;
   oauthAutoSwap?: boolean;
   theme: "dark" | "light";
   language: UiLanguage;
@@ -373,8 +371,6 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   ceoName: "CEO",
   autoAssign: true,
   yoloMode: false,
-  autoUpdateEnabled: false,
-  autoUpdateNoticePending: false,
   oauthAutoSwap: true,
   theme: "dark",
   language: "en",

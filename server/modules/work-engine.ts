@@ -29,6 +29,7 @@ import {
 } from "./goal-strategy.ts";
 import { ensureWorkModelSchema, type TaskImportance, type WorkType } from "./bootstrap/schema/work-model-migration.ts";
 import { formatHandoff, getHandoff } from "./work-model.ts";
+import { chooseAssignee, runStaffing } from "./staffing.ts";
 
 /**
  * The work engine (work restructure, phase 3; plan section 12b). One step runner for all autonomous work:
@@ -96,26 +97,16 @@ function note(
 // ── Who does a step ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Picks the agent for a step from its department. Important work goes to the lead, routine work to the senior
- * (phase 5 adds load-aware rules). A provider preference wins over the role, so research angles use both models.
+ * Picks the agent for a step from its department, by the lead/senior rules (staffing.ts): important work to the lead
+ * while they have room, routine work to the senior. A model preference narrows the choice first, so research angles
+ * use both models.
  */
 export function pickStepAgent(
   db: Db,
   departmentId: string,
   opts: { importance: TaskImportance; provider?: string | null; exclude?: string[] },
 ): Row | null {
-  const members = (
-    db
-      .prepare(
-        "SELECT * FROM agents WHERE department_id=? AND COALESCE(role,'')<>'vp' AND COALESCE(status,'idle')<>'offline' ORDER BY created_at, id",
-      )
-      .all(departmentId) as Row[]
-  ).filter((agent) => !opts.exclude?.includes(String(agent.id)));
-  if (!members.length) return null;
-  const isLead = (agent: Row) => agent.role === "team_leader";
-  const roleRank = (agent: Row) => (opts.importance === "important" ? (isLead(agent) ? 0 : 1) : isLead(agent) ? 1 : 0);
-  const providerRank = (agent: Row) => (opts.provider && agent.cli_provider !== opts.provider ? 1 : 0);
-  return [...members].sort((a, b) => providerRank(a) - providerRank(b) || roleRank(a) - roleRank(b))[0];
+  return chooseAssignee(db, departmentId, opts);
 }
 
 /** The department a research phase runs in: the playbook's research department, else Planning, else any staffed one. */
@@ -873,12 +864,18 @@ export async function startPlannedWork(db: Db, startTask: StartTask, now = Date.
       }
     }
     if (!isResearchPhaseTask(task)) {
+      const idea = task.playbook_step === "operations:idea";
       const starts = Number(
-        (db.prepare("SELECT COUNT(*) AS n FROM autonomy_start_reservations WHERE day=?").get(autonomyDay(now)) as Row)
-          .n,
+        (
+          db
+            .prepare(
+              `SELECT COUNT(*) AS n FROM ${idea ? "autonomy_idea_start_reservations" : "autonomy_start_reservations"} WHERE day=?`,
+            )
+            .get(autonomyDay(now)) as Row
+        ).n,
       );
-      if (starts >= config.daily_start_cap) {
-        note(db, "blocked", "Daily autonomous start cap reached", now);
+      if (starts >= (idea ? config.idea_daily_start_cap : config.daily_start_cap)) {
+        note(db, "blocked", idea ? "Daily idea start cap reached" : "Daily autonomous start cap reached", now);
         continue;
       }
     }
@@ -975,6 +972,8 @@ export async function runWorkEngineTick(deps: WorkEngineDeps): Promise<void> {
         );
       }
     }
+    // Leads and seniors: waiting work is rebalanced and overloaded teams ask for a hire (staffing.ts).
+    runStaffing(db, now);
     const started = await startPlannedWork(db, deps.startTask, now);
     for (const id of started) deps.broadcast?.("task_update", db.prepare("SELECT * FROM tasks WHERE id=?").get(id));
   } finally {

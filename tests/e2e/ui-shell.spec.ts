@@ -70,14 +70,19 @@ test.describe("ATLAS shell", () => {
     await expect(page.getByRole("tab", { name: "API", selected: true })).toBeVisible();
   });
 
-  test("Team is one area with three tabs and the renamed default agents", async ({ page }) => {
+  test("Team is one area with its tabs, Behind the scenes, and the renamed default agents", async ({ page }) => {
     await openApp(page, "/team");
     const tabs = page.getByRole("tablist", { name: "Team" });
     await expect(tabs.getByRole("tab", { name: "Agents", selected: true })).toBeVisible();
     await expect(page.getByText("Marcus").first()).toBeVisible();
-    await tabs.getByRole("tab", { name: "Model Director" }).click();
-    await expect(page).toHaveURL(/\/team\/models$/);
+    await expect(tabs.getByRole("tab", { name: "Model Director" })).toHaveCount(0);
+    await tabs.getByRole("tab", { name: "Behind the scenes" }).click();
+    await expect(page).toHaveURL(/\/team\/behind-the-scenes$/);
+    await expect(page.getByRole("region", { name: "Behind the scenes" }).getByRole("article").first()).toBeVisible();
     await expect(sidebar(page).locator('[aria-current="page"]')).toContainText("Team");
+    // Model routing moved to Settings > Models; the old address opens Settings.
+    await page.goto("/team/models");
+    await expect(page.getByRole("tab", { name: "Models" })).toBeVisible();
   });
 
   test("Settings removes the obsolete SSH tab while Homelab remains available", async ({ page }) => {
@@ -179,6 +184,7 @@ test.describe("ATLAS shell on a phone", () => {
       "/outreach",
       "/homelab",
       "/team",
+      "/team/behind-the-scenes",
       "/settings",
     ]) {
       await page.goto(path);

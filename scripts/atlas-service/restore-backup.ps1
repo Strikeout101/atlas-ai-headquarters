@@ -11,7 +11,7 @@
   Nothing is deleted: the database that was replaced stays in backups\.
 
 .EXAMPLE
-  .\scripts\atlas-service\restore-backup.ps1 -Backup .\backups\auto\claw-empire-2026-11-18-030000.sqlite
+  .\scripts\atlas-service\restore-backup.ps1 -Backup .\backups\auto\atlas-2026-11-18-030000.sqlite
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Backup,
@@ -23,7 +23,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoDir = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-if (-not $Database) { $Database = Join-Path $RepoDir "claw-empire.sqlite" }
+if (-not $Database) {
+  $Database = Join-Path $RepoDir "atlas.sqlite"
+  if (-not (Test-Path $Database)) { $Database = Join-Path $RepoDir "claw-empire.sqlite" }  # before the rename
+}
 $Backup = (Resolve-Path $Backup).Path
 $Service = Join-Path $PSScriptRoot "atlas-service.ps1"
 
@@ -52,7 +55,7 @@ if ((Test-Path $lock) -and (Get-Process -Id ([int](Get-Content $lock -Raw)) -Err
 }
 # The dev server (port 8790) only matters when restoring the real database.
 $ports = @($Port)
-if ($Database -eq (Join-Path $RepoDir "claw-empire.sqlite")) { $ports += 8790 }
+if ((Split-Path $Database -Parent) -eq $RepoDir) { $ports += 8790 }
 $listening = Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue
 if ($listening) { throw "ATLAS is still running (a port is in use). Close the dev server window, then run this again." }
 

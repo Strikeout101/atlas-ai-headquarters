@@ -41,7 +41,7 @@ describe("db runtime", () => {
   });
 
   it("initializeDatabaseRuntime sets up the DB and log folders", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "claw-empire-runtime-test-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "atlas-runtime-test-"));
     const dbPath = path.join(tmpDir, "test.sqlite");
     const logsDir = path.join(tmpDir, "logs");
     process.env.DB_PATH = dbPath;

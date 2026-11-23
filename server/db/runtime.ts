@@ -1,7 +1,13 @@
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-import { DEFAULT_DB_PATH, DEFAULT_LOGS_DIR, LEGACY_DB_PATH } from "../config/runtime.ts";
+import {
+  DEFAULT_DB_PATH,
+  DEFAULT_LOGS_DIR,
+  LEGACY_DB_PATH,
+  PREVIOUS_DB_PATH,
+  resolveDbPath,
+} from "../config/runtime.ts";
 
 export function readNonNegativeIntEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -47,16 +53,22 @@ export function initializeDatabaseRuntime(): {
   db: DatabaseSync;
   logsDir: string;
 } {
-  if (!process.env.DB_PATH && !fs.existsSync(DEFAULT_DB_PATH) && fs.existsSync(LEGACY_DB_PATH)) {
+  // A very old install (climpire.sqlite) with neither newer name: move it to atlas.sqlite once.
+  if (
+    !process.env.DB_PATH &&
+    !fs.existsSync(DEFAULT_DB_PATH) &&
+    !fs.existsSync(PREVIOUS_DB_PATH) &&
+    fs.existsSync(LEGACY_DB_PATH)
+  ) {
     fs.renameSync(LEGACY_DB_PATH, DEFAULT_DB_PATH);
     for (const suffix of ["-wal", "-shm"]) {
       const src = LEGACY_DB_PATH + suffix;
       if (fs.existsSync(src)) fs.renameSync(src, DEFAULT_DB_PATH + suffix);
     }
-    console.log("[ATLAS] Migrated database: climpire.sqlite -> claw-empire.sqlite");
+    console.log("[ATLAS] Migrated database: climpire.sqlite -> atlas.sqlite");
   }
 
-  const dbPath = process.env.DB_PATH ?? DEFAULT_DB_PATH;
+  const dbPath = resolveDbPath((file) => fs.existsSync(file));
   const db = new DatabaseSync(dbPath);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);

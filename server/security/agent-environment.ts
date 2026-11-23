@@ -9,7 +9,7 @@ export function agentEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJ
     "INBOX_WEBHOOK_SECRET",
   ])
     delete env[key];
-  env.CLAW_EMPIRE_AGENT_PROCESS = "1";
+  env.ATLAS_AGENT_PROCESS = "1";
   // No git credentials: the credential helper (the owner's own GitHub login) is switched off and git may not prompt,
   // so an agent's own `git push` fails. Reviewed work is pushed by ATLAS with the project's account.
   env.GIT_TERMINAL_PROMPT = "0";

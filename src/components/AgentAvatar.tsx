@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { Agent } from "../types";
 import { buildLookMap, lookForSprite, portraitUrl } from "./atlas-office/agentLooks";
 
-/** Map agent IDs to sprite numbers (stable order, same as OfficeView) */
+/** Map agent IDs to sprite numbers (stable order). */
 export function buildSpriteMap(agents: Agent[]): Map<string, number> {
   const map = new Map<string, number>();
   // 1) Agents with a sprite_number in the database

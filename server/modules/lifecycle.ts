@@ -9,6 +9,7 @@ import { startDiscordReceiver } from "../messenger/discord-receiver.ts";
 import { startTelegramReceiver } from "../messenger/telegram-receiver.ts";
 import { registerGracefulShutdownHandlers } from "./lifecycle/register-graceful-shutdown.ts";
 import { AUTONOMY_TICK_MS, runAutonomyTick } from "./agent-proposals.ts";
+import { autonomyConfig } from "./autonomy-store.ts";
 import { runVpReviewTick, VP_REVIEW_TICK_MS } from "./vp-review.ts";
 import { executeVpApproval } from "./vp-execution.ts";
 import { isAutonomyAllowed } from "./control-state.ts";
@@ -472,8 +473,14 @@ export function startLifecycle(ctx: RuntimeContext): void {
 
   // Agent autonomy (level 1): one eligible idle agent per tick thinks and may suggest tasks for the owner to approve.
   let autonomyTickRunning = false;
+  let lastAutonomyCheckAt = 0;
   const autonomyTick = async () => {
     if (autonomyTickRunning) return;
+    const now = Date.now();
+    // Disposable browser-test runtimes must never call real model subscriptions.
+    if (db.prepare("SELECT 1 FROM settings WHERE key='__e2eRuntimeId'").get()) return;
+    if (now - lastAutonomyCheckAt < autonomyConfig(db).think_check_interval_minutes * 60_000) return;
+    lastAutonomyCheckAt = now;
     autonomyTickRunning = true;
     try {
       await runAutonomyTick({

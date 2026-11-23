@@ -16,6 +16,7 @@ import {
 } from "./agent-proposals.ts";
 import { registerAgentProposalRoutes } from "./routes/ops/agent-proposals.ts";
 import { listPendingApprovals } from "./routes/ops/approvals.ts";
+import { autonomyConfig } from "./autonomy-store.ts";
 
 vi.mock("../oauth/helpers.ts", () => ({
   encryptSecret: (value: string) => value,
@@ -56,6 +57,16 @@ function harness() {
 const reply = (proposals: unknown[]) => ({ text: JSON.stringify({ proposals }) });
 
 describe("agent autonomy: who thinks", () => {
+  it("uses the owner's think interval, pending caps and on/off setting", async () => {
+    const db = harness();
+    autonomyConfig(db);
+    db.exec("UPDATE autonomy_config SET think_interval_minutes=1440, think_max_pending_per_agent=0");
+    expect(pickAgentDueForThinking(db, 10 * HOUR)).toBeNull();
+    db.exec("UPDATE autonomy_config SET think_max_pending_per_agent=2, think_max_pending_total=0");
+    expect(pickAgentDueForThinking(db, 10 * HOUR)).toBeNull();
+    db.exec("UPDATE autonomy_config SET think_max_pending_total=12, think_enabled=0");
+    await expect(runAutonomyTick({ db, runAgentOneShot: vi.fn(), now: () => 10 * HOUR })).resolves.toBeNull();
+  });
   it("lets team leaders and agents with the toggle on think, never agents with it off", () => {
     const db = harness();
     const seen: string[] = [];
@@ -124,6 +135,7 @@ describe("agent autonomy: thinking", () => {
           description: "Step-by-step",
           reason: "Faster recovery",
           project_id: "nope",
+          business: "tech",
         },
       ]),
     );
@@ -178,7 +190,8 @@ describe("agent autonomy: thinking", () => {
     expect(await runAutonomyTick({ db, runAgentOneShot, now: () => PROPOSAL_TTL_MS + 1 })).toBeNull();
     expect(runAgentOneShot).not.toHaveBeenCalled();
 
-    db.prepare("DELETE FROM settings").run();
+    // Once migrated, the new control owns the setting.
+    db.prepare("UPDATE autonomy_config SET think_enabled=1 WHERE id=1").run();
     runAgentOneShot.mockResolvedValue(reply([]));
     await runAutonomyTick({ db, runAgentOneShot, now: () => PROPOSAL_TTL_MS + 1 });
     expect(db.prepare("SELECT status FROM agent_task_proposals WHERE id = 'old'").get()).toEqual({ status: "expired" });
@@ -186,10 +199,11 @@ describe("agent autonomy: thinking", () => {
 
   it("reads JSON wrapped in prose or code fences and ignores garbage", () => {
     const opts = { projectIds: new Set<string>(), existingTitles: [] };
-    expect(parseProposalReply('Sure!\n```json\n{"proposals":[{"title":"Tidy the wiki"}]}\n```', opts)).toEqual([
-      { title: "Tidy the wiki", description: "", reason: "", project_id: null },
-    ]);
+    expect(
+      parseProposalReply('Sure!\n```json\n{"proposals":[{"title":"Tidy the wiki","business":"tech"}]}\n```', opts),
+    ).toEqual([{ title: "Tidy the wiki", description: "", reason: "", project_id: null, business: "tech" }]);
     expect(parseProposalReply('{"proposals":[]}', opts)).toEqual([]);
+    expect(parseProposalReply('{"proposals":[{"title":"Tidy the wiki"}]}', opts)).toEqual([]);
     expect(parseProposalReply("no json here", opts)).toBeNull();
     expect(parseProposalReply('{"proposals":"nope"}', opts)).toBeNull();
   });
